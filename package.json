@@ -1,0 +1,23 @@
+{
+	"name": "better-age",
+	"private": true,
+	"version": "0.0.1",
+	"scripts": {
+		"build": "pnpm -r --if-present run build",
+		"clean": "pnpm -r --if-present run clean",
+		"clean:all": "pnpm run clean && rimraf node_modules .llms/references",
+		"lint": "biome check .",
+		"lint:fix": "biome check . --write",
+		"format": "biome format --write .",
+		"typecheck": "pnpm -r --if-present run typecheck",
+		"test": "pnpm -r --if-present run test",
+		"check": "pnpm -r --if-present run check && biome check .",
+		"check:ci": "pnpm run check"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "2.4.10",
+		"rimraf": "catalog:",
+		"typescript": "catalog:"
+	},
+	"packageManager": "pnpm@10.20.0+sha512.cf9998222162dd85864d0a8102e7892e7ba4ceadebbf5a31f9c2fce48dfce317a9c53b9f6464d1ef9042cba2e02ae02a9f7c143a2b438cd93c91840f0192b9dd"
+}

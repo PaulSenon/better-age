@@ -1,0 +1,23 @@
+{
+	"$schema": "https://opencode.ai/config.json",
+
+	// ===========================================================================
+	// OpenCode Project Configuration Template
+	// ===========================================================================
+	// This file provides commented examples of ALL available configuration
+	// options. Uncomment and modify sections as needed for this project.
+	// Project config overrides global config (~/.config/opencode/opencode.jsonc)
+	// ===========================================================================
+
+	// --- MCP Servers -----------------------------------------------------------
+	// Configure Model Context Protocol servers
+	"mcp": {},
+
+	// --- Instructions ----------------------------------------------------------
+	// Include instruction files for the model
+	"instructions": [".cursor/rules/**/*.md", ".cursor/rules/**/*.mdc"],
+
+	// --- Disabled Providers ----------------------------------------------------
+	// Disable specific providers even if credentials are available
+	"disabled_providers": []
+}

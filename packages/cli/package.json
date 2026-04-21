@@ -1,0 +1,47 @@
+{
+	"name": "@better-age/cli",
+	"version": "0.0.1",
+	"type": "module",
+	"bin": {
+		"bage": "./dist/cli.cjs"
+	},
+	"files": [
+		"dist"
+	],
+	"scripts": {
+		"pack": "pnpm pack --pack-destination ./dist",
+		"build": "rimraf ./dist && node ./esbuild.config.mjs",
+		"clean": "rimraf ./dist",
+		"prepare": "effect-language-service patch",
+		"lint": "biome check .",
+		"lint:fix": "biome check . --write",
+		"typecheck": "tsc --noEmit",
+		"check": "pnpm run lint && pnpm run typecheck",
+		"test:unit": "vitest run -c vitest.unit.config.ts",
+		"test:integration": "vitest run -c vitest.integration.config.ts",
+		"pretest:e2e": "pnpm run build && pnpm run pack",
+		"test:e2e": "vitest run -c vitest.e2e.config.ts",
+		"test": "pnpm run test:unit && pnpm run test:integration"
+	},
+	"dependencies": {
+		"@effect/cli": "^0.75.0",
+		"@effect/platform": "^0.96.0",
+		"@effect/platform-node": "^0.106.0",
+		"age-encryption": "^0.3.0",
+		"effect": "^3.21.0"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "2.4.10",
+		"@effect/language-service": "^0.85.1",
+		"@effect/vitest": "^0.29.0",
+		"@secure-exec/runtime-wasmvm": "^0.1.0",
+		"@types/dockerode": "^4.0.1",
+		"@types/node": "^25.5.2",
+		"dockerode": "^4.0.10",
+		"esbuild": "^0.28.0",
+		"rimraf": "catalog:",
+		"secure-exec": "^0.2.1",
+		"typescript": "^6.0.2",
+		"vitest": "^3.2.4"
+	}
+}

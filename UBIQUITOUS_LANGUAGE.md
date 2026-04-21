@@ -1,0 +1,121 @@
+# Ubiquitous Language
+
+## Identity model
+
+| Term | Definition | Aliases to avoid |
+| --- | --- | --- |
+| **Identity** | A long-lived cryptographic identity rooted by one stable **Owner Id** and one current key snapshot. | Account, profile, user key |
+| **Owner Id** | The stable identifier of an **Identity** that survives key rotation. Canonical v0 text format: `bsid1_<16hex>`. | Identity id, canonical fingerprint, account id |
+| **Fingerprint** | The stable identifier of one concrete public key. | Identity id, owner id, key id |
+| **Display Name** | A human-readable name chosen by the identity owner. | Alias, id, username |
+| **Handle** | The ergonomic reference formed as `<display-name>#<first-8-hex-of-owner-id-body>`. Example: `toto#069f7576`. | Alias, identity id, key id |
+| **Identity String** | The versioned shareable one-line export of an **Identity** used by `me` and `add-identity`. Any future plaintext URL path hints are cosmetic only; decoded payload is authoritative. | Shared ref, identity ref, pubkey string |
+| **Identity Updated At** | The UTC timestamp for when an **Identity** snapshot became current. | Last seen at, exported at, rotated at |
+| **Known Identity** | A home-local address-book entry for an external **Identity**. | Contact, saved recipient, known host |
+| **Local Alias** | A home-local nickname pointing to one **Known Identity**. | Display name, handle, identity id |
+| **Forget Identity** | The local-only operation that removes one **Known Identity** from **Home State** without touching any **Payload**. | Revoke identity, delete recipient, unshare |
+
+## Payload model
+
+| Term | Definition | Aliases to avoid |
+| --- | --- | --- |
+| **Payload** | A caller-owned encrypted env file containing secrets, metadata, and granted access. | Bundle, bag, vault, project state |
+| **Payload Id** | The stable identifier of one **Payload** across normal rewrites. Canonical v0 text format: `bspld_<16hex>`. | Version id, file id, path |
+| **Recipient** | An **Identity** currently granted to decrypt one **Payload**. | Share target, contact, user |
+| **Recipient Entry** | The payload-stored snapshot of one granted **Recipient**. | ACL line, alias entry, recipient row |
+| **Grant** | The operation that adds or refreshes one **Recipient** in a **Payload**. | Share, send, invite |
+| **Revoke** | The operation that removes one **Recipient** from future rewritten versions of a **Payload**. | Delete, unshare, ban |
+| **Inspect** | The operation that reads non-secret **Payload** metadata and env key names. | Show recipients, ls, show |
+| **View** | The human plaintext-reading operation that opens one **Payload** inside the secure in-process viewer. | Read, cat, open |
+| **Update** | The explicit maintenance operation that rewrites a **Payload** only for schema migration or stale self-recipient refresh. | Repair, migrate, refresh |
+
+## Local state and lifecycle
+
+| Term | Definition | Aliases to avoid |
+| --- | --- | --- |
+| **Home State** | The local persisted state under the tool home directory. | Config, cache, metadata db |
+| **Key Rotation** | Replacing the current key of an **Identity** while keeping the same **Owner Id**. | Rekey identity, rename identity |
+| **Retired Key** | A previously active local key kept after **Key Rotation** for historical decryptability. | Old key, archived key |
+| **Display Snapshot** | The payload-stored or home-stored copy of a **Display Name** used only for UX. | Alias, canonical name |
+| **Preamble** | The static plaintext instructional header at the top of a payload file. | Metadata header, comments block |
+| **Envelope** | The decrypted structured payload body containing metadata plus `envText`. | Container, inner blob, payload json |
+| **You Marker** | A viewer-relative render hint such as `[you]` shown when a listed identity is the current local self identity. It is never persisted as payload or home-state data. | Me flag, self tag |
+| **Interactive Session** | The guided keyboard-navigable CLI mode entered through `bage interactive`. | Wizard, shell, menu mode |
+| **Secure Viewer** | The in-process scrollable readonly terminal surface used by **View**. It may render plaintext to the terminal UI, but it must never fall back to plaintext `stdout`. | Pager, less, cat view |
+
+## Varlock integration
+
+| Term | Definition | Aliases to avoid |
+| --- | --- | --- |
+| **Load** | The machine-only operation that decrypts one **Payload** and writes raw `.env` text to `stdout` for another process to consume. | Read, view, export, decrypt |
+| **Load Protocol** | The versioned stdout/stderr/exit-code contract used by other tools to invoke **Load** safely. | Machine interface, API, machine mode |
+| **Varlock Plugin** | The thin adapter that invokes `better-age` **Load** and injects the resulting env text into one `varlock` run. | Core, second CLI, loader |
+| **Launcher Prefix** | The user-configured command prefix that starts the `better-age` CLI before the plugin appends fixed `load` arguments. | Full command, runner, shell script |
+| **CLI Runtime Requirement** | The requirement that the `better-age` CLI be invokable at runtime by the **Varlock Plugin**. | Peer dependency, bundled CLI |
+
+## Relationships
+
+- An **Identity** has exactly one stable **Owner Id**.
+- An **Identity** has exactly one current **Fingerprint** at a time.
+- An **Identity String** exports one current snapshot of one **Identity**.
+- A **Known Identity** belongs to one local **Home State**.
+- A **Local Alias** points to exactly one **Known Identity**.
+- A **Forget Identity** removes one **Known Identity** from **Home State** only.
+- A **Payload** has exactly one stable **Payload Id**.
+- A **Payload** contains zero or more **Recipient Entries**.
+- A **Recipient Entry** refers to one **Identity** by **Owner Id** and current key snapshot.
+- A **Grant** adds or refreshes one **Recipient Entry** in a **Payload**.
+- A **Revoke** removes one **Recipient Entry** from future rewritten versions of a **Payload**.
+- A **View** opens one **Payload** in the **Secure Viewer** for human reading.
+- An **Update** may rewrite a **Payload** without changing non-self access intent.
+- A **Key Rotation** keeps the same **Owner Id** but changes the current **Fingerprint**.
+- A **Retired Key** belongs to one local **Identity** history in **Home State**.
+- A **Preamble** belongs to one **Payload** file but carries no sensitive metadata.
+- An **Envelope** belongs to one **Payload** and contains both metadata and env content.
+- A **You Marker** is computed at render time from current local self identity.
+- An **Interactive Session** routes human workflows through keyboard-select navigation.
+- A **Secure Viewer** belongs to the human UX path and is distinct from **Load**.
+- A **Load** reads exactly one **Payload** path per invocation.
+- A **Load Protocol** versions one stable contract for **Load** behavior.
+- A **Varlock Plugin** depends on the **Load Protocol** of the CLI.
+- A **Launcher Prefix** starts the CLI, but the plugin owns the appended `load` arguments.
+- A **CLI Runtime Requirement** belongs to the **Varlock Plugin** runtime, not to payload or identity domain state.
+
+## Example dialogue
+
+> **Dev:** "When I paste someone's `me` output into `grant`, am I granting an **Identity String** or a **Recipient**?"
+
+> **Domain expert:** "You pass an **Identity String**, but the payload stores a **Recipient Entry** for that **Identity**."
+
+> **Dev:** "So if `paul#1234abcd` rotates his key, is that still the same **Recipient**?"
+
+> **Domain expert:** "It is the same long-lived **Identity** by **Owner Id**, but the payload may need an **Update** or fresh **Grant** to store the new key snapshot."
+
+> **Dev:** "And my `Local Alias` for that Paul?"
+
+> **Domain expert:** "Purely local. It lives in **Home State** and must never leak into the **Payload**."
+
+> **Dev:** "What does `inspect` actually read then?"
+
+> **Domain expert:** "The **Envelope** inside the **Payload**. It shows non-secret metadata, **Recipient Entries**, and env key names, but never secret values."
+
+> **Dev:** "So how do humans read actual secret values now?"
+
+> **Domain expert:** "Through **View**, which opens the **Payload** inside the **Secure Viewer**. That is distinct from machine-only **Load**."
+
+> **Dev:** "And what does the varlock integration call?"
+
+> **Domain expert:** "The **Varlock Plugin** calls machine-only **Load** through a versioned **Load Protocol**. The plugin may use a custom **Launcher Prefix**, but it still owns the fixed `load` arguments."
+
+## Flagged ambiguities
+
+- "share" was used to mean both **Grant** and file delivery. Recommendation: do not use "share" in the base model.
+- "alias" was used for both owner-provided **Display Name** and local-only **Local Alias**. Recommendation: keep them distinct.
+- "identity id" was used to mean both **Owner Id** and **Fingerprint**. Recommendation: use **Owner Id** for long-lived identity continuity and **Fingerprint** for the current key.
+- "identity ref", "shared string", and "`me` output" were used for the same concept. Recommendation: standardize on **Identity String**.
+- "recipient" and "identity" were sometimes used interchangeably. Recommendation: an **Identity** exists independently; a **Recipient** is an **Identity** granted in a specific **Payload**.
+- "repair", "migrate", and "refresh" overlapped around payload maintenance. Recommendation: standardize on **Update** for the explicit command and reserve migration/refresh for implementation details.
+- "read", "view", "decrypt", and "export" were drifting across human and machine plaintext behavior. Recommendation: standardize on **View** for human reading and **Load** for machine plaintext output.
+- "machine interface" and "protocol" were used for the same CLI compatibility boundary. Recommendation: standardize on **Load Protocol** and reserve "protocol version" for the explicit `--protocol-version` flag.
+- "plugin", "core", and "adapter" were drifting. Recommendation: standardize on **Varlock Plugin** as a thin adapter and avoid implying a second core implementation.
+- "command" was ambiguous between a full shell command and a fixed binary name. Recommendation: standardize on **Launcher Prefix** for the user-provided shell string prefix that the plugin extends.

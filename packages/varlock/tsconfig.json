@@ -1,0 +1,23 @@
+{
+	"compilerOptions": {
+		"target": "ES2024",
+		"module": "NodeNext",
+		"moduleResolution": "NodeNext",
+		"strict": true,
+		"noUncheckedIndexedAccess": true,
+		"exactOptionalPropertyTypes": true,
+		"skipLibCheck": true,
+		"declaration": false,
+		"sourceMap": true,
+		"esModuleInterop": true,
+		"allowSyntheticDefaultImports": true,
+		"resolveJsonModule": true,
+		"types": ["node", "vitest/globals"]
+	},
+	"include": [
+		"src/**/*.ts",
+		"test/**/*.ts",
+		"vitest.unit.config.ts",
+		"vitest.integration.config.ts"
+	]
+}

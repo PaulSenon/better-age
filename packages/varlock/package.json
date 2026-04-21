@@ -1,0 +1,32 @@
+{
+	"name": "@better-age/varlock",
+	"version": "0.0.1",
+	"type": "module",
+	"files": [
+		"dist"
+	],
+	"exports": {
+		"./plugin": "./dist/plugin.cjs"
+	},
+	"scripts": {
+		"build": "rimraf ./dist && node ./esbuild.config.mjs",
+		"clean": "rimraf ./dist",
+		"lint": "biome check .",
+		"typecheck": "tsc --noEmit",
+		"check": "pnpm run lint && pnpm run typecheck",
+		"test:unit": "vitest run -c vitest.unit.config.ts",
+		"test:integration": "vitest run -c vitest.integration.config.ts",
+		"test": "pnpm run test:unit && pnpm run test:integration"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "2.4.10",
+		"@types/node": "^25.5.2",
+		"esbuild": "^0.28.0",
+		"rimraf": "catalog:",
+		"typescript": "catalog:",
+		"vitest": "^3.2.4"
+	},
+	"dependencies": {
+		"varlock": "^0.9.0"
+	}
+}
