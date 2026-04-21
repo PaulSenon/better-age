@@ -7,6 +7,7 @@ import {
 	InspectPayloadEnvelopeError,
 	InspectPayloadFileFormatError,
 	InspectPayloadPersistenceError,
+	InspectPayloadVersionError,
 } from "../../app/inspect-payload/InspectPayloadError.js";
 import { ResolvePayloadTarget } from "../../app/shared/ResolvePayloadTarget.js";
 import { ResolvePayloadTargetError } from "../../app/shared/ResolvePayloadTargetError.js";
@@ -92,7 +93,7 @@ const renderInspectOutput = (inspection: {
 		readonly localAlias: Option.Option<string>;
 	}>;
 	readonly secretCount: number;
-	readonly version: 1;
+	readonly version: 2;
 }) =>
 	[
 		"Payload",
@@ -134,6 +135,15 @@ export const runInspectPayload = (input: {
 		});
 
 		yield* Prompt.writeStdout(`${renderInspectOutput(result)}\n`);
+
+		if (result.needsUpdate.isRequired) {
+			yield* Prompt.writeStderr(
+				["Warning: payload should be updated", `Run: bage update ${result.path}`, ""].join(
+					"\n",
+				),
+			);
+		}
+
 		return "completed" as const;
 	}).pipe(
 		Effect.catchIf(
@@ -163,6 +173,15 @@ export const runInspectPayload = (input: {
 		Effect.catchIf(
 			(error): error is InspectPayloadEnvelopeError =>
 				error instanceof InspectPayloadEnvelopeError,
+			(error) =>
+				Effect.gen(function* () {
+					yield* Prompt.writeStderr(`${error.message}\n`);
+					return yield* Effect.fail(new InspectPayloadCommandFailedError());
+				}),
+		),
+		Effect.catchIf(
+			(error): error is InspectPayloadVersionError =>
+				error instanceof InspectPayloadVersionError,
 			(error) =>
 				Effect.gen(function* () {
 					yield* Prompt.writeStderr(`${error.message}\n`);

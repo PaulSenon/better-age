@@ -7,12 +7,17 @@ import { decodeIdentityAlias } from "../../domain/identity/IdentityAlias.js";
 import {
 	encodeIdentityString,
 	IdentityStringPayload,
+	toIdentityStringPayload,
 } from "../../domain/identity/IdentityString.js";
 import { IdentityUpdatedAt } from "../../domain/identity/IdentityUpdatedAt.js";
 import { KeyFingerprint } from "../../domain/identity/KeyFingerprint.js";
 import { OwnerId } from "../../domain/identity/OwnerId.js";
 import { PrivateKeyRelativePath } from "../../domain/identity/PrivateKeyRelativePath.js";
 import { PublicKey } from "../../domain/identity/PublicKey.js";
+import {
+	derivePublicIdentityFingerprint,
+	type PublicIdentity,
+} from "../../domain/identity/PublicIdentity.js";
 import { HomeRepository } from "../../port/HomeRepository.js";
 import { makeInMemoryHomeRepository } from "../create-user-identity/CreateUserIdentity.test-support.js";
 import { ImportIdentityString } from "./ImportIdentityString.js";
@@ -31,6 +36,12 @@ const paulPublicKey = Schema.decodeUnknownSync(PublicKey)("age1paulrecipient");
 const paulIdentityUpdatedAt = Schema.decodeUnknownSync(IdentityUpdatedAt)(
 	"2026-04-14T12:00:00.000Z",
 );
+const paulPublicIdentity: PublicIdentity = {
+	displayName: paulDisplayName,
+	identityUpdatedAt: paulIdentityUpdatedAt,
+	ownerId: paulOwnerId,
+	publicKey: paulPublicKey,
+};
 const olderPaulFingerprint = Schema.decodeUnknownSync(KeyFingerprint)(
 	"bs1_deadbeef01234567",
 );
@@ -58,28 +69,21 @@ const selfPrivateKeyPath = Schema.decodeUnknownSync(PrivateKeyRelativePath)(
 	"keys/active.key.age",
 );
 const selfIdentityString = encodeIdentityString(
-	Schema.decodeUnknownSync(IdentityStringPayload)({
-		displayName: selfDisplayName,
-		fingerprint: selfFingerprint,
-		handle: selfHandle,
-		identityUpdatedAt: selfIdentityUpdatedAt,
-		ownerId: selfOwnerId,
-		publicKey: selfPublicKey,
-		version: "v1",
-	}),
+	Schema.decodeUnknownSync(IdentityStringPayload)(
+		toIdentityStringPayload({
+			displayName: selfDisplayName,
+			identityUpdatedAt: selfIdentityUpdatedAt,
+			ownerId: selfOwnerId,
+			publicKey: selfPublicKey,
+		}),
+	),
 );
 
 const makeIdentityString = () =>
 	encodeIdentityString(
-		Schema.decodeUnknownSync(IdentityStringPayload)({
-			displayName: paulDisplayName,
-			fingerprint: paulFingerprint,
-			handle: paulHandle,
-			identityUpdatedAt: paulIdentityUpdatedAt,
-			ownerId: paulOwnerId,
-			publicKey: paulPublicKey,
-			version: "v1",
-		}),
+		Schema.decodeUnknownSync(IdentityStringPayload)(
+			toIdentityStringPayload(paulPublicIdentity),
+		),
 	);
 
 describe("ImportIdentityString", () => {
@@ -107,13 +111,11 @@ describe("ImportIdentityString", () => {
 				expect(state.knownIdentities).toHaveLength(1);
 				expect(state.knownIdentities[0]).toEqual({
 					displayName: paulDisplayName,
-					fingerprint: paulFingerprint,
-					handle: paulHandle,
 					identityUpdatedAt: paulIdentityUpdatedAt,
-					localAlias: Option.none(),
 					ownerId: paulOwnerId,
 					publicKey: paulPublicKey,
 				});
+				expect(state.localAliases).toEqual({});
 			}),
 		);
 
@@ -131,9 +133,9 @@ describe("ImportIdentityString", () => {
 					});
 					const state = yield* homeRepository.loadState;
 
-					expect(state.knownIdentities[0]?.localAlias).toEqual(
-						Option.some(localAlias),
-					);
+					expect(state.localAliases).toEqual({
+						[paulOwnerId]: localAlias,
+					});
 				}),
 		);
 
@@ -150,14 +152,14 @@ describe("ImportIdentityString", () => {
 						knownIdentities: [
 							{
 								displayName: paulDisplayName,
-								fingerprint: olderPaulFingerprint,
-								handle: paulHandle,
 								identityUpdatedAt: olderPaulIdentityUpdatedAt,
-								localAlias: Option.some(localAlias),
 								ownerId: paulOwnerId,
 								publicKey: olderPaulPublicKey,
 							},
 						],
+						localAliases: {
+							[paulOwnerId]: localAlias,
+						},
 					});
 
 					const result = yield* ImportIdentityString.execute({
@@ -167,12 +169,9 @@ describe("ImportIdentityString", () => {
 
 					expect(result.outcome).toBe("updated");
 					expect(nextState.knownIdentities).toHaveLength(1);
-					expect(nextState.knownIdentities[0]?.localAlias).toEqual(
-						Option.some(localAlias),
-					);
-					expect(nextState.knownIdentities[0]?.fingerprint).toBe(
-						paulFingerprint,
-					);
+					expect(nextState.localAliases).toEqual({
+						[paulOwnerId]: localAlias,
+					});
 					expect(nextState.knownIdentities[0]?.publicKey).toBe(paulPublicKey);
 					expect(nextState.knownIdentities[0]?.identityUpdatedAt).toBe(
 						paulIdentityUpdatedAt,
@@ -194,14 +193,14 @@ describe("ImportIdentityString", () => {
 						knownIdentities: [
 							{
 								displayName: paulDisplayName,
-								fingerprint: olderPaulFingerprint,
-								handle: paulHandle,
 								identityUpdatedAt: olderPaulIdentityUpdatedAt,
-								localAlias: Option.some(previousAlias),
 								ownerId: paulOwnerId,
 								publicKey: olderPaulPublicKey,
 							},
 						],
+						localAliases: {
+							[paulOwnerId]: previousAlias,
+						},
 					});
 
 					yield* ImportIdentityString.execute({
@@ -210,9 +209,9 @@ describe("ImportIdentityString", () => {
 					});
 					const nextState = yield* homeRepository.loadState;
 
-					expect(nextState.knownIdentities[0]?.localAlias).toEqual(
-						Option.some(nextAlias),
-					);
+					expect(nextState.localAliases).toEqual({
+						[paulOwnerId]: nextAlias,
+					});
 				}),
 		);
 
@@ -227,14 +226,14 @@ describe("ImportIdentityString", () => {
 					knownIdentities: [
 						{
 							displayName: paulDisplayName,
-							fingerprint: paulFingerprint,
-							handle: paulHandle,
 							identityUpdatedAt: newerPaulIdentityUpdatedAt,
-							localAlias: Option.some(localAlias),
 							ownerId: paulOwnerId,
 							publicKey: newerPaulPublicKey,
 						},
 					],
+					localAliases: {
+						[paulOwnerId]: localAlias,
+					},
 				});
 
 				const result = yield* ImportIdentityString.execute({
@@ -243,9 +242,9 @@ describe("ImportIdentityString", () => {
 				const nextState = yield* homeRepository.loadState;
 
 				expect(result.outcome).toBe("unchanged");
-				expect(nextState.knownIdentities[0]?.localAlias).toEqual(
-					Option.some(localAlias),
-				);
+				expect(nextState.localAliases).toEqual({
+					[paulOwnerId]: localAlias,
+				});
 				expect(nextState.knownIdentities[0]?.publicKey).toBe(
 					newerPaulPublicKey,
 				);
@@ -276,14 +275,14 @@ describe("ImportIdentityString", () => {
 					...emptyHomeState(),
 					self: Option.some({
 						createdAt: "2026-04-14T10:00:00.000Z",
-						displayName: selfDisplayName,
-						fingerprint: selfFingerprint,
-						handle: selfHandle,
-						identityUpdatedAt: selfIdentityUpdatedAt,
 						keyMode: "pq-hybrid",
-						ownerId: selfOwnerId,
 						privateKeyPath: selfPrivateKeyPath,
-						publicKey: selfPublicKey,
+						publicIdentity: {
+							displayName: selfDisplayName,
+							identityUpdatedAt: selfIdentityUpdatedAt,
+							ownerId: selfOwnerId,
+							publicKey: selfPublicKey,
+						},
 					}),
 				});
 

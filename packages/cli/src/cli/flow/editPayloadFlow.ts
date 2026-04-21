@@ -5,6 +5,7 @@ import {
 	EditPayloadEnvError,
 	type EditPayloadPersistenceError,
 	EditPayloadUpdateRequiredError,
+	type EditPayloadVersionError,
 } from "../../app/edit-payload/EditPayloadError.js";
 import { ResolveEditorCommand } from "../../app/shared/ResolveEditorCommand.js";
 import type {
@@ -21,6 +22,7 @@ import type {
 	UpdatePayloadFileFormatError,
 	UpdatePayloadNoSelfIdentityError,
 	UpdatePayloadPersistenceError,
+	UpdatePayloadVersionError,
 } from "../../app/update-payload/UpdatePayloadError.js";
 import { Editor } from "../../port/Editor.js";
 import type {
@@ -58,6 +60,7 @@ export type EditPayloadFlowError =
 	| EditPayloadEnvError
 	| EditPayloadPersistenceError
 	| EditPayloadUpdateRequiredError
+	| EditPayloadVersionError
 	| EditorExitError
 	| EditorLaunchError
 	| EditorUnavailableError
@@ -74,7 +77,8 @@ export type EditPayloadFlowError =
 	| UpdatePayloadEnvError
 	| UpdatePayloadFileFormatError
 	| UpdatePayloadNoSelfIdentityError
-	| UpdatePayloadPersistenceError;
+	| UpdatePayloadPersistenceError
+	| UpdatePayloadVersionError;
 
 export type EditPayloadFlowContext =
 	| EditPayload

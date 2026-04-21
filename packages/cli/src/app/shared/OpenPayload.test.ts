@@ -2,12 +2,15 @@ import { describe, expect, layer } from "@effect/vitest";
 import { Effect, Layer, Option, Schema } from "effect";
 import { emptyHomeState } from "../../domain/home/HomeState.js";
 import { DisplayName } from "../../domain/identity/DisplayName.js";
-import { Handle } from "../../domain/identity/Handle.js";
 import { IdentityUpdatedAt } from "../../domain/identity/IdentityUpdatedAt.js";
 import { KeyFingerprint } from "../../domain/identity/KeyFingerprint.js";
 import { OwnerId } from "../../domain/identity/OwnerId.js";
 import { PrivateKeyRelativePath } from "../../domain/identity/PrivateKeyRelativePath.js";
 import { PublicKey } from "../../domain/identity/PublicKey.js";
+import {
+	derivePublicIdentityFingerprint,
+	derivePublicIdentityHandle,
+} from "../../domain/identity/PublicIdentity.js";
 import { serializePayloadFile } from "../../domain/payload/PayloadFile.js";
 import { HomeRepository } from "../../port/HomeRepository.js";
 import {
@@ -21,7 +24,6 @@ const selfDisplayName = Schema.decodeUnknownSync(DisplayName)("isaac-mbp");
 const selfFingerprint = Schema.decodeUnknownSync(KeyFingerprint)(
 	"bs1_0123456789abcdef",
 );
-const selfHandle = Schema.decodeUnknownSync(Handle)("isaac-mbp#069f7576");
 const selfIdentityUpdatedAt = Schema.decodeUnknownSync(IdentityUpdatedAt)(
 	"2026-04-14T10:00:00.000Z",
 );
@@ -35,7 +37,6 @@ const paulDisplayName = Schema.decodeUnknownSync(DisplayName)("paul");
 const paulFingerprint = Schema.decodeUnknownSync(KeyFingerprint)(
 	"bs1_aaaaaaaaaaaaaaaa",
 );
-const paulHandle = Schema.decodeUnknownSync(Handle)("paul#aaaaaaaa");
 const paulIdentityUpdatedAt = Schema.decodeUnknownSync(IdentityUpdatedAt)(
 	"2026-04-14T11:00:00.000Z",
 );
@@ -63,14 +64,14 @@ describe("OpenPayload", () => {
 						activeKeyFingerprint: Option.some(selfFingerprint),
 						self: Option.some({
 							createdAt: "2026-04-14T10:00:00.000Z",
-							displayName: selfDisplayName,
-							fingerprint: selfFingerprint,
-							handle: selfHandle,
-							identityUpdatedAt: selfIdentityUpdatedAt,
 							keyMode: "pq-hybrid",
-							ownerId: selfOwnerId,
 							privateKeyPath: selfPrivateKeyPath,
-							publicKey: selfPublicKey,
+							publicIdentity: {
+								displayName: selfDisplayName,
+								identityUpdatedAt: selfIdentityUpdatedAt,
+								ownerId: selfOwnerId,
+								publicKey: selfPublicKey,
+							},
 						}),
 						rotationTtl: "3m",
 					});
@@ -91,21 +92,19 @@ describe("OpenPayload", () => {
 						payloadId: "bspld_0123456789abcdef",
 						recipients: [
 							{
-								displayNameSnapshot: selfDisplayName,
-								fingerprint: selfFingerprint,
+								displayName: selfDisplayName,
 								identityUpdatedAt: selfIdentityUpdatedAt,
 								ownerId: selfOwnerId,
 								publicKey: selfPublicKey,
 							},
 							{
-								displayNameSnapshot: paulDisplayName,
-								fingerprint: paulFingerprint,
+								displayName: paulDisplayName,
 								identityUpdatedAt: paulIdentityUpdatedAt,
 								ownerId: paulOwnerId,
 								publicKey: paulPublicKey,
 							},
 						],
-						version: 1,
+						version: 2,
 					});
 
 					const result = yield* OpenPayload.execute({
@@ -123,14 +122,12 @@ describe("OpenPayload", () => {
 					expect(result.nextState.knownIdentities).toEqual([
 						{
 							displayName: paulDisplayName,
-							fingerprint: paulFingerprint,
-							handle: paulHandle,
 							identityUpdatedAt: paulIdentityUpdatedAt,
-							localAlias: Option.none(),
 							ownerId: paulOwnerId,
 							publicKey: paulPublicKey,
 						},
 					]);
+					expect(result.nextState.localAliases).toEqual({});
 					expect(payloadCrypto.snapshot().decryptCalls).toEqual([
 						{
 							armoredPayload: "FAKE-ARMORED-PAYLOAD",

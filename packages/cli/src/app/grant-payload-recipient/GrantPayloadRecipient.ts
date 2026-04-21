@@ -13,6 +13,7 @@ import {
 	GrantPayloadRecipientUnchangedSuccess,
 	GrantPayloadRecipientUpdatedSuccess,
 	GrantPayloadRecipientUpdateRequiredError,
+	GrantPayloadRecipientVersionError,
 } from "./GrantPayloadRecipientError.js";
 
 export class GrantPayloadRecipient extends Effect.Service<GrantPayloadRecipient>()(
@@ -52,6 +53,10 @@ export class GrantPayloadRecipient extends Effect.Service<GrantPayloadRecipient>
 										return new GrantPayloadRecipientEnvError({
 											message: error.message,
 										});
+									case "OpenPayloadVersionError":
+										return new GrantPayloadRecipientVersionError({
+											message: error.message,
+										});
 								}
 							}),
 						);
@@ -66,6 +71,7 @@ export class GrantPayloadRecipient extends Effect.Service<GrantPayloadRecipient>
 					const resolution = resolveGrantIdentityRef({
 						identityRef: input.identityRef,
 						knownIdentities: openedPayload.nextState.knownIdentities,
+						localAliases: openedPayload.nextState.localAliases,
 						selfIdentity: openedPayload.nextState.self,
 					});
 

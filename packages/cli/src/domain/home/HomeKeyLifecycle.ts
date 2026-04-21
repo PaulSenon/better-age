@@ -1,10 +1,11 @@
 import { Option, Schema } from "effect";
 import type { GeneratedIdentity } from "../../port/Crypto.js";
-import { toHandle } from "../identity/Handle.js";
+import type { SelfIdentity } from "../identity/Identity.js";
 import {
 	PrivateKeyRelativePath,
 	type PrivateKeyRelativePath as PrivateKeyRelativePathType,
 } from "../identity/PrivateKeyRelativePath.js";
+import { derivePublicIdentityFingerprint } from "../identity/PublicIdentity.js";
 import type { HomeState } from "./HomeState.js";
 
 export const toRetiredPrivateKeyPath = (fingerprint: string) =>
@@ -18,7 +19,9 @@ export const buildRotatedHomeState = (input: {
 	readonly privateKeyPath: PrivateKeyRelativePathType;
 	readonly rotatedIdentity: GeneratedIdentity;
 }) => {
-	const selfIdentity = input.previousState.self.pipe(Option.getOrUndefined);
+	const selfIdentity = input.previousState.self.pipe(
+		Option.getOrUndefined,
+	) as SelfIdentity | undefined;
 
 	if (selfIdentity === undefined) {
 		throw new Error(
@@ -31,23 +34,23 @@ export const buildRotatedHomeState = (input: {
 		activeKeyFingerprint: Option.some(input.rotatedIdentity.fingerprint),
 		retiredKeys: [
 			{
-				fingerprint: selfIdentity.fingerprint,
-				privateKeyPath: toRetiredPrivateKeyPath(selfIdentity.fingerprint),
+				fingerprint: derivePublicIdentityFingerprint(selfIdentity.publicIdentity),
+				privateKeyPath: toRetiredPrivateKeyPath(
+					derivePublicIdentityFingerprint(selfIdentity.publicIdentity),
+				),
 				retiredAt: input.now,
 			},
 			...input.previousState.retiredKeys,
 		],
 		self: Option.some({
 			...selfIdentity,
-			fingerprint: input.rotatedIdentity.fingerprint,
-			handle: toHandle({
-				displayName: selfIdentity.displayName,
-				ownerId: input.rotatedIdentity.ownerId,
-			}),
-			identityUpdatedAt: input.rotatedIdentity.identityUpdatedAt,
-			ownerId: input.rotatedIdentity.ownerId,
 			privateKeyPath: input.privateKeyPath,
-			publicKey: input.rotatedIdentity.publicKey,
+			publicIdentity: {
+				...selfIdentity.publicIdentity,
+				identityUpdatedAt: input.rotatedIdentity.identityUpdatedAt,
+				ownerId: input.rotatedIdentity.ownerId,
+				publicKey: input.rotatedIdentity.publicKey,
+			},
 		}),
 	} satisfies HomeState;
 };

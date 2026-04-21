@@ -1,10 +1,8 @@
 import { Schema } from "effect";
 import { describe, expect, it } from "vitest";
 import { DisplayName } from "../identity/DisplayName.js";
-import { Handle } from "../identity/Handle.js";
 import { KnownIdentity } from "../identity/Identity.js";
 import { IdentityUpdatedAt } from "../identity/IdentityUpdatedAt.js";
-import { KeyFingerprint } from "../identity/KeyFingerprint.js";
 import { OwnerId } from "../identity/OwnerId.js";
 import { PublicKey } from "../identity/PublicKey.js";
 import { PayloadRecipient } from "./PayloadEnvelope.js";
@@ -15,44 +13,34 @@ import {
 
 const isaac = Schema.decodeUnknownSync(KnownIdentity)({
 	displayName: Schema.decodeUnknownSync(DisplayName)("isaac"),
-	fingerprint: Schema.decodeUnknownSync(KeyFingerprint)("bs1_1111111111111111"),
-	handle: Schema.decodeUnknownSync(Handle)("isaac#069f7576"),
 	identityUpdatedAt: Schema.decodeUnknownSync(IdentityUpdatedAt)(
 		"2026-04-14T10:00:00.000Z",
 	),
-	localAlias: null,
 	ownerId: Schema.decodeUnknownSync(OwnerId)("bsid1_069f7576d2ab43ef"),
 	publicKey: Schema.decodeUnknownSync(PublicKey)("age1isaac"),
 });
 
 const paulOld = Schema.decodeUnknownSync(KnownIdentity)({
 	displayName: Schema.decodeUnknownSync(DisplayName)("paul"),
-	fingerprint: Schema.decodeUnknownSync(KeyFingerprint)("bs1_aaaaaaaaaaaaaaaa"),
-	handle: Schema.decodeUnknownSync(Handle)("paul#aaaaaaaa"),
 	identityUpdatedAt: Schema.decodeUnknownSync(IdentityUpdatedAt)(
 		"2026-04-14T10:00:00.000Z",
 	),
-	localAlias: null,
 	ownerId: Schema.decodeUnknownSync(OwnerId)("bsid1_aaaaaaaaaaaaaaaa"),
 	publicKey: Schema.decodeUnknownSync(PublicKey)("age1paulold"),
 });
 
 const paulNew = Schema.decodeUnknownSync(KnownIdentity)({
 	displayName: Schema.decodeUnknownSync(DisplayName)("paul"),
-	fingerprint: Schema.decodeUnknownSync(KeyFingerprint)("bs1_bbbbbbbbbbbbbbbb"),
-	handle: Schema.decodeUnknownSync(Handle)("paul#aaaaaaaa"),
 	identityUpdatedAt: Schema.decodeUnknownSync(IdentityUpdatedAt)(
 		"2026-04-15T10:00:00.000Z",
 	),
-	localAlias: null,
 	ownerId: Schema.decodeUnknownSync(OwnerId)("bsid1_aaaaaaaaaaaaaaaa"),
 	publicKey: Schema.decodeUnknownSync(PublicKey)("age1paulnew"),
 });
 
 const toRecipient = (identity: typeof isaac) =>
 	Schema.decodeUnknownSync(PayloadRecipient)({
-		displayNameSnapshot: identity.displayName,
-		fingerprint: identity.fingerprint,
+		displayName: identity.displayName,
 		identityUpdatedAt: identity.identityUpdatedAt,
 		ownerId: identity.ownerId,
 		publicKey: identity.publicKey,

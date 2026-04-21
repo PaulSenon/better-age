@@ -30,6 +30,13 @@ export class InspectPayloadEnvelopeError extends Schema.TaggedError<InspectPaylo
 	},
 ) {}
 
+export class InspectPayloadVersionError extends Schema.TaggedError<InspectPayloadVersionError>()(
+	"InspectPayloadVersionError",
+	{
+		message: Schema.String,
+	},
+) {}
+
 export class InspectPayloadEnvError extends Schema.TaggedError<InspectPayloadEnvError>()(
 	"InspectPayloadEnvError",
 	{
@@ -61,6 +68,6 @@ export class InspectPayloadSuccess extends Schema.TaggedClass<InspectPayloadSucc
 			}),
 		),
 		secretCount: Schema.Number,
-		version: Schema.Literal(1),
+		version: Schema.Literal(2),
 	},
 ) {}

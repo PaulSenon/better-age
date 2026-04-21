@@ -12,6 +12,7 @@ import {
 	RevokePayloadRecipientRemovedSuccess,
 	RevokePayloadRecipientUnchangedSuccess,
 	RevokePayloadRecipientUpdateRequiredError,
+	RevokePayloadRecipientVersionError,
 } from "./RevokePayloadRecipientError.js";
 
 export class RevokePayloadRecipient extends Effect.Service<RevokePayloadRecipient>()(
@@ -51,6 +52,10 @@ export class RevokePayloadRecipient extends Effect.Service<RevokePayloadRecipien
 										return new RevokePayloadRecipientEnvError({
 											message: error.message,
 										});
+									case "OpenPayloadVersionError":
+										return new RevokePayloadRecipientVersionError({
+											message: error.message,
+										});
 								}
 							}),
 						);
@@ -65,6 +70,7 @@ export class RevokePayloadRecipient extends Effect.Service<RevokePayloadRecipien
 					const resolution = resolveRevokeIdentityRef({
 						identityRef: input.identityRef,
 						knownIdentities: openedPayload.nextState.knownIdentities,
+						localAliases: openedPayload.nextState.localAliases,
 						payloadRecipients: openedPayload.envelope.recipients,
 						selfIdentity: openedPayload.nextState.self,
 					});
@@ -90,7 +96,7 @@ export class RevokePayloadRecipient extends Effect.Service<RevokePayloadRecipien
 						selfOwnerId: Option.getOrNull(
 							Option.map(
 								openedPayload.nextState.self,
-								(selfIdentity) => selfIdentity.ownerId,
+								(selfIdentity) => selfIdentity.publicIdentity.ownerId,
 							),
 						),
 						targetOwnerId: resolution.ownerId,

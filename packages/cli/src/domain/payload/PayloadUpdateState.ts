@@ -1,7 +1,11 @@
 import { Option } from "effect";
 import type { HomeState } from "../home/HomeState.js";
 import { getSelfIdentity } from "../home/HomeState.js";
-import type { SelfIdentity } from "../identity/Identity.js";
+import {
+	materializeSelfIdentity,
+	toPublicIdentityFromSelfIdentity,
+	type SelfIdentity,
+} from "../identity/Identity.js";
 import type { PayloadEnvelope, PayloadRecipient } from "./PayloadEnvelope.js";
 
 export type PayloadUpdateReason =
@@ -14,24 +18,31 @@ export type PayloadUpdateState = {
 	readonly reasons: ReadonlyArray<PayloadUpdateReason>;
 };
 
-const currentPayloadSchemaVersion = 1;
+const currentPayloadSchemaVersion = 2;
 
 const isSameSelfSnapshot = (
 	selfIdentity: SelfIdentity,
 	recipient: PayloadRecipient,
 ): boolean =>
-	selfIdentity.fingerprint === recipient.fingerprint &&
-	selfIdentity.publicKey === recipient.publicKey &&
-	selfIdentity.identityUpdatedAt === recipient.identityUpdatedAt &&
-	selfIdentity.displayName === recipient.displayNameSnapshot;
+	toPublicIdentityFromSelfIdentity(selfIdentity).displayName === recipient.displayName &&
+	toPublicIdentityFromSelfIdentity(selfIdentity).identityUpdatedAt ===
+		recipient.identityUpdatedAt &&
+	toPublicIdentityFromSelfIdentity(selfIdentity).ownerId === recipient.ownerId &&
+	toPublicIdentityFromSelfIdentity(selfIdentity).publicKey === recipient.publicKey;
 
 export const computePayloadUpdateState = (
 	state: HomeState,
 	envelope: PayloadEnvelope,
+	input?: {
+		readonly persistedSchemaVersion?: number;
+	},
 ): PayloadUpdateState => {
 	const reasons: Array<PayloadUpdateReason> = [];
 
-	if (envelope.version !== currentPayloadSchemaVersion) {
+	const persistedSchemaVersion =
+		input?.persistedSchemaVersion ?? envelope.version;
+
+	if (persistedSchemaVersion !== currentPayloadSchemaVersion) {
 		reasons.push("schema-outdated");
 	}
 
@@ -45,7 +56,8 @@ export const computePayloadUpdateState = (
 	}
 
 	const selfRecipients = envelope.recipients.filter(
-		(recipient) => recipient.ownerId === selfIdentity.value.ownerId,
+		(recipient) =>
+			recipient.ownerId === materializeSelfIdentity(selfIdentity.value).ownerId,
 	);
 
 	if (selfRecipients.length > 1) {
@@ -92,10 +104,4 @@ export const toPayloadNeedsUpdate = (state: PayloadUpdateState) => ({
 
 export const toPayloadRecipientFromSelfIdentity = (
 	selfIdentity: SelfIdentity,
-): PayloadRecipient => ({
-	displayNameSnapshot: selfIdentity.displayName,
-	fingerprint: selfIdentity.fingerprint,
-	identityUpdatedAt: selfIdentity.identityUpdatedAt,
-	ownerId: selfIdentity.ownerId,
-	publicKey: selfIdentity.publicKey,
-});
+): PayloadRecipient => toPublicIdentityFromSelfIdentity(selfIdentity);

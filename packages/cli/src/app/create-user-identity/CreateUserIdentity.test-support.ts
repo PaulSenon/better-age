@@ -1,6 +1,5 @@
 import { Effect, Schema } from "effect";
-import type { HomeState } from "../../domain/home/HomeState.js";
-import { emptyHomeState, getActiveKey } from "../../domain/home/HomeState.js";
+import { emptyHomeState, getActiveKey, HomeState } from "../../domain/home/HomeState.js";
 import { PrivateKeyRelativePath } from "../../domain/identity/PrivateKeyRelativePath.js";
 import type { HomeLocation } from "../../port/HomeRepository.js";
 import { HomeRepository } from "../../port/HomeRepository.js";
@@ -12,6 +11,8 @@ import {
 } from "../../port/HomeRepositoryError.js";
 
 export interface InMemoryHomeRepository extends HomeRepository {
+	readonly getSaveCount: () => number;
+	readonly seedStateDocument: (document: unknown | null) => void;
 	readonly seedPrivateKey: (path: string, contents: string) => void;
 	readonly snapshot: () => {
 		readonly files: ReadonlyMap<string, string>;
@@ -27,6 +28,8 @@ export const makeInMemoryHomeRepository = (input?: {
 }): InMemoryHomeRepository => {
 	const rootDirectory = input?.rootDirectory ?? "/virtual-home";
 	let state = emptyHomeState();
+	let rawStateDocument: unknown | null = Schema.encodeSync(HomeState)(state);
+	let saveCount = 0;
 	const files = new Map<string, string>();
 	const location = {
 		keysDirectory: `${rootDirectory}/keys`,
@@ -41,6 +44,7 @@ export const makeInMemoryHomeRepository = (input?: {
 			}),
 		getActiveKey: Effect.sync(() => getActiveKey(state)),
 		getLocation: Effect.succeed(location),
+		loadStateDocument: Effect.sync(() => rawStateDocument),
 		loadState: Effect.sync(() => state),
 		readPrivateKey: (privateKeyPath) =>
 			Effect.suspend(() => {
@@ -67,6 +71,8 @@ export const makeInMemoryHomeRepository = (input?: {
 					)
 				: Effect.sync(() => {
 						state = nextState;
+						rawStateDocument = Schema.encodeSync(HomeState)(nextState);
+						saveCount += 1;
 					}),
 		writePrivateKey: (fingerprint, contents) =>
 			input?.failOnWrite
@@ -106,6 +112,10 @@ export const makeInMemoryHomeRepository = (input?: {
 	});
 
 	return Object.assign(service, {
+		getSaveCount: () => saveCount,
+		seedStateDocument: (document: unknown | null) => {
+			rawStateDocument = document;
+		},
 		seedPrivateKey: (path: string, contents: string) => {
 			files.set(path, contents);
 		},

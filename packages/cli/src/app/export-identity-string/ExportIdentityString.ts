@@ -4,6 +4,7 @@ import {
 	encodeIdentityString,
 	type IdentityString,
 	IdentityStringPayload,
+	toIdentityStringPayload,
 } from "../../domain/identity/IdentityString.js";
 import { HomeRepository } from "../../port/HomeRepository.js";
 import type {
@@ -40,15 +41,12 @@ export class ExportIdentityString extends Effect.Service<ExportIdentityString>()
 						);
 					}
 
-					return Schema.decodeUnknown(IdentityStringPayload)({
-						displayName: selfIdentity.value.displayName,
-						fingerprint: selfIdentity.value.fingerprint,
-						handle: selfIdentity.value.handle,
-						identityUpdatedAt: selfIdentity.value.identityUpdatedAt,
-						ownerId: selfIdentity.value.ownerId,
-						publicKey: selfIdentity.value.publicKey,
-						version: "v1",
-					}).pipe(Effect.map(encodeIdentityString), Effect.orDie);
+					return Schema.decodeUnknown(
+						IdentityStringPayload,
+					)(toIdentityStringPayload(selfIdentity.value.publicIdentity)).pipe(
+						Effect.map(encodeIdentityString),
+						Effect.orDie,
+					);
 				}),
 				Effect.withSpan("ExportIdentityString.execute"),
 			);

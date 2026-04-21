@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { Clock, Effect, Option, Schema } from "effect";
 import { getSelfIdentity } from "../../domain/home/HomeState.js";
+import { toPublicIdentityFromSelfIdentity } from "../../domain/identity/Identity.js";
 import { PayloadEnvelope } from "../../domain/payload/PayloadEnvelope.js";
 import { serializePayloadFile } from "../../domain/payload/PayloadFile.js";
 import { PayloadId } from "../../domain/payload/PayloadId.js";
@@ -65,21 +66,13 @@ export class CreatePayload extends Effect.Service<CreatePayload>()(
 					envText: "",
 					lastRewrittenAt: now,
 					payloadId: makePayloadId(),
-					recipients: [
-						{
-							displayNameSnapshot: selfIdentity.value.displayName,
-							fingerprint: selfIdentity.value.fingerprint,
-							identityUpdatedAt: selfIdentity.value.identityUpdatedAt,
-							ownerId: selfIdentity.value.ownerId,
-							publicKey: selfIdentity.value.publicKey,
-						},
-					],
-					version: 1,
+					recipients: [toPublicIdentityFromSelfIdentity(selfIdentity.value)],
+					version: 2,
 				}).pipe(Effect.orDie);
 				const armoredPayload = yield* payloadCrypto
 					.encryptEnvelope({
 						envelope,
-						recipients: [selfIdentity.value.publicKey],
+						recipients: [selfIdentity.value.publicIdentity.publicKey],
 					})
 					.pipe(
 						Effect.mapError(

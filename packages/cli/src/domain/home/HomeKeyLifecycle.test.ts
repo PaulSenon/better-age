@@ -2,12 +2,12 @@ import { Option, Schema } from "effect";
 import { describe, expect, it } from "vitest";
 import { GeneratedIdentity } from "../../port/Crypto.js";
 import { DisplayName } from "../identity/DisplayName.js";
-import { Handle } from "../identity/Handle.js";
 import { IdentityUpdatedAt } from "../identity/IdentityUpdatedAt.js";
 import { KeyFingerprint } from "../identity/KeyFingerprint.js";
 import { OwnerId } from "../identity/OwnerId.js";
 import { PrivateKeyRelativePath } from "../identity/PrivateKeyRelativePath.js";
 import { PublicKey } from "../identity/PublicKey.js";
+import { derivePublicIdentityFingerprint } from "../identity/PublicIdentity.js";
 import {
 	buildRotatedHomeState,
 	toRetiredPrivateKeyPath,
@@ -18,7 +18,6 @@ const selfDisplayName = Schema.decodeUnknownSync(DisplayName)("isaac");
 const selfFingerprint = Schema.decodeUnknownSync(KeyFingerprint)(
 	"bs1_1111111111111111",
 );
-const selfHandle = Schema.decodeUnknownSync(Handle)("isaac#069f7576");
 const selfIdentityUpdatedAt = Schema.decodeUnknownSync(IdentityUpdatedAt)(
 	"2026-04-14T10:00:00.000Z",
 );
@@ -45,14 +44,14 @@ describe("HomeKeyLifecycle", () => {
 				activeKeyFingerprint: Option.some(selfFingerprint),
 				self: Option.some({
 					createdAt: "2026-04-14T10:00:00.000Z",
-					displayName: selfDisplayName,
-					fingerprint: selfFingerprint,
-					handle: selfHandle,
-					identityUpdatedAt: selfIdentityUpdatedAt,
 					keyMode: "pq-hybrid",
-					ownerId: selfOwnerId,
 					privateKeyPath: selfPrivateKeyPath,
-					publicKey: selfPublicKey,
+					publicIdentity: {
+						displayName: selfDisplayName,
+						identityUpdatedAt: selfIdentityUpdatedAt,
+						ownerId: selfOwnerId,
+						publicKey: selfPublicKey,
+					},
 				}),
 			},
 			privateKeyPath: selfPrivateKeyPath,
@@ -65,21 +64,26 @@ describe("HomeKeyLifecycle", () => {
 		expect(nextState.self).toEqual(
 			Option.some({
 				createdAt: "2026-04-14T10:00:00.000Z",
-				displayName: selfDisplayName,
-				fingerprint: rotatedIdentity.fingerprint,
-				handle: Schema.decodeUnknownSync(Handle)("isaac#069f7576"),
-				identityUpdatedAt: rotatedIdentity.identityUpdatedAt,
 				keyMode: "pq-hybrid",
-				ownerId: selfOwnerId,
 				privateKeyPath: selfPrivateKeyPath,
-				publicKey: rotatedIdentity.publicKey,
+				publicIdentity: {
+					displayName: selfDisplayName,
+					identityUpdatedAt: rotatedIdentity.identityUpdatedAt,
+					ownerId: selfOwnerId,
+					publicKey: rotatedIdentity.publicKey,
+				},
 			}),
 		);
 		expect(nextState.retiredKeys).toEqual([
 			{
-				fingerprint: selfFingerprint,
+				fingerprint: derivePublicIdentityFingerprint({
+					displayName: selfDisplayName,
+					identityUpdatedAt: selfIdentityUpdatedAt,
+					ownerId: selfOwnerId,
+					publicKey: selfPublicKey,
+				}),
 				privateKeyPath: Schema.decodeUnknownSync(PrivateKeyRelativePath)(
-					"keys/retired/bs1_1111111111111111.key.age",
+					"keys/retired/bs1_3bfa41d75f2637e0.key.age",
 				),
 				retiredAt: "2026-04-15T10:30:00.000Z",
 			},

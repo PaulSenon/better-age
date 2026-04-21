@@ -1,13 +1,19 @@
 import { Effect, Option, Schema } from "effect";
 import type { HomeState } from "../../domain/home/HomeState.js";
 import { isSelfOwnerId } from "../../domain/home/SelfIdentityGuard.js";
-import { Handle } from "../../domain/identity/Handle.js";
 import {
 	KnownIdentity,
 	type KnownIdentity as KnownIdentityType,
+	getLocalAlias,
 } from "../../domain/identity/Identity.js";
 import { getEnvKeyNames } from "../../domain/payload/EnvText.js";
 import { PayloadEnvelope } from "../../domain/payload/PayloadEnvelope.js";
+import {
+	CURRENT_PAYLOAD_SCHEMA_VERSION,
+	normalizePayloadEnvelopeToCurrent,
+	readPayloadSchemaVersion,
+	VersionedPayloadEnvelope,
+} from "../../domain/payload/PayloadEnvelopeMigration.js";
 import { parsePayloadFile } from "../../domain/payload/PayloadFile.js";
 import {
 	getPayloadNeedsUpdate,
@@ -33,6 +39,7 @@ import {
 	OpenPayloadEnvelopeError,
 	OpenPayloadFileFormatError,
 	OpenPayloadPersistenceError,
+	OpenPayloadVersionError,
 } from "./OpenPayloadError.js";
 
 const toPersistenceError = (
@@ -50,20 +57,12 @@ const toPersistenceError = (
 		operation,
 	});
 
-const toHandle = (displayName: string, ownerId: string) =>
-	Schema.decodeUnknownSync(Handle)(
-		`${displayName}#${ownerId.slice("bsid1_".length, "bsid1_".length + 8)}`,
-	);
-
 const toKnownIdentity = (
 	recipient: Schema.Schema.Type<typeof PayloadEnvelope>["recipients"][number],
 ): KnownIdentityType =>
 	Schema.decodeUnknownSync(KnownIdentity)({
-		displayName: recipient.displayNameSnapshot,
-		fingerprint: recipient.fingerprint,
-		handle: toHandle(recipient.displayNameSnapshot, recipient.ownerId),
+		displayName: recipient.displayName,
 		identityUpdatedAt: recipient.identityUpdatedAt,
-		localAlias: null,
 		ownerId: recipient.ownerId,
 		publicKey: recipient.publicKey,
 	});
@@ -103,7 +102,6 @@ const mergeKnownIdentities = (
 
 		nextKnownIdentities[existingIndex] = {
 			...nextIdentity,
-			localAlias: existingIdentity.localAlias,
 		};
 		didChange = true;
 	}
@@ -112,6 +110,15 @@ const mergeKnownIdentities = (
 		? {
 				...state,
 				knownIdentities: nextKnownIdentities,
+				localAliases: Object.fromEntries(
+					nextKnownIdentities.flatMap((identity) => {
+						const localAlias = getLocalAlias(state.localAliases, identity.ownerId);
+
+						return Option.isSome(localAlias)
+							? [[identity.ownerId, localAlias.value] as const]
+							: [];
+					}),
+				),
 			}
 		: state;
 };
@@ -122,6 +129,7 @@ export type OpenPayloadSuccess = {
 	readonly needsUpdate: PayloadNeedsUpdate;
 	readonly nextState: HomeState;
 	readonly path: string;
+	readonly persistedSchemaVersion: number | undefined;
 	readonly state: HomeState;
 };
 
@@ -186,7 +194,20 @@ export class OpenPayload extends Effect.Service<OpenPayload>()("OpenPayload", {
 							}),
 					),
 				);
-			const envelope = yield* Schema.decodeUnknown(PayloadEnvelope)(
+
+			const payloadSchemaVersion = readPayloadSchemaVersion(decryptedEnvelope);
+
+			if (
+				Option.isSome(payloadSchemaVersion) &&
+				payloadSchemaVersion.value > CURRENT_PAYLOAD_SCHEMA_VERSION
+			) {
+				return yield* new OpenPayloadVersionError({
+					message:
+						"CLI is too old to open this payload. Update CLI to latest version.",
+				});
+			}
+
+			const decodedEnvelope = yield* Schema.decodeUnknown(VersionedPayloadEnvelope)(
 				decryptedEnvelope,
 			).pipe(
 				Effect.mapError(
@@ -196,6 +217,32 @@ export class OpenPayload extends Effect.Service<OpenPayload>()("OpenPayload", {
 						}),
 				),
 			);
+			const normalizedEnvelope = normalizePayloadEnvelopeToCurrent({
+				envelope: decodedEnvelope,
+			});
+
+			if (normalizedEnvelope._tag === "unsupported-newer") {
+				return yield* new OpenPayloadVersionError({
+					message:
+						"CLI is too old to open this payload. Update CLI to latest version.",
+				});
+			}
+
+			if (normalizedEnvelope._tag === "hard-broken") {
+				return yield* new OpenPayloadVersionError({
+					message:
+						"CLI no longer supports migrating this payload version. Update or migrate with a supported CLI first.",
+				});
+			}
+
+			if (normalizedEnvelope._tag === "missing-path") {
+				return yield* new OpenPayloadVersionError({
+					message:
+						"CLI cannot migrate this payload because a payload migration step is missing.",
+				});
+			}
+
+			const envelope = normalizedEnvelope.artifact;
 			const envKeys = yield* Effect.try({
 				catch: (cause) =>
 					cause instanceof Error
@@ -223,9 +270,12 @@ export class OpenPayload extends Effect.Service<OpenPayload>()("OpenPayload", {
 			return {
 				envelope,
 				envKeys,
-				needsUpdate: getPayloadNeedsUpdate(nextState, envelope),
+				needsUpdate: getPayloadNeedsUpdate(nextState, envelope, {
+					persistedSchemaVersion: Option.getOrUndefined(payloadSchemaVersion),
+				}),
 				nextState,
 				path: input.path,
+				persistedSchemaVersion: Option.getOrUndefined(payloadSchemaVersion),
 				state,
 			} satisfies OpenPayloadSuccess;
 		});

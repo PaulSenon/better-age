@@ -1,7 +1,6 @@
 import { describe, expect, layer } from "@effect/vitest";
 import { Effect, Layer, Option, Schema } from "effect";
 import { DisplayName } from "../../domain/identity/DisplayName.js";
-import { Handle } from "../../domain/identity/Handle.js";
 import { IdentityUpdatedAt } from "../../domain/identity/IdentityUpdatedAt.js";
 import { KeyFingerprint } from "../../domain/identity/KeyFingerprint.js";
 import { OwnerId } from "../../domain/identity/OwnerId.js";
@@ -22,7 +21,6 @@ const selfDisplayName = Schema.decodeUnknownSync(DisplayName)("isaac-mbp");
 const selfFingerprint = Schema.decodeUnknownSync(KeyFingerprint)(
 	"bs1_0123456789abcdef",
 );
-const selfHandle = Schema.decodeUnknownSync(Handle)("isaac-mbp#069f7576");
 const selfIdentityUpdatedAt = Schema.decodeUnknownSync(IdentityUpdatedAt)(
 	"2026-04-14T10:00:00.000Z",
 );
@@ -53,14 +51,14 @@ describe("CreatePayload", () => {
 						activeKeyFingerprint: Option.some(selfFingerprint),
 						self: Option.some({
 							createdAt: "2026-04-14T10:00:00.000Z",
-							displayName: selfDisplayName,
-							fingerprint: selfFingerprint,
-							handle: selfHandle,
-							identityUpdatedAt: selfIdentityUpdatedAt,
 							keyMode: "pq-hybrid",
-							ownerId: selfOwnerId,
 							privateKeyPath: selfPrivateKeyPath,
-							publicKey: selfPublicKey,
+							publicIdentity: {
+								displayName: selfDisplayName,
+								identityUpdatedAt: selfIdentityUpdatedAt,
+								ownerId: selfOwnerId,
+								publicKey: selfPublicKey,
+							},
 						}),
 					});
 
@@ -97,8 +95,7 @@ describe("CreatePayload", () => {
 					);
 					expect(decodedEnvelope.recipients).toEqual([
 						{
-							displayNameSnapshot: selfDisplayName,
-							fingerprint: selfFingerprint,
+							displayName: selfDisplayName,
 							identityUpdatedAt: selfIdentityUpdatedAt,
 							ownerId: selfOwnerId,
 							publicKey: selfPublicKey,

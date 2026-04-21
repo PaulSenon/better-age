@@ -7,8 +7,9 @@ describe("HomeState", () => {
 		const state = Schema.decodeUnknownSync(HomeState)({
 			activeKeyFingerprint: null,
 			defaultEditorCommand: null,
-			homeSchemaVersion: 1,
+			homeSchemaVersion: 2,
 			knownIdentities: [],
+			localAliases: {},
 			retiredKeys: [],
 			rotationTtl: "3m",
 			self: null,
@@ -19,14 +20,15 @@ describe("HomeState", () => {
 		expect(state.retiredKeys).toEqual([]);
 	});
 
-	it("builds an empty v0 home state with default rotation ttl", () => {
+	it("builds an empty current home state with default rotation ttl", () => {
 		const state = emptyHomeState();
 
-		expect(state.homeSchemaVersion).toBe(1);
+		expect(state.homeSchemaVersion).toBe(2);
 		expect(state.rotationTtl).toBe("3m");
 		expect(Option.isNone(getSelfIdentity(state))).toBe(true);
 		expect(Option.isNone(state.defaultEditorCommand)).toBe(true);
 		expect(state.knownIdentities).toEqual([]);
+		expect(state.localAliases).toEqual({});
 		expect(state.retiredKeys).toEqual([]);
 	});
 });

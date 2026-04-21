@@ -29,6 +29,13 @@ export class ReadPayloadEnvelopeError extends Schema.TaggedError<ReadPayloadEnve
 	},
 ) {}
 
+export class ReadPayloadVersionError extends Schema.TaggedError<ReadPayloadVersionError>()(
+	"ReadPayloadVersionError",
+	{
+		message: Schema.String,
+	},
+) {}
+
 export class ReadPayloadEnvError extends Schema.TaggedError<ReadPayloadEnvError>()(
 	"ReadPayloadEnvError",
 	{

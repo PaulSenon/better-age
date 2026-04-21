@@ -7,6 +7,7 @@ import {
 	ReadPayloadEnvelopeError,
 	ReadPayloadFileFormatError,
 	ReadPayloadPersistenceError,
+	ReadPayloadVersionError,
 } from "../../app/read-payload/ReadPayloadError.js";
 import { Prompt } from "../../port/Prompt.js";
 import {
@@ -73,14 +74,14 @@ export const loadPayloadCommand = Command.make(
 				path,
 			});
 
+			yield* Prompt.writeStdout(result.envText);
+
 			if (result.needsUpdate.isRequired) {
 				yield* writeUserFacingWarning({
 					id: "WARN.LOAD.UPDATE_REQUIRED",
 					path,
 				});
 			}
-
-			yield* Prompt.writeStdout(result.envText);
 		}).pipe(
 			Effect.catchIf(
 				(error): error is ReadPayloadPersistenceError =>
@@ -125,6 +126,15 @@ export const loadPayloadCommand = Command.make(
 							path,
 						}),
 					),
+			),
+			Effect.catchIf(
+				(error): error is ReadPayloadVersionError =>
+					error instanceof ReadPayloadVersionError,
+				(error) =>
+					Effect.gen(function* () {
+						yield* Prompt.writeStderr(`${error.message}\n`);
+						return yield* Effect.fail(new LoadPayloadCommandFailedError());
+					}),
 			),
 			Effect.catchIf(
 				(error): error is ReadPayloadEnvError =>

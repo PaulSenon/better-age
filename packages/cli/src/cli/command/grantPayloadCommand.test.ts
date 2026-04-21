@@ -8,6 +8,7 @@ import {
 	GrantPayloadRecipientAmbiguousIdentityError,
 	GrantPayloadRecipientUnchangedSuccess,
 	GrantPayloadRecipientUpdateRequiredError,
+	GrantPayloadRecipientVersionError,
 } from "../../app/grant-payload-recipient/GrantPayloadRecipientError.js";
 import { ImportIdentityString } from "../../app/import-identity-string/ImportIdentityString.js";
 import {
@@ -320,7 +321,7 @@ describe("grantPayloadCommand", () => {
 									},
 								],
 								secretCount: 1,
-								version: 1,
+								version: 2,
 							}),
 						),
 				}),
@@ -358,7 +359,7 @@ describe("grantPayloadCommand", () => {
 								recipientCount: 2,
 								recipients: [],
 								secretCount: 1,
-								version: 1,
+								version: 2,
 							}),
 						),
 				}),
@@ -601,7 +602,7 @@ describe("grantPayloadCommand", () => {
 												recipientCount: 2,
 												recipients: [],
 												secretCount: 1,
-												version: 1,
+												version: 2,
 											}),
 										),
 								}),
@@ -667,7 +668,7 @@ describe("grantPayloadCommand", () => {
 								recipientCount: 2,
 								recipients: [],
 								secretCount: 1,
-								version: 1,
+								version: 2,
 							}),
 						),
 				}),
@@ -804,7 +805,7 @@ describe("grantPayloadCommand", () => {
 													recipientCount: 2,
 													recipients: [],
 													secretCount: 1,
-													version: 1,
+													version: 2,
 												}),
 											),
 									}),
@@ -974,7 +975,7 @@ describe("grantPayloadCommand", () => {
 													recipientCount: 2,
 													recipients: [],
 													secretCount: 1,
-													version: 1,
+													version: 2,
 												}),
 											),
 									}),
@@ -1090,7 +1091,7 @@ describe("grantPayloadCommand", () => {
 													recipientCount: 2,
 													recipients: [],
 													secretCount: 1,
-													version: 1,
+													version: 2,
 												}),
 											),
 									}),
@@ -1182,7 +1183,7 @@ describe("grantPayloadCommand", () => {
 													recipientCount: 2,
 													recipients: [],
 													secretCount: 1,
-													version: 1,
+													version: 2,
 												}),
 											),
 									}),
@@ -1263,7 +1264,7 @@ describe("grantPayloadCommand", () => {
 													recipientCount: 2,
 													recipients: [],
 													secretCount: 1,
-													version: 1,
+													version: 2,
 												}),
 											),
 									}),
@@ -1276,6 +1277,86 @@ describe("grantPayloadCommand", () => {
 					expect(prompt.stderr).toEqual([]);
 					expect(prompt.stdout).toEqual([]);
 				}),
+		);
+
+		it.effect("prints update-cli remediation when payload version is unsupported", () =>
+			Effect.gen(function* () {
+				const prompt = makePrompt("n");
+				const cli = Command.run(
+					Command.make("bage").pipe(
+						Command.withSubcommands([grantPayloadCommand]),
+					),
+					{ name: "bage", version: "0.0.1" },
+				);
+
+				const result = yield* cli(["node", "bage", "grant", "./.env.enc"]).pipe(
+					Effect.provide(
+						Layer.mergeAll(
+							NodeContext.layer,
+							Layer.succeed(HomeRepository, makeHomeRepository()),
+							Layer.succeed(
+								ImportIdentityString,
+								ImportIdentityString.make({
+									execute: () => Effect.die("unused"),
+								}),
+							),
+							Layer.succeed(
+								UpdatePayload,
+								UpdatePayload.make({
+									execute: () => Effect.die("unused"),
+								}),
+							),
+							Layer.succeed(
+								GrantPayloadRecipient,
+								GrantPayloadRecipient.make({
+									execute: () =>
+										Effect.fail(
+											new GrantPayloadRecipientVersionError({
+												message:
+													"CLI is too old to open this payload. Update CLI to latest version.",
+											}),
+										),
+								}),
+							),
+							Layer.succeed(Prompt, prompt),
+							Layer.succeed(
+								InteractivePrompt,
+								makeInteractivePrompt(["paul (paul#aaaaaaaa)"]),
+							),
+							Layer.succeed(
+								InspectPayload,
+								InspectPayload.make({
+									execute: ({ path }) =>
+										Effect.succeed(
+											new InspectPayloadSuccess({
+												createdAt: "2026-04-14T10:00:00.000Z",
+												envKeys: ["API_TOKEN"],
+												lastRewrittenAt: "2026-04-14T10:00:00.000Z",
+												needsUpdate: {
+													isRequired: false,
+													reason: Option.none(),
+												},
+												path,
+												payloadId: "bspld_0123456789abcdef" as never,
+												recipientCount: 2,
+												recipients: [],
+												secretCount: 1,
+												version: 2,
+											}),
+										),
+								}),
+							),
+							Layer.succeed(ResolvePayloadTarget, makeResolvePayloadTarget()),
+						),
+					),
+					Effect.either,
+				);
+
+				expect(result._tag).toBe("Left");
+				expect(prompt.stderr).toEqual([
+					"CLI is too old to open this payload. Update CLI to latest version.\n",
+				]);
+			}),
 		);
 
 		it.effect("runs update then retries grant when accepted", () =>
@@ -1359,7 +1440,7 @@ describe("grantPayloadCommand", () => {
 												recipientCount: 2,
 												recipients: [],
 												secretCount: 1,
-												version: 1,
+												version: 2,
 											}),
 										),
 								}),
@@ -1507,7 +1588,7 @@ describe("grantPayloadCommand", () => {
 													recipientCount: 3,
 													recipients: [],
 													secretCount: 1,
-													version: 1,
+													version: 2,
 												}),
 											),
 									}),

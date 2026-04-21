@@ -2,7 +2,6 @@ import { describe, expect, layer } from "@effect/vitest";
 import { Effect, Layer, Option, Schema } from "effect";
 import { emptyHomeState } from "../../domain/home/HomeState.js";
 import { DisplayName } from "../../domain/identity/DisplayName.js";
-import { Handle } from "../../domain/identity/Handle.js";
 import { IdentityUpdatedAt } from "../../domain/identity/IdentityUpdatedAt.js";
 import { KeyFingerprint } from "../../domain/identity/KeyFingerprint.js";
 import { OwnerId } from "../../domain/identity/OwnerId.js";
@@ -22,7 +21,6 @@ const selfDisplayName = Schema.decodeUnknownSync(DisplayName)("isaac");
 const selfFingerprint = Schema.decodeUnknownSync(KeyFingerprint)(
 	"bs1_1111111111111111",
 );
-const selfHandle = Schema.decodeUnknownSync(Handle)("isaac#069f7576");
 const selfIdentityUpdatedAt = Schema.decodeUnknownSync(IdentityUpdatedAt)(
 	"2026-04-14T10:00:00.000Z",
 );
@@ -74,14 +72,14 @@ describe("ChangePassphrase", () => {
 					],
 					self: Option.some({
 						createdAt: "2026-04-14T10:00:00.000Z",
-						displayName: selfDisplayName,
-						fingerprint: selfFingerprint,
-						handle: selfHandle,
-						identityUpdatedAt: selfIdentityUpdatedAt,
 						keyMode: "pq-hybrid",
-						ownerId: selfOwnerId,
 						privateKeyPath: selfPrivateKeyPath,
-						publicKey: selfPublicKey,
+						publicIdentity: {
+							displayName: selfDisplayName,
+							identityUpdatedAt: selfIdentityUpdatedAt,
+							ownerId: selfOwnerId,
+							publicKey: selfPublicKey,
+						},
 					}),
 				});
 				homeRepository.seedPrivateKey("keys/active.key.age", "old-active");
@@ -160,14 +158,14 @@ describe("ChangePassphrase", () => {
 					],
 					self: Option.some({
 						createdAt: "2026-04-14T10:00:00.000Z",
-						displayName: selfDisplayName,
-						fingerprint: selfFingerprint,
-						handle: selfHandle,
-						identityUpdatedAt: selfIdentityUpdatedAt,
 						keyMode: "pq-hybrid",
-						ownerId: selfOwnerId,
 						privateKeyPath: selfPrivateKeyPath,
-						publicKey: selfPublicKey,
+						publicIdentity: {
+							displayName: selfDisplayName,
+							identityUpdatedAt: selfIdentityUpdatedAt,
+							ownerId: selfOwnerId,
+							publicKey: selfPublicKey,
+						},
 					}),
 				});
 				baseRepository.seedPrivateKey("keys/active.key.age", "old-active");

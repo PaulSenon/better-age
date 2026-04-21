@@ -18,7 +18,10 @@ import { makeInMemoryHomeRepository } from "../create-user-identity/CreateUserId
 import { OpenPayload } from "../shared/OpenPayload.js";
 import { OpenPayloadCryptoError } from "../shared/OpenPayloadError.js";
 import { ReadPayload } from "./ReadPayload.js";
-import { ReadPayloadCryptoError } from "./ReadPayloadError.js";
+import {
+	ReadPayloadCryptoError,
+	ReadPayloadVersionError,
+} from "./ReadPayloadError.js";
 
 const selfDisplayName = Schema.decodeUnknownSync(DisplayName)("isaac-mbp");
 const selfFingerprint = Schema.decodeUnknownSync(KeyFingerprint)(
@@ -33,6 +36,23 @@ const selfPrivateKeyPath = Schema.decodeUnknownSync(PrivateKeyRelativePath)(
 	"keys/active.key.age",
 );
 const selfPublicKey = Schema.decodeUnknownSync(PublicKey)("age1self");
+const selfIdentity = {
+	createdAt: "2026-04-14T10:00:00.000Z",
+	keyMode: "pq-hybrid" as const,
+	privateKeyPath: selfPrivateKeyPath,
+	publicIdentity: {
+		displayName: selfDisplayName,
+		identityUpdatedAt: selfIdentityUpdatedAt,
+		ownerId: selfOwnerId,
+		publicKey: selfPublicKey,
+	},
+};
+const selfRecipient = {
+	displayName: selfDisplayName,
+	identityUpdatedAt: selfIdentityUpdatedAt,
+	ownerId: selfOwnerId,
+	publicKey: selfPublicKey,
+};
 
 const paulDisplayName = Schema.decodeUnknownSync(DisplayName)("paul");
 const paulFingerprint = Schema.decodeUnknownSync(KeyFingerprint)(
@@ -44,6 +64,12 @@ const paulIdentityUpdatedAt = Schema.decodeUnknownSync(IdentityUpdatedAt)(
 );
 const paulOwnerId = Schema.decodeUnknownSync(OwnerId)("bsid1_aaaaaaaaaaaaaaaa");
 const paulPublicKey = Schema.decodeUnknownSync(PublicKey)("age1paulnew");
+const paulRecipient = {
+	displayName: paulDisplayName,
+	identityUpdatedAt: paulIdentityUpdatedAt,
+	ownerId: paulOwnerId,
+	publicKey: paulPublicKey,
+};
 
 describe("ReadPayload", () => {
 	const homeRepository = makeInMemoryHomeRepository();
@@ -66,17 +92,7 @@ describe("ReadPayload", () => {
 					yield* homeRepository.saveState({
 						...emptyHomeState(),
 						activeKeyFingerprint: Option.some(selfFingerprint),
-						self: Option.some({
-							createdAt: "2026-04-14T10:00:00.000Z",
-							displayName: selfDisplayName,
-							fingerprint: selfFingerprint,
-							handle: selfHandle,
-							identityUpdatedAt: selfIdentityUpdatedAt,
-							keyMode: "pq-hybrid",
-							ownerId: selfOwnerId,
-							privateKeyPath: selfPrivateKeyPath,
-							publicKey: selfPublicKey,
-						}),
+						self: Option.some(selfIdentity),
 						knownIdentities: [],
 						retiredKeys: [],
 						rotationTtl: "3m",
@@ -97,22 +113,10 @@ describe("ReadPayload", () => {
 						lastRewrittenAt: "2026-04-14T10:00:00.000Z",
 						payloadId: "bspld_0123456789abcdef",
 						recipients: [
-							{
-								displayNameSnapshot: selfDisplayName,
-								fingerprint: selfFingerprint,
-								identityUpdatedAt: selfIdentityUpdatedAt,
-								ownerId: selfOwnerId,
-								publicKey: selfPublicKey,
-							},
-							{
-								displayNameSnapshot: paulDisplayName,
-								fingerprint: paulFingerprint,
-								identityUpdatedAt: paulIdentityUpdatedAt,
-								ownerId: paulOwnerId,
-								publicKey: paulPublicKey,
-							},
+							selfRecipient,
+							paulRecipient,
 						],
-						version: 1,
+						version: 2,
 					});
 
 					const result = yield* ReadPayload.execute({
@@ -132,10 +136,7 @@ describe("ReadPayload", () => {
 					expect(homeRepository.snapshot().state.knownIdentities).toEqual([
 						{
 							displayName: paulDisplayName,
-							fingerprint: paulFingerprint,
-							handle: paulHandle,
 							identityUpdatedAt: paulIdentityUpdatedAt,
-							localAlias: Option.none(),
 							ownerId: paulOwnerId,
 							publicKey: paulPublicKey,
 						},
@@ -156,17 +157,7 @@ describe("ReadPayload", () => {
 				yield* homeRepository.saveState({
 					...emptyHomeState(),
 					activeKeyFingerprint: Option.some(selfFingerprint),
-					self: Option.some({
-						createdAt: "2026-04-14T10:00:00.000Z",
-						displayName: selfDisplayName,
-						fingerprint: selfFingerprint,
-						handle: selfHandle,
-						identityUpdatedAt: selfIdentityUpdatedAt,
-						keyMode: "pq-hybrid",
-						ownerId: selfOwnerId,
-						privateKeyPath: selfPrivateKeyPath,
-						publicKey: selfPublicKey,
-					}),
+					self: Option.some(selfIdentity),
 					knownIdentities: [],
 					retiredKeys: [],
 					rotationTtl: "3m",
@@ -188,14 +179,13 @@ describe("ReadPayload", () => {
 					payloadId: "bspld_fedcba9876543210",
 					recipients: [
 						{
-							displayNameSnapshot: selfDisplayName,
-							fingerprint: "bs1_bbbbbbbbbbbbbbbb",
+							displayName: selfDisplayName,
 							identityUpdatedAt: selfIdentityUpdatedAt,
 							ownerId: selfOwnerId,
 							publicKey: "age1stale",
 						},
 					],
-					version: 1,
+					version: 2,
 				});
 
 				const result = yield* ReadPayload.execute({
@@ -207,6 +197,145 @@ describe("ReadPayload", () => {
 					isRequired: true,
 					reason: Option.some("self key is stale"),
 				});
+			}),
+		);
+
+		it.effect("migrates one-version-behind payload in memory and warns for update", () =>
+			Effect.gen(function* () {
+				yield* homeRepository.saveState({
+					...emptyHomeState(),
+					activeKeyFingerprint: Option.some(selfFingerprint),
+					self: Option.some(selfIdentity),
+					knownIdentities: [],
+					retiredKeys: [],
+					rotationTtl: "3m",
+				});
+				homeRepository.seedPrivateKey(
+					"keys/active.key.age",
+					"AGE-ENCRYPTED-ACTIVE-KEY",
+				);
+				payloadRepository.seedFile(
+					"/workspace/legacy-v1.env.enc",
+					serializePayloadFile({
+						armoredPayload: "FAKE-ARMORED-PAYLOAD",
+					}),
+				);
+				payloadCrypto.seedDecryptedEnvelope({
+					createdAt: "2026-04-14T10:00:00.000Z",
+					envText: "API_TOKEN=secret\n",
+					lastRewrittenAt: "2026-04-14T10:00:00.000Z",
+					payloadId: "bspld_1111111111111111",
+					recipients: [selfRecipient, paulRecipient],
+					version: 1,
+				});
+
+				const result = yield* ReadPayload.execute({
+					passphrase: "test-passphrase",
+					path: "/workspace/legacy-v1.env.enc",
+				});
+
+				expect(result.needsUpdate).toEqual({
+					isRequired: true,
+					reason: Option.some("payload schema is outdated"),
+				});
+				expect(payloadRepository.snapshot().writeCalls).toHaveLength(0);
+			}),
+		);
+
+		it.effect("migrates multi-hop legacy payload in memory and normalizes recipient shape", () =>
+			Effect.gen(function* () {
+				yield* homeRepository.saveState({
+					...emptyHomeState(),
+					activeKeyFingerprint: Option.some(selfFingerprint),
+					self: Option.some(selfIdentity),
+					knownIdentities: [],
+					retiredKeys: [],
+					rotationTtl: "3m",
+				});
+				homeRepository.seedPrivateKey(
+					"keys/active.key.age",
+					"AGE-ENCRYPTED-ACTIVE-KEY",
+				);
+				payloadRepository.seedFile(
+					"/workspace/legacy-v0.env.enc",
+					serializePayloadFile({
+						armoredPayload: "FAKE-ARMORED-PAYLOAD",
+					}),
+				);
+				payloadCrypto.seedDecryptedEnvelope({
+					createdAt: "2026-04-14T10:00:00.000Z",
+					envText: "API_TOKEN=secret\n",
+					lastRewrittenAt: "2026-04-14T10:00:00.000Z",
+					payloadId: "bspld_0000000000000000",
+					recipients: [
+						{
+							...paulRecipient,
+							fingerprint: paulFingerprint,
+							handle: paulHandle,
+						},
+					],
+					version: 0,
+				});
+
+				const result = yield* ReadPayload.execute({
+					passphrase: "test-passphrase",
+					path: "/workspace/legacy-v0.env.enc",
+				});
+
+				expect(result.needsUpdate).toEqual({
+					isRequired: true,
+					reason: Option.some("payload schema is outdated"),
+				});
+				expect(homeRepository.snapshot().state.knownIdentities).toEqual([
+					{
+						displayName: paulDisplayName,
+						identityUpdatedAt: paulIdentityUpdatedAt,
+						ownerId: paulOwnerId,
+						publicKey: paulPublicKey,
+					},
+				]);
+				expect(payloadRepository.snapshot().writeCalls).toHaveLength(0);
+			}),
+		);
+
+		it.effect("fails when payload version is newer than runtime", () =>
+			Effect.gen(function* () {
+				yield* homeRepository.saveState({
+					...emptyHomeState(),
+					activeKeyFingerprint: Option.some(selfFingerprint),
+					self: Option.some(selfIdentity),
+				});
+				homeRepository.seedPrivateKey(
+					"keys/active.key.age",
+					"AGE-ENCRYPTED-ACTIVE-KEY",
+				);
+				payloadRepository.seedFile(
+					"/workspace/newer.env.enc",
+					serializePayloadFile({
+						armoredPayload: "FAKE-ARMORED-PAYLOAD",
+					}),
+				);
+				payloadCrypto.seedDecryptedEnvelope({
+					createdAt: "2026-04-14T10:00:00.000Z",
+					envText: "API_TOKEN=secret\n",
+					lastRewrittenAt: "2026-04-14T10:00:00.000Z",
+					payloadId: "bspld_2222222222222222",
+					recipients: [selfRecipient],
+					version: 3,
+				});
+
+				const result = yield* ReadPayload.execute({
+					passphrase: "test-passphrase",
+					path: "/workspace/newer.env.enc",
+				}).pipe(Effect.either);
+
+				expect(result._tag).toBe("Left");
+				if (result._tag === "Left") {
+					expect(result.left).toBeInstanceOf(ReadPayloadVersionError);
+					expect(result.left.message).toContain(
+						"CLI is too old to open this payload",
+					);
+				}
 			}),
 		);
 	});

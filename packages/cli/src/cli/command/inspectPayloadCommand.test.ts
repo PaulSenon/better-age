@@ -152,7 +152,7 @@ describe("inspectPayloadCommand", () => {
 									},
 								],
 								secretCount: 2,
-								version: 1,
+								version: 2,
 							}),
 						).pipe(
 							Effect.tap(() =>
@@ -198,7 +198,7 @@ describe("inspectPayloadCommand", () => {
 						[
 							"Payload",
 							"path: ./.env.enc",
-							"version: 1",
+							"version: 2",
 							"payload id: bspld_0123456789abcdef",
 							"created at: 2026-04-14T10:00:00.000Z",
 							"last rewritten at: 2026-04-14T11:00:00.000Z",
@@ -217,6 +217,15 @@ describe("inspectPayloadCommand", () => {
 							"",
 						].join("\n"),
 					]);
+					expect(
+						(prompt as typeof prompt & { stderr: Array<string> }).stderr,
+					).toEqual([
+						[
+							"Warning: payload should be updated",
+							"Run: bage update ./.env.enc",
+							"",
+						].join("\n"),
+					]);
 				}),
 		);
 
@@ -224,6 +233,18 @@ describe("inspectPayloadCommand", () => {
 			Effect.gen(function* () {
 				const prompt = yield* Prompt;
 				const resolvePayloadTarget = yield* ResolvePayloadTarget;
+				(
+					prompt as typeof prompt & {
+						stderr: Array<string>;
+						stdout: Array<string>;
+					}
+				).stderr.length = 0;
+				(
+					prompt as typeof prompt & {
+						stderr: Array<string>;
+						stdout: Array<string>;
+					}
+				).stdout.length = 0;
 				(
 					resolvePayloadTarget as typeof resolvePayloadTarget & {
 						calls: Array<Option.Option<string>>;
@@ -251,6 +272,15 @@ describe("inspectPayloadCommand", () => {
 				expect(
 					(prompt as typeof prompt & { stdout: Array<string> }).stdout[0],
 				).toContain("path: ./.env.enc");
+				expect(
+					(prompt as typeof prompt & { stderr: Array<string> }).stderr,
+				).toEqual([
+					[
+						"Warning: payload should be updated",
+						"Run: bage update ./.env.enc",
+						"",
+					].join("\n"),
+				]);
 			}),
 		);
 	});
@@ -353,7 +383,7 @@ describe("inspectPayloadCommand", () => {
 															recipientCount: 1,
 															recipients: [],
 															secretCount: 1,
-															version: 1,
+															version: 2,
 														}),
 													);
 										}),

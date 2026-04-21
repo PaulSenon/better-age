@@ -17,6 +17,7 @@ import {
 	EditPayloadRewrittenSuccess,
 	EditPayloadUnchangedSuccess,
 	EditPayloadUpdateRequiredError,
+	EditPayloadVersionError,
 } from "./EditPayloadError.js";
 
 const toPersistenceError = (operation: string, error: PayloadWriteError) =>
@@ -63,6 +64,10 @@ export class EditPayload extends Effect.Service<EditPayload>()("EditPayload", {
 							return new EditPayloadPersistenceError({
 								message: error.message,
 								operation: "decode payload envelope",
+							});
+						case "OpenPayloadVersionError":
+							return new EditPayloadVersionError({
+								message: error.message,
 							});
 					}
 				}),
@@ -116,6 +121,10 @@ export class EditPayload extends Effect.Service<EditPayload>()("EditPayload", {
 								return new EditPayloadPersistenceError({
 									message: error.message,
 									operation: "decode payload envelope",
+								});
+							case "OpenPayloadVersionError":
+								return new EditPayloadVersionError({
+									message: error.message,
 								});
 						}
 					}),

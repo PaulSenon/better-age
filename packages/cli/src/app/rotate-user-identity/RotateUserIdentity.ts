@@ -3,6 +3,7 @@ import {
 	buildRotatedHomeState,
 	toRetiredPrivateKeyPath,
 } from "../../domain/home/HomeKeyLifecycle.js";
+import { materializeSelfIdentity } from "../../domain/identity/Identity.js";
 import { Crypto } from "../../port/Crypto.js";
 import type {
 	IdentityGenerationError,
@@ -62,9 +63,10 @@ export class RotateUserIdentity extends Effect.Service<RotateUserIdentity>()(
 							message: "No active identity configured",
 						});
 					}
+					const resolvedSelfIdentity = materializeSelfIdentity(selfIdentity);
 
 					const previousEncryptedPrivateKey = yield* homeRepository
-						.readPrivateKey(selfIdentity.privateKeyPath)
+						.readPrivateKey(resolvedSelfIdentity.privateKeyPath)
 						.pipe(
 							Effect.mapError((error) =>
 								toPersistenceError("read active private key", error),
@@ -89,7 +91,7 @@ export class RotateUserIdentity extends Effect.Service<RotateUserIdentity>()(
 					const rotatedIdentity = yield* crypto
 						.generateUserIdentity({
 							keyMode: selfIdentity.keyMode,
-							ownerId: selfIdentity.ownerId,
+							ownerId: resolvedSelfIdentity.ownerId,
 							passphrase: input.passphrase,
 						})
 						.pipe(
@@ -101,13 +103,13 @@ export class RotateUserIdentity extends Effect.Service<RotateUserIdentity>()(
 							),
 						);
 					const retiredPrivateKeyPath = toRetiredPrivateKeyPath(
-						selfIdentity.fingerprint,
+						resolvedSelfIdentity.fingerprint,
 					);
 					const now = new Date(yield* Clock.currentTimeMillis).toISOString();
 					const nextState = buildRotatedHomeState({
 						now,
 						previousState: state,
-						privateKeyPath: selfIdentity.privateKeyPath,
+						privateKeyPath: resolvedSelfIdentity.privateKeyPath,
 						rotatedIdentity,
 					});
 
@@ -124,7 +126,7 @@ export class RotateUserIdentity extends Effect.Service<RotateUserIdentity>()(
 					yield* homeRepository
 						.writePrivateKeyAtPath({
 							contents: rotatedIdentity.encryptedSecretKey,
-							privateKeyPath: selfIdentity.privateKeyPath,
+							privateKeyPath: resolvedSelfIdentity.privateKeyPath,
 						})
 						.pipe(
 							Effect.mapError((error) =>
@@ -139,7 +141,7 @@ export class RotateUserIdentity extends Effect.Service<RotateUserIdentity>()(
 						yield* homeRepository
 							.writePrivateKeyAtPath({
 								contents: previousEncryptedPrivateKey,
-								privateKeyPath: selfIdentity.privateKeyPath,
+								privateKeyPath: resolvedSelfIdentity.privateKeyPath,
 							})
 							.pipe(Effect.catchAll(() => Effect.void));
 						yield* homeRepository
@@ -153,7 +155,7 @@ export class RotateUserIdentity extends Effect.Service<RotateUserIdentity>()(
 
 					return new RotateUserIdentitySuccess({
 						newFingerprint: rotatedIdentity.fingerprint,
-						oldFingerprint: selfIdentity.fingerprint,
+						oldFingerprint: resolvedSelfIdentity.fingerprint,
 						ownerId: rotatedIdentity.ownerId,
 					});
 				},

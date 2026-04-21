@@ -29,6 +29,10 @@ type HomeRepositoryShape = {
 		HomeStateLoadError | HomeStateDecodeError
 	>;
 	readonly getLocation: Effect.Effect<HomeLocation>;
+	readonly loadStateDocument?: Effect.Effect<
+		unknown | null,
+		HomeStateLoadError | HomeStateDecodeError
+	>;
 	readonly loadState: Effect.Effect<
 		HomeState,
 		HomeStateLoadError | HomeStateDecodeError

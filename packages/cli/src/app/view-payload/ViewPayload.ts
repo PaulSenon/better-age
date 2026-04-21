@@ -16,6 +16,7 @@ import {
 	ReadPayloadEnvelopeError,
 	ReadPayloadFileFormatError,
 	ReadPayloadPersistenceError,
+	ReadPayloadVersionError,
 } from "../read-payload/ReadPayloadError.js";
 import { ResolvePayloadTarget } from "../shared/ResolvePayloadTarget.js";
 import { ResolvePayloadTargetError } from "../shared/ResolvePayloadTargetError.js";
@@ -26,17 +27,24 @@ export class ViewPayloadFailedError extends Error {
 
 export class ViewPayload extends Effect.Service<ViewPayload>()("ViewPayload", {
 	accessors: true,
-	effect: Effect.gen(function* () {
-		const prompt = yield* Prompt;
+		effect: Effect.gen(function* () {
+			const prompt = yield* Prompt;
 		const readPayload = yield* ReadPayload;
 		const resolvePayloadTarget = yield* ResolvePayloadTarget;
 		const secureViewer = yield* SecureViewer;
 
-		const failWithMessage = (message: string) =>
-			Effect.gen(function* () {
-				yield* prompt.writeStderr(`${message}\n`);
-				return yield* Effect.fail(new ViewPayloadFailedError());
-			});
+			const failWithMessage = (message: string) =>
+				Effect.gen(function* () {
+					yield* prompt.writeStderr(`${message}\n`);
+					return yield* Effect.fail(new ViewPayloadFailedError());
+				});
+
+			const writeUpdateWarning = (path: string) =>
+				prompt.writeStderr(
+					["Warning: payload should be updated", `Run: bage update ${path}`, ""].join(
+						"\n",
+					),
+				);
 
 		const execute = Effect.fn("ViewPayload.execute")(function* (input: {
 			readonly path: Option.Option<string>;
@@ -57,6 +65,10 @@ export class ViewPayload extends Effect.Service<ViewPayload>()("ViewPayload", {
 					envText: result.envText,
 					path: result.path,
 				});
+
+				if (result.needsUpdate.isRequired) {
+					yield* writeUpdateWarning(result.path);
+				}
 			}).pipe(
 				Effect.catchIf(
 					(error): error is ResolvePayloadTargetError =>
@@ -86,6 +98,11 @@ export class ViewPayload extends Effect.Service<ViewPayload>()("ViewPayload", {
 				Effect.catchIf(
 					(error): error is ReadPayloadEnvelopeError =>
 						error instanceof ReadPayloadEnvelopeError,
+					(error) => failWithMessage(error.message),
+				),
+				Effect.catchIf(
+					(error): error is ReadPayloadVersionError =>
+						error instanceof ReadPayloadVersionError,
 					(error) => failWithMessage(error.message),
 				),
 				Effect.catchIf(

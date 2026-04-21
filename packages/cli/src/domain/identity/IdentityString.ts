@@ -1,10 +1,5 @@
 import { Either, Encoding, Schema } from "effect";
-import { DisplayName } from "./DisplayName.js";
-import { Handle } from "./Handle.js";
-import { IdentityUpdatedAt } from "./IdentityUpdatedAt.js";
-import { KeyFingerprint } from "./KeyFingerprint.js";
-import { OwnerId } from "./OwnerId.js";
-import { PublicKey } from "./PublicKey.js";
+import { PublicIdentity, type PublicIdentity as PublicIdentityType } from "./PublicIdentity.js";
 
 export class IdentityStringDecodeError extends Schema.TaggedError<IdentityStringDecodeError>()(
 	"IdentityStringDecodeError",
@@ -21,18 +16,29 @@ export const IdentityString = Schema.String.pipe(
 export type IdentityString = Schema.Schema.Type<typeof IdentityString>;
 
 export const IdentityStringPayload = Schema.Struct({
-	displayName: DisplayName,
-	fingerprint: KeyFingerprint,
-	handle: Handle,
-	identityUpdatedAt: IdentityUpdatedAt,
-	ownerId: OwnerId,
-	publicKey: PublicKey,
+	...PublicIdentity.fields,
 	version: Schema.Literal("v1"),
 });
 
 export type IdentityStringPayload = Schema.Schema.Type<
 	typeof IdentityStringPayload
 >;
+
+export const toIdentityStringPayload = (
+	publicIdentity: PublicIdentityType,
+): IdentityStringPayload => ({
+	...publicIdentity,
+	version: "v1",
+});
+
+export const toPublicIdentityFromIdentityStringPayload = (
+	payload: IdentityStringPayload,
+): PublicIdentityType => ({
+	displayName: payload.displayName,
+	identityUpdatedAt: payload.identityUpdatedAt,
+	ownerId: payload.ownerId,
+	publicKey: payload.publicKey,
+});
 
 const prefix = "better-age://identity/v1/";
 

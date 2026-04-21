@@ -31,6 +31,13 @@ export class RevokePayloadRecipientUpdateRequiredError extends Schema.TaggedErro
 	},
 ) {}
 
+export class RevokePayloadRecipientVersionError extends Schema.TaggedError<RevokePayloadRecipientVersionError>()(
+	"RevokePayloadRecipientVersionError",
+	{
+		message: Schema.String,
+	},
+) {}
+
 export class RevokePayloadRecipientAmbiguousIdentityError extends Schema.TaggedError<RevokePayloadRecipientAmbiguousIdentityError>()(
 	"RevokePayloadRecipientAmbiguousIdentityError",
 	{

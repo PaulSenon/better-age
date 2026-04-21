@@ -1,7 +1,17 @@
 import { Command, HelpDoc, ValidationError } from "@effect/cli";
 import { NodeContext, NodeRuntime } from "@effect/platform-node";
 import { Effect, Layer } from "effect";
+import {
+	HomeStatePreflightMissingPathError,
+	HomeStatePreflightUnsupportedVersionError,
+} from "../app/shared/HomeStatePreflightError.js";
+import { withHomeStatePreflight } from "../app/shared/HomeStatePreflight.js";
 import { BetterAgeLive } from "../program/layer.js";
+import {
+	HomeStateDecodeError,
+	HomeStateLoadError,
+	HomeStateSaveError,
+} from "../port/HomeRepositoryError.js";
 import { addIdentityCommand } from "./command/addIdentityCommand.js";
 import { changePassphraseCommand } from "./command/changePassphraseCommand.js";
 import { createPayloadCommand } from "./command/createPayloadCommand.js";
@@ -64,9 +74,29 @@ const renderCliValidationError = (error: ValidationError.ValidationError) => {
 };
 
 export const runCli = (argv: ReadonlyArray<string>) =>
-	cli(argv).pipe(
+	withHomeStatePreflight(cli(argv)).pipe(
 		Effect.provide(MainLive),
 		Effect.as(0),
+		Effect.catchIf(
+			(
+				error,
+			): error is
+				| HomeStatePreflightMissingPathError
+				| HomeStatePreflightUnsupportedVersionError
+				| HomeStateLoadError
+				| HomeStateDecodeError
+				| HomeStateSaveError =>
+				error instanceof HomeStatePreflightMissingPathError ||
+				error instanceof HomeStatePreflightUnsupportedVersionError ||
+				error instanceof HomeStateLoadError ||
+				error instanceof HomeStateDecodeError ||
+				error instanceof HomeStateSaveError,
+			(error) =>
+				Effect.sync(() => {
+					process.stderr.write(withTrailingNewline(error.message));
+					return 1;
+				}),
+		),
 		Effect.catchIf(
 			(error): error is CliCommandFailedError =>
 				error instanceof CliCommandFailedError,
