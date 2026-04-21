@@ -11,7 +11,10 @@ Use it together with:
 Versioned persisted artifacts:
 - `Home State`
 - `Payload Envelope`
-- `Public Identity Snapshot` legacy representations, reused inside home/payload migration
+- `Identity String`
+
+Shared nested migration concern:
+- `Public Identity Snapshot` legacy representations, reused inside home/payload/identity-string migration
 
 Compatibility boundary kept separate:
 - `Load Protocol`
@@ -28,6 +31,7 @@ Current code entry points:
 - shared engine: `packages/cli/src/domain/migration/ArtifactMigration.ts`
 - home migration definition: `packages/cli/src/domain/home/HomeStateMigration.ts`
 - payload migration definition: `packages/cli/src/domain/payload/PayloadEnvelopeMigration.ts`
+- identity-string migration definition: `packages/cli/src/domain/identity/IdentityString.ts`
 - shared legacy identity adapters: `packages/cli/src/domain/identity/PublicIdentityMigration.ts`
 - home preflight: `packages/cli/src/app/shared/HomeStatePreflight.ts`
 - payload read preflight: `packages/cli/src/app/shared/OpenPayload.ts`
@@ -63,6 +67,17 @@ Important:
 - migrate legacy identity shapes in `PublicIdentityMigration.ts`
 - then let home/payload migrations reuse that
 
+### Identity String
+
+Use when shareable/importable identity encoding changed.
+
+Behavior contract:
+- explicit stable version marker in prefix and payload
+- decode must reject prefix/payload version mismatch
+- older supported versions may normalize to current in memory
+- newer unsupported versions hard-fail with update-CLI remediation
+- import keeps using canonical public identity after normalization
+
 ## Do not skip cleanup
 
 If the current shape is messy, first realign shapes before adding migration steps.
@@ -84,6 +99,7 @@ Examples:
 - `HomeState.ts`
 - `PayloadEnvelope.ts`
 - `PublicIdentity.ts`
+- `IdentityString.ts`
 
 Keep runtime shape as the only destination shape. Do not add “target version” options.
 

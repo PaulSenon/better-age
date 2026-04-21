@@ -1,7 +1,12 @@
+import { Schema } from "effect";
 import { describe, expect, it } from "vitest";
 import {
 	CURRENT_PAYLOAD_SCHEMA_VERSION,
+	LegacyPayloadEnvelopeV0,
+	LegacyPayloadEnvelopeV1,
 	normalizePayloadEnvelopeToCurrent,
+	PayloadEnvelopeMigrationDefinition,
+	VersionedPayloadEnvelope,
 } from "./PayloadEnvelopeMigration.js";
 
 const currentRecipient = {
@@ -14,31 +19,27 @@ const currentRecipient = {
 describe("PayloadEnvelopeMigration", () => {
 	it("keeps every released payload version migratable by default", () => {
 		const currentResult = normalizePayloadEnvelopeToCurrent({
-			envelope: {
+			envelope: Schema.decodeUnknownSync(VersionedPayloadEnvelope)({
 				createdAt: "2026-04-14T10:00:00.000Z",
 				envText: "API_TOKEN=secret\n",
 				lastRewrittenAt: "2026-04-14T10:00:00.000Z",
 				payloadId: "bspld_2222222222222222",
 				recipients: [currentRecipient],
 				version: 2,
-			} as unknown as Parameters<
-				typeof normalizePayloadEnvelopeToCurrent
-			>[0]["envelope"],
+			}),
 		});
 		const legacyV1Result = normalizePayloadEnvelopeToCurrent({
-			envelope: {
+			envelope: Schema.decodeUnknownSync(LegacyPayloadEnvelopeV1)({
 				createdAt: "2026-04-14T10:00:00.000Z",
 				envText: "API_TOKEN=secret\n",
 				lastRewrittenAt: "2026-04-14T10:00:00.000Z",
 				payloadId: "bspld_1111111111111111",
 				recipients: [currentRecipient],
 				version: 1,
-			} as unknown as Parameters<
-				typeof normalizePayloadEnvelopeToCurrent
-			>[0]["envelope"],
+			}),
 		});
 		const legacyV0Result = normalizePayloadEnvelopeToCurrent({
-			envelope: {
+			envelope: Schema.decodeUnknownSync(LegacyPayloadEnvelopeV0)({
 				createdAt: "2026-04-14T10:00:00.000Z",
 				envText: "API_TOKEN=secret\n",
 				lastRewrittenAt: "2026-04-14T10:00:00.000Z",
@@ -51,9 +52,7 @@ describe("PayloadEnvelopeMigration", () => {
 					},
 				],
 				version: 0,
-			} as unknown as Parameters<
-				typeof normalizePayloadEnvelopeToCurrent
-			>[0]["envelope"],
+			}),
 		});
 
 		expect(currentResult._tag).toBe("current");
@@ -74,7 +73,7 @@ describe("PayloadEnvelopeMigration", () => {
 
 	it("normalizes oldest supported payload into current recipient shape", () => {
 		const result = normalizePayloadEnvelopeToCurrent({
-			envelope: {
+			envelope: Schema.decodeUnknownSync(LegacyPayloadEnvelopeV0)({
 				createdAt: "2026-04-14T10:00:00.000Z",
 				envText: "API_TOKEN=secret\n",
 				lastRewrittenAt: "2026-04-14T10:00:00.000Z",
@@ -87,9 +86,7 @@ describe("PayloadEnvelopeMigration", () => {
 					},
 				],
 				version: 0,
-			} as unknown as Parameters<
-				typeof normalizePayloadEnvelopeToCurrent
-			>[0]["envelope"],
+			}),
 		});
 
 		expect(result).toMatchObject({
@@ -103,16 +100,14 @@ describe("PayloadEnvelopeMigration", () => {
 	});
 
 	it("blocks otherwise migratable legacy payload versions only when cutoff policy says so", () => {
-		const legacyEnvelope = {
+		const legacyEnvelope = Schema.decodeUnknownSync(LegacyPayloadEnvelopeV1)({
 			createdAt: "2026-04-14T10:00:00.000Z",
 			envText: "API_TOKEN=secret\n",
 			lastRewrittenAt: "2026-04-14T10:00:00.000Z",
 			payloadId: "bspld_1111111111111111",
 			recipients: [currentRecipient],
 			version: 1 as const,
-		} as unknown as Parameters<
-			typeof normalizePayloadEnvelopeToCurrent
-		>[0]["envelope"];
+		});
 
 		expect(
 			normalizePayloadEnvelopeToCurrent({
@@ -137,16 +132,14 @@ describe("PayloadEnvelopeMigration", () => {
 	it("treats explicit hard-break versions as additive to cutoff policy", () => {
 		expect(
 			normalizePayloadEnvelopeToCurrent({
-				envelope: {
+				envelope: Schema.decodeUnknownSync(LegacyPayloadEnvelopeV1)({
 					createdAt: "2026-04-14T10:00:00.000Z",
 					envText: "API_TOKEN=secret\n",
 					lastRewrittenAt: "2026-04-14T10:00:00.000Z",
 					payloadId: "bspld_1111111111111111",
 					recipients: [currentRecipient],
 					version: 1,
-				} as unknown as Parameters<
-					typeof normalizePayloadEnvelopeToCurrent
-				>[0]["envelope"],
+				}),
 				policy: {
 					hardBreakVersions: [1],
 				},
