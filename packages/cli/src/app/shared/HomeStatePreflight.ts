@@ -1,11 +1,12 @@
 import { Effect, Schema } from "effect";
+import type { HomeState as CurrentHomeState } from "../../domain/home/HomeState.js";
+import { emptyHomeState, HomeState } from "../../domain/home/HomeState.js";
 import {
 	CURRENT_HOME_SCHEMA_VERSION,
 	normalizeHomeStateToCurrent,
 	readHomeSchemaVersion,
 	VersionedHomeStateDocument,
 } from "../../domain/home/HomeStateMigration.js";
-import { emptyHomeState, HomeState } from "../../domain/home/HomeState.js";
 import { HomeRepository } from "../../port/HomeRepository.js";
 import { HomeStateDecodeError } from "../../port/HomeRepositoryError.js";
 import {
@@ -27,9 +28,9 @@ const decodeVersionedHomeStateDocument = (input: {
 		),
 	);
 
-const normalizeOrFail = (document: Schema.Schema.Type<
-	typeof VersionedHomeStateDocument
->) => {
+const normalizeOrFail = (
+	document: Schema.Schema.Type<typeof VersionedHomeStateDocument>,
+) => {
 	const result = normalizeHomeStateToCurrent({ document });
 
 	switch (result._tag) {
@@ -60,6 +61,10 @@ const normalizeOrFail = (document: Schema.Schema.Type<
 	}
 };
 
+const toCurrentHomeState = (
+	document: Schema.Schema.Type<typeof VersionedHomeStateDocument>,
+) => document as CurrentHomeState;
+
 const loadAndNormalizeHomeState = Effect.gen(function* () {
 	const homeRepository = yield* HomeRepository;
 
@@ -80,14 +85,12 @@ const loadAndNormalizeHomeState = Effect.gen(function* () {
 		detectedVersion !== undefined &&
 		detectedVersion > CURRENT_HOME_SCHEMA_VERSION
 	) {
-		return yield* Effect.fail(
-			new HomeStatePreflightUnsupportedVersionError({
-				currentVersion: CURRENT_HOME_SCHEMA_VERSION,
-				homeVersion: detectedVersion,
-				message:
-					"CLI is too old to open this managed home state. Update CLI to continue.",
-			}),
-		);
+		return yield* new HomeStatePreflightUnsupportedVersionError({
+			currentVersion: CURRENT_HOME_SCHEMA_VERSION,
+			homeVersion: detectedVersion,
+			message:
+				"CLI is too old to open this managed home state. Update CLI to continue.",
+		});
 	}
 
 	const decodedDocument = yield* decodeVersionedHomeStateDocument({
@@ -97,15 +100,17 @@ const loadAndNormalizeHomeState = Effect.gen(function* () {
 	const normalized = yield* normalizeOrFail(decodedDocument);
 
 	if (normalized._tag === "current") {
-		return normalized.artifact;
+		return toCurrentHomeState(normalized.artifact);
 	}
 
-	const currentState = normalized.artifact;
+	const currentState = toCurrentHomeState(normalized.artifact);
 	yield* homeRepository.saveState(currentState);
 	return currentState;
 }).pipe(Effect.withSpan("HomeStatePreflight.execute"));
 
-export const withHomeStatePreflight = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+export const withHomeStatePreflight = <A, E, R>(
+	effect: Effect.Effect<A, E, R>,
+) =>
 	Effect.gen(function* () {
 		yield* HomeStatePreflight.execute;
 		return yield* effect;

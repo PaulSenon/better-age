@@ -45,20 +45,19 @@ describe("CreateUserIdentity integration", () => {
 				expect(result.privateKeyPath).toBe("keys/active.key.age");
 				expect(snapshot.state.self._tag).toBe("Some");
 				if (snapshot.state.self._tag === "Some") {
-					expect(snapshot.state.self.value.displayName).toBe(
+					expect(snapshot.state.self.value.publicIdentity.displayName).toBe(
 						"integration-host",
 					);
-					expect(snapshot.state.self.value.ownerId).toMatch(
+					expect(snapshot.state.self.value.publicIdentity.ownerId).toMatch(
 						/^bsid1_[a-f0-9]{16}$/,
 					);
-					expect(snapshot.state.self.value.fingerprint).toBe(
-						result.fingerprint,
-					);
-					expect(snapshot.state.self.value.handle).toBe(
-						`integration-host#${snapshot.state.self.value.ownerId.slice("bsid1_".length, "bsid1_".length + 8)}`,
+					expect(result.handle).toBe(
+						`integration-host#${snapshot.state.self.value.publicIdentity.ownerId.slice("bsid1_".length, "bsid1_".length + 8)}`,
 					);
 					expect(snapshot.state.self.value.keyMode).toBe("pq-hybrid");
-					expect(snapshot.state.self.value.publicKey).toBe(result.publicKey);
+					expect(snapshot.state.self.value.publicIdentity.publicKey).toBe(
+						result.publicKey,
+					);
 				}
 				expect(result.publicKey.startsWith("age1")).toBe(true);
 

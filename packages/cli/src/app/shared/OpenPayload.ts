@@ -2,9 +2,9 @@ import { Effect, Option, Schema } from "effect";
 import type { HomeState } from "../../domain/home/HomeState.js";
 import { isSelfOwnerId } from "../../domain/home/SelfIdentityGuard.js";
 import {
+	getLocalAlias,
 	KnownIdentity,
 	type KnownIdentity as KnownIdentityType,
-	getLocalAlias,
 } from "../../domain/identity/Identity.js";
 import { getEnvKeyNames } from "../../domain/payload/EnvText.js";
 import { PayloadEnvelope } from "../../domain/payload/PayloadEnvelope.js";
@@ -112,7 +112,10 @@ const mergeKnownIdentities = (
 				knownIdentities: nextKnownIdentities,
 				localAliases: Object.fromEntries(
 					nextKnownIdentities.flatMap((identity) => {
-						const localAlias = getLocalAlias(state.localAliases, identity.ownerId);
+						const localAlias = getLocalAlias(
+							state.localAliases,
+							identity.ownerId,
+						);
 
 						return Option.isSome(localAlias)
 							? [[identity.ownerId, localAlias.value] as const]
@@ -132,6 +135,10 @@ export type OpenPayloadSuccess = {
 	readonly persistedSchemaVersion: number | undefined;
 	readonly state: HomeState;
 };
+
+const decodeCurrentPayloadEnvelope = (
+	envelope: Schema.Schema.Type<typeof VersionedPayloadEnvelope>,
+) => Schema.decodeUnknownSync(PayloadEnvelope)(envelope);
 
 export class OpenPayload extends Effect.Service<OpenPayload>()("OpenPayload", {
 	accessors: true,
@@ -207,9 +214,9 @@ export class OpenPayload extends Effect.Service<OpenPayload>()("OpenPayload", {
 				});
 			}
 
-			const decodedEnvelope = yield* Schema.decodeUnknown(VersionedPayloadEnvelope)(
-				decryptedEnvelope,
-			).pipe(
+			const decodedEnvelope = yield* Schema.decodeUnknown(
+				VersionedPayloadEnvelope,
+			)(decryptedEnvelope).pipe(
 				Effect.mapError(
 					() =>
 						new OpenPayloadEnvelopeError({
@@ -242,7 +249,9 @@ export class OpenPayload extends Effect.Service<OpenPayload>()("OpenPayload", {
 				});
 			}
 
-			const envelope = normalizedEnvelope.artifact;
+			const envelope = decodeCurrentPayloadEnvelope(
+				normalizedEnvelope.artifact,
+			);
 			const envKeys = yield* Effect.try({
 				catch: (cause) =>
 					cause instanceof Error
@@ -271,7 +280,9 @@ export class OpenPayload extends Effect.Service<OpenPayload>()("OpenPayload", {
 				envelope,
 				envKeys,
 				needsUpdate: getPayloadNeedsUpdate(nextState, envelope, {
-					persistedSchemaVersion: Option.getOrUndefined(payloadSchemaVersion),
+					...(Option.isSome(payloadSchemaVersion)
+						? { persistedSchemaVersion: payloadSchemaVersion.value }
+						: {}),
 				}),
 				nextState,
 				path: input.path,

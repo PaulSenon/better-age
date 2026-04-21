@@ -41,12 +41,9 @@ export class ExportIdentityString extends Effect.Service<ExportIdentityString>()
 						);
 					}
 
-					return Schema.decodeUnknown(
-						IdentityStringPayload,
-					)(toIdentityStringPayload(selfIdentity.value.publicIdentity)).pipe(
-						Effect.map(encodeIdentityString),
-						Effect.orDie,
-					);
+					return Schema.decodeUnknown(IdentityStringPayload)(
+						toIdentityStringPayload(selfIdentity.value.publicIdentity),
+					).pipe(Effect.map(encodeIdentityString), Effect.orDie);
 				}),
 				Effect.withSpan("ExportIdentityString.execute"),
 			);

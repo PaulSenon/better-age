@@ -1,5 +1,6 @@
 import { Clock, Effect } from "effect";
 import { resolveGrantIdentityRef } from "../../domain/identity/ResolveIdentityRef.js";
+import type { PayloadEnvelope } from "../../domain/payload/PayloadEnvelope.js";
 import { decideGrantRecipient } from "../../domain/payload/PayloadRecipientMutation.js";
 import { OpenPayload } from "../shared/OpenPayload.js";
 import { RewritePayloadEnvelope } from "../shared/RewritePayloadEnvelope.js";
@@ -114,14 +115,15 @@ export class GrantPayloadRecipient extends Effect.Service<GrantPayloadRecipient>
 							const now = new Date(
 								yield* Clock.currentTimeMillis,
 							).toISOString();
+							const nextEnvelope: PayloadEnvelope = {
+								...openedPayload.envelope,
+								lastRewrittenAt:
+									now as typeof openedPayload.envelope.lastRewrittenAt,
+								recipients: decision.nextRecipients,
+							};
 							yield* rewritePayloadEnvelope
 								.execute({
-									envelope: {
-										...openedPayload.envelope,
-										lastRewrittenAt:
-											now as typeof openedPayload.envelope.lastRewrittenAt,
-										recipients: decision.nextRecipients,
-									},
+									envelope: nextEnvelope,
 									path: input.path,
 								})
 								.pipe(

@@ -27,24 +27,26 @@ export class ViewPayloadFailedError extends Error {
 
 export class ViewPayload extends Effect.Service<ViewPayload>()("ViewPayload", {
 	accessors: true,
-		effect: Effect.gen(function* () {
-			const prompt = yield* Prompt;
+	effect: Effect.gen(function* () {
+		const prompt = yield* Prompt;
 		const readPayload = yield* ReadPayload;
 		const resolvePayloadTarget = yield* ResolvePayloadTarget;
 		const secureViewer = yield* SecureViewer;
 
-			const failWithMessage = (message: string) =>
-				Effect.gen(function* () {
-					yield* prompt.writeStderr(`${message}\n`);
-					return yield* Effect.fail(new ViewPayloadFailedError());
-				});
+		const failWithMessage = (message: string) =>
+			Effect.gen(function* () {
+				yield* prompt.writeStderr(`${message}\n`);
+				return yield* Effect.fail(new ViewPayloadFailedError());
+			});
 
-			const writeUpdateWarning = (path: string) =>
-				prompt.writeStderr(
-					["Warning: payload should be updated", `Run: bage update ${path}`, ""].join(
-						"\n",
-					),
-				);
+		const writeUpdateWarning = (path: string) =>
+			prompt.writeStderr(
+				[
+					"Warning: payload should be updated",
+					`Run: bage update ${path}`,
+					"",
+				].join("\n"),
+			);
 
 		const execute = Effect.fn("ViewPayload.execute")(function* (input: {
 			readonly path: Option.Option<string>;

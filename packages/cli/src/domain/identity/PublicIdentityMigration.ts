@@ -1,12 +1,8 @@
-import { Option, Schema } from "effect";
+import { type Option, Schema } from "effect";
 import { DisplayName } from "./DisplayName.js";
+import { KeyMode, type KnownIdentity, type SelfIdentity } from "./Identity.js";
 import { IdentityAlias } from "./IdentityAlias.js";
 import { IdentityUpdatedAt } from "./IdentityUpdatedAt.js";
-import {
-	KeyMode,
-	type KnownIdentity,
-	type SelfIdentity,
-} from "./Identity.js";
 import { OwnerId } from "./OwnerId.js";
 import { PrivateKeyRelativePath } from "./PrivateKeyRelativePath.js";
 import { PublicIdentity } from "./PublicIdentity.js";
@@ -34,7 +30,9 @@ export const LegacySelfIdentityV1 = Schema.Struct({
 	publicKey: PublicKey,
 });
 
-export type LegacySelfIdentityV1 = Schema.Schema.Type<typeof LegacySelfIdentityV1>;
+export type LegacySelfIdentityV1 = Schema.Schema.Type<
+	typeof LegacySelfIdentityV1
+>;
 
 export const LegacyPayloadRecipientV0 = Schema.Struct({
 	displayName: DisplayName,
@@ -49,7 +47,9 @@ export type LegacyPayloadRecipientV0 = Schema.Schema.Type<
 	typeof LegacyPayloadRecipientV0
 >;
 
-export const migrateLegacyKnownIdentityV1 = (input: LegacyKnownIdentityV1): {
+export const migrateLegacyKnownIdentityV1 = (
+	input: LegacyKnownIdentityV1,
+): {
 	readonly localAlias: Option.Option<IdentityAlias>;
 	readonly publicIdentity: KnownIdentity;
 } => ({

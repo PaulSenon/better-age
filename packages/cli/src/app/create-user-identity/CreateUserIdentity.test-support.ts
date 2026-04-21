@@ -1,5 +1,9 @@
 import { Effect, Schema } from "effect";
-import { emptyHomeState, getActiveKey, HomeState } from "../../domain/home/HomeState.js";
+import {
+	emptyHomeState,
+	getActiveKey,
+	HomeState,
+} from "../../domain/home/HomeState.js";
 import { PrivateKeyRelativePath } from "../../domain/identity/PrivateKeyRelativePath.js";
 import type { HomeLocation } from "../../port/HomeRepository.js";
 import { HomeRepository } from "../../port/HomeRepository.js";
@@ -69,11 +73,17 @@ export const makeInMemoryHomeRepository = (input?: {
 							stateFile: location.stateFile,
 						}),
 					)
-				: Effect.sync(() => {
-						state = nextState;
-						rawStateDocument = Schema.encodeSync(HomeState)(nextState);
-						saveCount += 1;
-					}),
+				: Schema.encode(HomeState)(nextState).pipe(
+						Effect.orDie,
+						Effect.tap((encodedState) =>
+							Effect.sync(() => {
+								state = nextState;
+								rawStateDocument = encodedState;
+								saveCount += 1;
+							}),
+						),
+						Effect.asVoid,
+					),
 		writePrivateKey: (fingerprint, contents) =>
 			input?.failOnWrite
 				? Effect.fail(

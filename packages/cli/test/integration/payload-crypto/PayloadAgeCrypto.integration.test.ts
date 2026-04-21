@@ -28,14 +28,13 @@ describe("PayloadAgeCrypto integration", () => {
 						payloadId: "bspld_0123456789abcdef",
 						recipients: [
 							{
-								displayNameSnapshot: "integration-host",
-								fingerprint: generatedIdentity.fingerprint,
+								displayName: "integration-host",
 								identityUpdatedAt: generatedIdentity.identityUpdatedAt,
 								ownerId: generatedIdentity.ownerId,
 								publicKey: generatedIdentity.publicKey,
 							},
 						],
-						version: 1,
+						version: 2,
 					}).pipe(Effect.orDie);
 
 					const armoredPayload = yield* PayloadCrypto.encryptEnvelope({

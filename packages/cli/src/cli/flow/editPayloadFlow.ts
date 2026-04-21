@@ -117,6 +117,7 @@ const runEditLoop = (input: {
 	| EditPayloadCryptoError
 	| EditPayloadPersistenceError
 	| EditPayloadUpdateRequiredError
+	| EditPayloadVersionError
 	| EditorExitError
 	| EditorLaunchError
 	| EditorUnavailableError

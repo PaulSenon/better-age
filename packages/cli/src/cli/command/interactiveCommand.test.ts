@@ -167,34 +167,27 @@ const makeConfiguredHomeRepository = () =>
 			knownIdentities: [
 				{
 					displayName: Schema.decodeUnknownSync(DisplayName)("paul"),
-					fingerprint: Schema.decodeUnknownSync(KeyFingerprint)(
-						"bs1_aaaaaaaaaaaaaaaa",
-					),
-					handle: Schema.decodeUnknownSync(Handle)("paul#aaaaaaaa"),
 					identityUpdatedAt: Schema.decodeUnknownSync(IdentityUpdatedAt)(
 						"2026-04-14T10:00:00.000Z",
 					),
-					localAlias: Option.none(),
 					ownerId: Schema.decodeUnknownSync(OwnerId)("bsid1_aaaaaaaaaaaaaaaa"),
 					publicKey: Schema.decodeUnknownSync(PublicKey)("age1paul"),
 				},
 			],
 			self: Option.some({
 				createdAt: "2026-04-14T10:00:00.000Z",
-				displayName: Schema.decodeUnknownSync(DisplayName)("isaac"),
-				fingerprint: Schema.decodeUnknownSync(KeyFingerprint)(
-					"bs1_1111111111111111",
-				),
-				handle: Schema.decodeUnknownSync(Handle)("isaac#069f7576"),
-				identityUpdatedAt: Schema.decodeUnknownSync(IdentityUpdatedAt)(
-					"2026-04-14T10:00:00.000Z",
-				),
 				keyMode: "pq-hybrid",
-				ownerId: Schema.decodeUnknownSync(OwnerId)("bsid1_069f7576d2ab43ef"),
 				privateKeyPath: Schema.decodeUnknownSync(PrivateKeyRelativePath)(
 					"keys/active.key.age",
 				),
-				publicKey: Schema.decodeUnknownSync(PublicKey)("age1isaac"),
+				publicIdentity: {
+					displayName: Schema.decodeUnknownSync(DisplayName)("isaac"),
+					identityUpdatedAt: Schema.decodeUnknownSync(IdentityUpdatedAt)(
+						"2026-04-14T10:00:00.000Z",
+					),
+					ownerId: Schema.decodeUnknownSync(OwnerId)("bsid1_069f7576d2ab43ef"),
+					publicKey: Schema.decodeUnknownSync(PublicKey)("age1isaac"),
+				},
 			}),
 		}),
 		readPrivateKey: (_privateKeyPath) => Effect.die("unused"),

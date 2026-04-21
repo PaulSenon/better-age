@@ -6,8 +6,8 @@ import { IdentityUpdatedAt } from "../identity/IdentityUpdatedAt.js";
 import { KeyFingerprint } from "../identity/KeyFingerprint.js";
 import { OwnerId } from "../identity/OwnerId.js";
 import { PrivateKeyRelativePath } from "../identity/PrivateKeyRelativePath.js";
-import { PublicKey } from "../identity/PublicKey.js";
 import { derivePublicIdentityFingerprint } from "../identity/PublicIdentity.js";
+import { PublicKey } from "../identity/PublicKey.js";
 import {
 	buildRotatedHomeState,
 	toRetiredPrivateKeyPath,

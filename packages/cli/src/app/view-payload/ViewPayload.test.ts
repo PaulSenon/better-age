@@ -98,58 +98,64 @@ describe("ViewPayload", () => {
 		})(),
 	);
 
-	it.effect("warns after successful interactive read when payload should be updated", () =>
-		(() => {
-			const prompt = makePrompt();
-			const secureViewer = Object.assign(
-				SecureViewer.make({
-					view: (input) =>
-						Effect.sync(() => {
-							secureViewer.calls.push(input);
-						}),
-				}),
-				{ calls: [] as Array<{ envText: string; path: string }> },
-			);
-			const dependencies = Layer.mergeAll(
-				Layer.succeed(Prompt, prompt),
-				Layer.succeed(ResolvePayloadTarget, makeResolvePayloadTarget()),
-				Layer.succeed(
-					ReadPayload,
-					ReadPayload.make({
-						execute: ({ path }) =>
-							Effect.succeed(
-								new ReadPayloadSuccess({
-									envText: "API_TOKEN=secret\nDEBUG=true",
-									needsUpdate: {
-										isRequired: true,
-										reason: Option.some("payload schema is outdated"),
-									},
-									path,
-								}),
-							),
+	it.effect(
+		"warns after successful interactive read when payload should be updated",
+		() =>
+			(() => {
+				const prompt = makePrompt();
+				const secureViewer = Object.assign(
+					SecureViewer.make({
+						view: (input) =>
+							Effect.sync(() => {
+								secureViewer.calls.push(input);
+							}),
 					}),
-				),
-				Layer.succeed(SecureViewer, secureViewer),
-			);
-
-			return Effect.gen(function* () {
-				yield* ViewPayload.execute({
-					path: Option.none(),
-				});
-
-				expect(secureViewer.calls).toEqual([
-					{
-						envText: "API_TOKEN=secret\nDEBUG=true",
-						path: "./.env.enc",
-					},
-				]);
-				expect(prompt.stderr).toEqual([
-					["Warning: payload should be updated", "Run: bage update ./.env.enc", ""].join(
-						"\n",
+					{ calls: [] as Array<{ envText: string; path: string }> },
+				);
+				const dependencies = Layer.mergeAll(
+					Layer.succeed(Prompt, prompt),
+					Layer.succeed(ResolvePayloadTarget, makeResolvePayloadTarget()),
+					Layer.succeed(
+						ReadPayload,
+						ReadPayload.make({
+							execute: ({ path }) =>
+								Effect.succeed(
+									new ReadPayloadSuccess({
+										envText: "API_TOKEN=secret\nDEBUG=true",
+										needsUpdate: {
+											isRequired: true,
+											reason: Option.some("payload schema is outdated"),
+										},
+										path,
+									}),
+								),
+						}),
 					),
-				]);
-			}).pipe(Effect.provide(Layer.provide(ViewPayload.Default, dependencies)));
-		})(),
+					Layer.succeed(SecureViewer, secureViewer),
+				);
+
+				return Effect.gen(function* () {
+					yield* ViewPayload.execute({
+						path: Option.none(),
+					});
+
+					expect(secureViewer.calls).toEqual([
+						{
+							envText: "API_TOKEN=secret\nDEBUG=true",
+							path: "./.env.enc",
+						},
+					]);
+					expect(prompt.stderr).toEqual([
+						[
+							"Warning: payload should be updated",
+							"Run: bage update ./.env.enc",
+							"",
+						].join("\n"),
+					]);
+				}).pipe(
+					Effect.provide(Layer.provide(ViewPayload.Default, dependencies)),
+				);
+			})(),
 	);
 
 	it.effect(

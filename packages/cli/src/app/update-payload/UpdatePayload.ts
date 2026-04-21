@@ -101,9 +101,11 @@ export class UpdatePayload extends Effect.Service<UpdatePayload>()(
 				const updateState = computePayloadUpdateState(
 					openedPayload.nextState,
 					openedPayload.envelope,
-					{
-						persistedSchemaVersion: openedPayload.persistedSchemaVersion,
-					},
+					openedPayload.persistedSchemaVersion === undefined
+						? {}
+						: {
+								persistedSchemaVersion: openedPayload.persistedSchemaVersion,
+							},
 				);
 				const reasons = updateState.reasons.map(getPayloadUpdateReasonMessage);
 				const selfIdentity = getSelfIdentity(openedPayload.nextState);
@@ -126,7 +128,9 @@ export class UpdatePayload extends Effect.Service<UpdatePayload>()(
 				const currentSelfRecipient = toPayloadRecipientFromSelfIdentity(
 					selfIdentity.value,
 				);
-				const resolvedSelfIdentity = materializeSelfIdentity(selfIdentity.value);
+				const resolvedSelfIdentity = materializeSelfIdentity(
+					selfIdentity.value,
+				);
 				const nextRecipients = synthesizeNextRecipients({
 					currentSelfRecipient,
 					ownerId: resolvedSelfIdentity.ownerId,

@@ -23,9 +23,7 @@ describe("ExportIdentityString", () => {
 				identityUpdatedAt: Schema.decodeUnknownSync(IdentityUpdatedAt)(
 					"2026-04-14T10:00:00.000Z",
 				),
-				ownerId: Schema.decodeUnknownSync(OwnerId)(
-					"bsid1_069f7576d2ab43ef",
-				),
+				ownerId: Schema.decodeUnknownSync(OwnerId)("bsid1_069f7576d2ab43ef"),
 				publicKey: Schema.decodeUnknownSync(PublicKey)("age1testrecipient"),
 			}),
 		),
@@ -39,6 +37,7 @@ describe("ExportIdentityString", () => {
 					deletePrivateKey: () => Effect.void,
 					getActiveKey: Effect.succeed(Option.none()),
 					getLocation: Effect.die("unused"),
+					loadStateDocument: Effect.die("unused"),
 					loadState: Effect.succeed({
 						...emptyHomeState(),
 						activeKeyFingerprint: Option.some(

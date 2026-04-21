@@ -112,10 +112,7 @@ describe("ReadPayload", () => {
 						envText: "API_TOKEN=secret\nDEBUG=true\n",
 						lastRewrittenAt: "2026-04-14T10:00:00.000Z",
 						payloadId: "bspld_0123456789abcdef",
-						recipients: [
-							selfRecipient,
-							paulRecipient,
-						],
+						recipients: [selfRecipient, paulRecipient],
 						version: 2,
 					});
 
@@ -200,102 +197,106 @@ describe("ReadPayload", () => {
 			}),
 		);
 
-		it.effect("migrates one-version-behind payload in memory and warns for update", () =>
-			Effect.gen(function* () {
-				yield* homeRepository.saveState({
-					...emptyHomeState(),
-					activeKeyFingerprint: Option.some(selfFingerprint),
-					self: Option.some(selfIdentity),
-					knownIdentities: [],
-					retiredKeys: [],
-					rotationTtl: "3m",
-				});
-				homeRepository.seedPrivateKey(
-					"keys/active.key.age",
-					"AGE-ENCRYPTED-ACTIVE-KEY",
-				);
-				payloadRepository.seedFile(
-					"/workspace/legacy-v1.env.enc",
-					serializePayloadFile({
-						armoredPayload: "FAKE-ARMORED-PAYLOAD",
-					}),
-				);
-				payloadCrypto.seedDecryptedEnvelope({
-					createdAt: "2026-04-14T10:00:00.000Z",
-					envText: "API_TOKEN=secret\n",
-					lastRewrittenAt: "2026-04-14T10:00:00.000Z",
-					payloadId: "bspld_1111111111111111",
-					recipients: [selfRecipient, paulRecipient],
-					version: 1,
-				});
+		it.effect(
+			"migrates one-version-behind payload in memory and warns for update",
+			() =>
+				Effect.gen(function* () {
+					yield* homeRepository.saveState({
+						...emptyHomeState(),
+						activeKeyFingerprint: Option.some(selfFingerprint),
+						self: Option.some(selfIdentity),
+						knownIdentities: [],
+						retiredKeys: [],
+						rotationTtl: "3m",
+					});
+					homeRepository.seedPrivateKey(
+						"keys/active.key.age",
+						"AGE-ENCRYPTED-ACTIVE-KEY",
+					);
+					payloadRepository.seedFile(
+						"/workspace/legacy-v1.env.enc",
+						serializePayloadFile({
+							armoredPayload: "FAKE-ARMORED-PAYLOAD",
+						}),
+					);
+					payloadCrypto.seedDecryptedEnvelope({
+						createdAt: "2026-04-14T10:00:00.000Z",
+						envText: "API_TOKEN=secret\n",
+						lastRewrittenAt: "2026-04-14T10:00:00.000Z",
+						payloadId: "bspld_1111111111111111",
+						recipients: [selfRecipient, paulRecipient],
+						version: 1,
+					});
 
-				const result = yield* ReadPayload.execute({
-					passphrase: "test-passphrase",
-					path: "/workspace/legacy-v1.env.enc",
-				});
+					const result = yield* ReadPayload.execute({
+						passphrase: "test-passphrase",
+						path: "/workspace/legacy-v1.env.enc",
+					});
 
-				expect(result.needsUpdate).toEqual({
-					isRequired: true,
-					reason: Option.some("payload schema is outdated"),
-				});
-				expect(payloadRepository.snapshot().writeCalls).toHaveLength(0);
-			}),
+					expect(result.needsUpdate).toEqual({
+						isRequired: true,
+						reason: Option.some("payload schema is outdated"),
+					});
+					expect(payloadRepository.snapshot().writeCalls).toHaveLength(0);
+				}),
 		);
 
-		it.effect("migrates multi-hop legacy payload in memory and normalizes recipient shape", () =>
-			Effect.gen(function* () {
-				yield* homeRepository.saveState({
-					...emptyHomeState(),
-					activeKeyFingerprint: Option.some(selfFingerprint),
-					self: Option.some(selfIdentity),
-					knownIdentities: [],
-					retiredKeys: [],
-					rotationTtl: "3m",
-				});
-				homeRepository.seedPrivateKey(
-					"keys/active.key.age",
-					"AGE-ENCRYPTED-ACTIVE-KEY",
-				);
-				payloadRepository.seedFile(
-					"/workspace/legacy-v0.env.enc",
-					serializePayloadFile({
-						armoredPayload: "FAKE-ARMORED-PAYLOAD",
-					}),
-				);
-				payloadCrypto.seedDecryptedEnvelope({
-					createdAt: "2026-04-14T10:00:00.000Z",
-					envText: "API_TOKEN=secret\n",
-					lastRewrittenAt: "2026-04-14T10:00:00.000Z",
-					payloadId: "bspld_0000000000000000",
-					recipients: [
+		it.effect(
+			"migrates multi-hop legacy payload in memory and normalizes recipient shape",
+			() =>
+				Effect.gen(function* () {
+					yield* homeRepository.saveState({
+						...emptyHomeState(),
+						activeKeyFingerprint: Option.some(selfFingerprint),
+						self: Option.some(selfIdentity),
+						knownIdentities: [],
+						retiredKeys: [],
+						rotationTtl: "3m",
+					});
+					homeRepository.seedPrivateKey(
+						"keys/active.key.age",
+						"AGE-ENCRYPTED-ACTIVE-KEY",
+					);
+					payloadRepository.seedFile(
+						"/workspace/legacy-v0.env.enc",
+						serializePayloadFile({
+							armoredPayload: "FAKE-ARMORED-PAYLOAD",
+						}),
+					);
+					payloadCrypto.seedDecryptedEnvelope({
+						createdAt: "2026-04-14T10:00:00.000Z",
+						envText: "API_TOKEN=secret\n",
+						lastRewrittenAt: "2026-04-14T10:00:00.000Z",
+						payloadId: "bspld_0000000000000000",
+						recipients: [
+							{
+								...paulRecipient,
+								fingerprint: paulFingerprint,
+								handle: paulHandle,
+							},
+						],
+						version: 0,
+					});
+
+					const result = yield* ReadPayload.execute({
+						passphrase: "test-passphrase",
+						path: "/workspace/legacy-v0.env.enc",
+					});
+
+					expect(result.needsUpdate).toEqual({
+						isRequired: true,
+						reason: Option.some("payload schema is outdated"),
+					});
+					expect(homeRepository.snapshot().state.knownIdentities).toEqual([
 						{
-							...paulRecipient,
-							fingerprint: paulFingerprint,
-							handle: paulHandle,
+							displayName: paulDisplayName,
+							identityUpdatedAt: paulIdentityUpdatedAt,
+							ownerId: paulOwnerId,
+							publicKey: paulPublicKey,
 						},
-					],
-					version: 0,
-				});
-
-				const result = yield* ReadPayload.execute({
-					passphrase: "test-passphrase",
-					path: "/workspace/legacy-v0.env.enc",
-				});
-
-				expect(result.needsUpdate).toEqual({
-					isRequired: true,
-					reason: Option.some("payload schema is outdated"),
-				});
-				expect(homeRepository.snapshot().state.knownIdentities).toEqual([
-					{
-						displayName: paulDisplayName,
-						identityUpdatedAt: paulIdentityUpdatedAt,
-						ownerId: paulOwnerId,
-						publicKey: paulPublicKey,
-					},
-				]);
-				expect(payloadRepository.snapshot().writeCalls).toHaveLength(0);
-			}),
+					]);
+					expect(payloadRepository.snapshot().writeCalls).toHaveLength(0);
+				}),
 		);
 
 		it.effect("fails when payload version is newer than runtime", () =>
@@ -315,14 +316,18 @@ describe("ReadPayload", () => {
 						armoredPayload: "FAKE-ARMORED-PAYLOAD",
 					}),
 				);
-				payloadCrypto.seedDecryptedEnvelope({
+				const unsupportedNewerEnvelope = {
 					createdAt: "2026-04-14T10:00:00.000Z",
 					envText: "API_TOKEN=secret\n",
 					lastRewrittenAt: "2026-04-14T10:00:00.000Z",
 					payloadId: "bspld_2222222222222222",
 					recipients: [selfRecipient],
 					version: 3,
-				});
+				} as unknown as Parameters<
+					typeof payloadCrypto.seedDecryptedEnvelope
+				>[0];
+
+				payloadCrypto.seedDecryptedEnvelope(unsupportedNewerEnvelope);
 
 				const result = yield* ReadPayload.execute({
 					passphrase: "test-passphrase",

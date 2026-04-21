@@ -1,9 +1,9 @@
 import { createHash } from "node:crypto";
 import { Schema } from "effect";
 import { DisplayName } from "./DisplayName.js";
-import { toHandle, type Handle } from "./Handle.js";
+import { type Handle, toHandle } from "./Handle.js";
 import { IdentityUpdatedAt } from "./IdentityUpdatedAt.js";
-import { KeyFingerprint, type KeyFingerprint } from "./KeyFingerprint.js";
+import { KeyFingerprint } from "./KeyFingerprint.js";
 import { OwnerId } from "./OwnerId.js";
 import { PublicKey } from "./PublicKey.js";
 
@@ -16,9 +16,7 @@ export const PublicIdentity = Schema.Struct({
 
 export type PublicIdentity = Schema.Schema.Type<typeof PublicIdentity>;
 
-export const derivePublicIdentityHandle = (
-	identity: PublicIdentity,
-): Handle =>
+export const derivePublicIdentityHandle = (identity: PublicIdentity): Handle =>
 	toHandle({
 		displayName: identity.displayName,
 		ownerId: identity.ownerId,

@@ -82,10 +82,7 @@ const paulTwo = {
 const toRecipient = (
 	identity: Pick<
 		typeof paul,
-		| "displayName"
-		| "identityUpdatedAt"
-		| "ownerId"
-		| "publicKey"
+		"displayName" | "identityUpdatedAt" | "ownerId" | "publicKey"
 	>,
 ) => ({
 	displayName: identity.displayName,
@@ -131,10 +128,7 @@ describe("RevokePayloadRecipient", () => {
 					envText: "API_TOKEN=secret\n",
 					lastRewrittenAt: "2026-04-14T10:00:00.000Z",
 					payloadId: "bspld_0123456789abcdef",
-					recipients: [
-						selfRecipient,
-						toRecipient(paul),
-					],
+					recipients: [selfRecipient, toRecipient(paul)],
 					version: 2,
 				});
 
@@ -152,9 +146,7 @@ describe("RevokePayloadRecipient", () => {
 				expect(
 					payloadCrypto.snapshot().encryptCalls[0]?.envelope,
 				).toMatchObject({
-					recipients: [
-						selfRecipient,
-					],
+					recipients: [selfRecipient],
 				});
 			}),
 		);
@@ -178,9 +170,7 @@ describe("RevokePayloadRecipient", () => {
 					envText: "API_TOKEN=secret\n",
 					lastRewrittenAt: "2026-04-14T10:00:00.000Z",
 					payloadId: "bspld_0123456789abcdef",
-					recipients: [
-						selfRecipient,
-					],
+					recipients: [selfRecipient],
 					version: 2,
 				});
 
@@ -218,9 +208,7 @@ describe("RevokePayloadRecipient", () => {
 					envText: "API_TOKEN=secret\n",
 					lastRewrittenAt: "2026-04-14T10:00:00.000Z",
 					payloadId: "bspld_0123456789abcdef",
-					recipients: [
-						selfRecipient,
-					],
+					recipients: [selfRecipient],
 					version: 2,
 				});
 
@@ -258,11 +246,7 @@ describe("RevokePayloadRecipient", () => {
 					envText: "API_TOKEN=secret\n",
 					lastRewrittenAt: "2026-04-14T10:00:00.000Z",
 					payloadId: "bspld_0123456789abcdef",
-					recipients: [
-						toRecipient(paul),
-						toRecipient(paulTwo),
-						selfRecipient,
-					],
+					recipients: [toRecipient(paul), toRecipient(paulTwo), selfRecipient],
 					version: 2,
 				});
 
@@ -327,45 +311,47 @@ describe("RevokePayloadRecipient", () => {
 			}),
 		);
 
-		it.effect("fails with version remediation when payload is newer than CLI", () =>
-			Effect.gen(function* () {
-				yield* homeRepository.saveState({
-					...emptyHomeState(),
-					activeKeyFingerprint: Option.some(selfFingerprint),
-					knownIdentities: [paul],
-					self: Option.some(selfIdentity),
-					rotationTtl: "3m",
-				});
-				homeRepository.seedPrivateKey("keys/active.key.age", "AGE-ENCRYPTED");
-				payloadRepository.seedFile(
-					"/workspace/newer.env.enc",
-					serializePayloadFile({ armoredPayload: "FAKE-ARMORED-PAYLOAD" }),
-				);
-				payloadCrypto.seedDecryptedEnvelope({
-					createdAt: "2026-04-14T10:00:00.000Z",
-					envText: "API_TOKEN=secret\n",
-					lastRewrittenAt: "2026-04-14T10:00:00.000Z",
-					payloadId: "bspld_0123456789abcdef",
-					recipients: [selfRecipient],
-					version: 999,
-				});
-
-				const result = yield* RevokePayloadRecipient.execute({
-					identityRef: "paul#aaaaaaaa",
-					passphrase: "test-passphrase",
-					path: "/workspace/newer.env.enc",
-				}).pipe(Effect.either);
-
-				expect(result._tag).toBe("Left");
-				if (result._tag === "Left") {
-					expect(result.left).toEqual(
-						new RevokePayloadRecipientVersionError({
-							message:
-								"CLI is too old to open this payload. Update CLI to latest version.",
-						}),
+		it.effect(
+			"fails with version remediation when payload is newer than CLI",
+			() =>
+				Effect.gen(function* () {
+					yield* homeRepository.saveState({
+						...emptyHomeState(),
+						activeKeyFingerprint: Option.some(selfFingerprint),
+						knownIdentities: [paul],
+						self: Option.some(selfIdentity),
+						rotationTtl: "3m",
+					});
+					homeRepository.seedPrivateKey("keys/active.key.age", "AGE-ENCRYPTED");
+					payloadRepository.seedFile(
+						"/workspace/newer.env.enc",
+						serializePayloadFile({ armoredPayload: "FAKE-ARMORED-PAYLOAD" }),
 					);
-				}
-			}),
+					payloadCrypto.seedDecryptedEnvelope({
+						createdAt: "2026-04-14T10:00:00.000Z",
+						envText: "API_TOKEN=secret\n",
+						lastRewrittenAt: "2026-04-14T10:00:00.000Z",
+						payloadId: "bspld_0123456789abcdef",
+						recipients: [selfRecipient],
+						version: 999,
+					});
+
+					const result = yield* RevokePayloadRecipient.execute({
+						identityRef: "paul#aaaaaaaa",
+						passphrase: "test-passphrase",
+						path: "/workspace/newer.env.enc",
+					}).pipe(Effect.either);
+
+					expect(result._tag).toBe("Left");
+					if (result._tag === "Left") {
+						expect(result.left).toEqual(
+							new RevokePayloadRecipientVersionError({
+								message:
+									"CLI is too old to open this payload. Update CLI to latest version.",
+							}),
+						);
+					}
+				}),
 		);
 	});
 });

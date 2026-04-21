@@ -35,7 +35,9 @@ describe("HomeStateMigration", () => {
 				retiredKeys: [],
 				rotationTtl: "3m",
 				self: Option.none(),
-			},
+			} as unknown as Parameters<
+				typeof normalizeHomeStateToCurrent
+			>[0]["document"],
 		});
 		const legacyV1Result = normalizeHomeStateToCurrent({
 			document: {
@@ -46,7 +48,9 @@ describe("HomeStateMigration", () => {
 				retiredKeys: [],
 				rotationTtl: "3m",
 				self: Option.some(legacySelfIdentityV1),
-			},
+			} as unknown as Parameters<
+				typeof normalizeHomeStateToCurrent
+			>[0]["document"],
 		});
 		const legacyV0Result = normalizeHomeStateToCurrent({
 			document: {
@@ -56,7 +60,9 @@ describe("HomeStateMigration", () => {
 				knownIdentities: [legacyKnownIdentityV1],
 				retiredKeys: [],
 				self: Option.some(legacySelfIdentityV1),
-			},
+			} as unknown as Parameters<
+				typeof normalizeHomeStateToCurrent
+			>[0]["document"],
 		});
 
 		expect(currentResult._tag).toBe("current");
@@ -85,7 +91,9 @@ describe("HomeStateMigration", () => {
 				retiredKeys: [],
 				rotationTtl: "3m",
 				self: Option.some(legacySelfIdentityV1),
-			},
+			} as unknown as Parameters<
+				typeof normalizeHomeStateToCurrent
+			>[0]["document"],
 		});
 
 		expect(result).toMatchObject({
@@ -130,7 +138,9 @@ describe("HomeStateMigration", () => {
 			retiredKeys: [],
 			rotationTtl: "3m" as const,
 			self: Option.some(legacySelfIdentityV1),
-		};
+		} as unknown as Parameters<
+			typeof normalizeHomeStateToCurrent
+		>[0]["document"];
 
 		expect(
 			normalizeHomeStateToCurrent({
@@ -163,7 +173,9 @@ describe("HomeStateMigration", () => {
 					retiredKeys: [],
 					rotationTtl: "3m",
 					self: Option.some(legacySelfIdentityV1),
-				},
+				} as unknown as Parameters<
+					typeof normalizeHomeStateToCurrent
+				>[0]["document"],
 				policy: {
 					hardBreakVersions: [1],
 				},
@@ -177,18 +189,22 @@ describe("HomeStateMigration", () => {
 	});
 
 	it("keeps unsupported-newer distinct from intentional hard-broken legacy", () => {
+		const unsupportedNewerDocument = {
+			activeKeyFingerprint: Option.none(),
+			defaultEditorCommand: Option.none(),
+			homeSchemaVersion: 3,
+			knownIdentities: [],
+			localAliases: {},
+			retiredKeys: [],
+			rotationTtl: "3m",
+			self: Option.none(),
+		} as unknown as Parameters<
+			typeof normalizeHomeStateToCurrent
+		>[0]["document"];
+
 		expect(
 			normalizeHomeStateToCurrent({
-				document: {
-					activeKeyFingerprint: Option.none(),
-					defaultEditorCommand: Option.none(),
-					homeSchemaVersion: 3,
-					knownIdentities: [],
-					localAliases: {},
-					retiredKeys: [],
-					rotationTtl: "3m",
-					self: Option.none(),
-				},
+				document: unsupportedNewerDocument,
 			}),
 		).toEqual({
 			_tag: "unsupported-newer",

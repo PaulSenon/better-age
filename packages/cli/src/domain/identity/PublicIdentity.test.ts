@@ -1,14 +1,14 @@
 import { describe, expect, it } from "@effect/vitest";
 import { Schema } from "effect";
 import { DisplayName } from "./DisplayName.js";
+import { IdentityUpdatedAt } from "./IdentityUpdatedAt.js";
+import { KeyFingerprint } from "./KeyFingerprint.js";
+import { OwnerId } from "./OwnerId.js";
 import {
 	derivePublicIdentityFingerprint,
 	derivePublicIdentityHandle,
 	PublicIdentity,
 } from "./PublicIdentity.js";
-import { IdentityUpdatedAt } from "./IdentityUpdatedAt.js";
-import { KeyFingerprint } from "./KeyFingerprint.js";
-import { OwnerId } from "./OwnerId.js";
 import { PublicKey } from "./PublicKey.js";
 
 describe("PublicIdentity", () => {

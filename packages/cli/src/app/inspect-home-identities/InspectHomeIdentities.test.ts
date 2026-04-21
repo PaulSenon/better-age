@@ -7,11 +7,11 @@ import { IdentityUpdatedAt } from "../../domain/identity/IdentityUpdatedAt.js";
 import { KeyFingerprint } from "../../domain/identity/KeyFingerprint.js";
 import { OwnerId } from "../../domain/identity/OwnerId.js";
 import { PrivateKeyRelativePath } from "../../domain/identity/PrivateKeyRelativePath.js";
-import { PublicKey } from "../../domain/identity/PublicKey.js";
 import {
 	derivePublicIdentityFingerprint,
 	derivePublicIdentityHandle,
 } from "../../domain/identity/PublicIdentity.js";
+import { PublicKey } from "../../domain/identity/PublicKey.js";
 import { HomeRepository } from "../../port/HomeRepository.js";
 import { makeInMemoryHomeRepository } from "../create-user-identity/CreateUserIdentity.test-support.js";
 import { InspectHomeIdentities } from "./InspectHomeIdentities.js";

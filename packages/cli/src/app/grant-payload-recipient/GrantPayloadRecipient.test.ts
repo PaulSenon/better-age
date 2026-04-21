@@ -93,10 +93,7 @@ const staleSelfPublicKey = Schema.decodeUnknownSync(PublicKey)("age1stale");
 const toRecipient = (
 	identity: Pick<
 		typeof paulOld,
-		| "displayName"
-		| "identityUpdatedAt"
-		| "ownerId"
-		| "publicKey"
+		"displayName" | "identityUpdatedAt" | "ownerId" | "publicKey"
 	>,
 ) => ({
 	displayName: identity.displayName,
@@ -142,9 +139,7 @@ describe("GrantPayloadRecipient", () => {
 					envText: "API_TOKEN=secret\n",
 					lastRewrittenAt: "2026-04-14T10:00:00.000Z",
 					payloadId: "bspld_0123456789abcdef",
-					recipients: [
-						selfRecipient,
-					],
+					recipients: [selfRecipient],
 					version: 2,
 				});
 
@@ -164,10 +159,7 @@ describe("GrantPayloadRecipient", () => {
 				expect(
 					payloadCrypto.snapshot().encryptCalls[0]?.envelope,
 				).toMatchObject({
-					recipients: [
-						selfRecipient,
-						toRecipient(paulNew),
-					],
+					recipients: [selfRecipient, toRecipient(paulNew)],
 				});
 			}),
 		);
@@ -195,10 +187,7 @@ describe("GrantPayloadRecipient", () => {
 						envText: "API_TOKEN=secret\n",
 						lastRewrittenAt: "2026-04-14T10:00:00.000Z",
 						payloadId: "bspld_0123456789abcdef",
-						recipients: [
-							selfRecipient,
-							toRecipient(paulOld),
-						],
+						recipients: [selfRecipient, toRecipient(paulOld)],
 						version: 2,
 					});
 
@@ -240,10 +229,7 @@ describe("GrantPayloadRecipient", () => {
 						envText: "API_TOKEN=secret\n",
 						lastRewrittenAt: "2026-04-14T10:00:00.000Z",
 						payloadId: "bspld_0123456789abcdef",
-						recipients: [
-							selfRecipient,
-							toRecipient(paulNew),
-						],
+						recipients: [selfRecipient, toRecipient(paulNew)],
 						version: 2,
 					});
 
@@ -285,10 +271,7 @@ describe("GrantPayloadRecipient", () => {
 					envText: "API_TOKEN=secret\n",
 					lastRewrittenAt: "2026-04-14T10:00:00.000Z",
 					payloadId: "bspld_0123456789abcdef",
-					recipients: [
-						selfRecipient,
-						toRecipient(paulNew),
-					],
+					recipients: [selfRecipient, toRecipient(paulNew)],
 					version: 2,
 				});
 
@@ -333,9 +316,7 @@ describe("GrantPayloadRecipient", () => {
 					envText: "API_TOKEN=secret\n",
 					lastRewrittenAt: "2026-04-14T10:00:00.000Z",
 					payloadId: "bspld_0123456789abcdef",
-					recipients: [
-						selfRecipient,
-					],
+					recipients: [selfRecipient],
 					version: 2,
 				});
 
@@ -399,45 +380,47 @@ describe("GrantPayloadRecipient", () => {
 			}),
 		);
 
-		it.effect("fails with version remediation when payload is newer than CLI", () =>
-			Effect.gen(function* () {
-				yield* homeRepository.saveState({
-					...emptyHomeState(),
-					activeKeyFingerprint: Option.some(selfFingerprint),
-					knownIdentities: [paulNew],
-					self: Option.some(selfIdentity),
-					rotationTtl: "3m",
-				});
-				homeRepository.seedPrivateKey("keys/active.key.age", "AGE-ENCRYPTED");
-				payloadRepository.seedFile(
-					"/workspace/newer.env.enc",
-					serializePayloadFile({ armoredPayload: "FAKE-ARMORED-PAYLOAD" }),
-				);
-				payloadCrypto.seedDecryptedEnvelope({
-					createdAt: "2026-04-14T10:00:00.000Z",
-					envText: "API_TOKEN=secret\n",
-					lastRewrittenAt: "2026-04-14T10:00:00.000Z",
-					payloadId: "bspld_0123456789abcdef",
-					recipients: [selfRecipient],
-					version: 999,
-				});
-
-				const result = yield* GrantPayloadRecipient.execute({
-					identityRef: "paul#aaaaaaaa",
-					passphrase: "test-passphrase",
-					path: "/workspace/newer.env.enc",
-				}).pipe(Effect.either);
-
-				expect(result._tag).toBe("Left");
-				if (result._tag === "Left") {
-					expect(result.left).toEqual(
-						new GrantPayloadRecipientVersionError({
-							message:
-								"CLI is too old to open this payload. Update CLI to latest version.",
-						}),
+		it.effect(
+			"fails with version remediation when payload is newer than CLI",
+			() =>
+				Effect.gen(function* () {
+					yield* homeRepository.saveState({
+						...emptyHomeState(),
+						activeKeyFingerprint: Option.some(selfFingerprint),
+						knownIdentities: [paulNew],
+						self: Option.some(selfIdentity),
+						rotationTtl: "3m",
+					});
+					homeRepository.seedPrivateKey("keys/active.key.age", "AGE-ENCRYPTED");
+					payloadRepository.seedFile(
+						"/workspace/newer.env.enc",
+						serializePayloadFile({ armoredPayload: "FAKE-ARMORED-PAYLOAD" }),
 					);
-				}
-			}),
+					payloadCrypto.seedDecryptedEnvelope({
+						createdAt: "2026-04-14T10:00:00.000Z",
+						envText: "API_TOKEN=secret\n",
+						lastRewrittenAt: "2026-04-14T10:00:00.000Z",
+						payloadId: "bspld_0123456789abcdef",
+						recipients: [selfRecipient],
+						version: 999,
+					});
+
+					const result = yield* GrantPayloadRecipient.execute({
+						identityRef: "paul#aaaaaaaa",
+						passphrase: "test-passphrase",
+						path: "/workspace/newer.env.enc",
+					}).pipe(Effect.either);
+
+					expect(result._tag).toBe("Left");
+					if (result._tag === "Left") {
+						expect(result.left).toEqual(
+							new GrantPayloadRecipientVersionError({
+								message:
+									"CLI is too old to open this payload. Update CLI to latest version.",
+							}),
+						);
+					}
+				}),
 		);
 	});
 });

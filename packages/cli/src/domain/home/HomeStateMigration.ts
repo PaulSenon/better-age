@@ -1,27 +1,27 @@
 import { Option, Schema } from "effect";
 import {
-	type ArtifactMigrationPolicy,
-	normalizeArtifactToCurrent,
-	type NormalizeArtifactResult,
-	type VersionedArtifactDefinition,
-} from "../migration/ArtifactMigration.js";
+	emptyLocalAliasMap,
+	type LocalAliasMap,
+	RetiredKey,
+	setLocalAlias,
+} from "../identity/Identity.js";
+import { KeyFingerprint } from "../identity/KeyFingerprint.js";
 import {
 	LegacyKnownIdentityV1,
 	LegacySelfIdentityV1,
 	migrateLegacyKnownIdentityV1,
 	migrateLegacySelfIdentityV1,
 } from "../identity/PublicIdentityMigration.js";
-import { KeyFingerprint } from "../identity/KeyFingerprint.js";
 import {
-	emptyLocalAliasMap,
-	LocalAliasMap,
-	RetiredKey,
-	setLocalAlias,
-} from "../identity/Identity.js";
+	type ArtifactMigrationPolicy,
+	type NormalizeArtifactResult,
+	normalizeArtifactToCurrent,
+	type VersionedArtifactDefinition,
+} from "../migration/ArtifactMigration.js";
 import {
+	type HomeState as CurrentHomeState,
 	emptyHomeState,
 	HomeState,
-	type HomeState as CurrentHomeState,
 	RotationTtl,
 } from "./HomeState.js";
 
@@ -95,9 +95,12 @@ const upgradeLegacyHomeStateV1 = (
 	defaultEditorCommand: document.defaultEditorCommand,
 	homeSchemaVersion: 2,
 	knownIdentities: document.knownIdentities.map(
-		(knownIdentity) => migrateLegacyKnownIdentityV1(knownIdentity).publicIdentity,
+		(knownIdentity) =>
+			migrateLegacyKnownIdentityV1(knownIdentity).publicIdentity,
 	),
-	localAliases: toLocalAliasesFromLegacyKnownIdentities(document.knownIdentities),
+	localAliases: toLocalAliasesFromLegacyKnownIdentities(
+		document.knownIdentities,
+	),
 	retiredKeys: document.retiredKeys,
 	rotationTtl: document.rotationTtl,
 	self: Option.map(document.self, migrateLegacySelfIdentityV1),
@@ -117,12 +120,14 @@ export const HomeStateMigrationDefinition: VersionedArtifactDefinition<Versioned
 		steps: [
 			{
 				fromVersion: 0,
-				migrate: upgradeLegacyHomeStateV0,
+				migrate: (artifact) =>
+					upgradeLegacyHomeStateV0(artifact as LegacyHomeStateV0),
 				toVersion: 1,
 			},
 			{
 				fromVersion: 1,
-				migrate: upgradeLegacyHomeStateV1,
+				migrate: (artifact) =>
+					upgradeLegacyHomeStateV1(artifact as LegacyHomeStateV1),
 				toVersion: 2,
 			},
 		],
@@ -135,7 +140,7 @@ export const normalizeHomeStateToCurrent = (input: {
 	normalizeArtifactToCurrent({
 		artifact: input.document,
 		definition: HomeStateMigrationDefinition,
-		policy: input.policy,
+		...(input.policy === undefined ? {} : { policy: input.policy }),
 	});
 
 export const emptyCurrentHomeState = () => emptyHomeState();

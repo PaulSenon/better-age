@@ -2,6 +2,7 @@ import { Effect, Option } from "effect";
 import { ForgetIdentity } from "../../app/forget-identity/ForgetIdentity.js";
 import { ImportIdentityString } from "../../app/import-identity-string/ImportIdentityString.js";
 import { ViewPayload } from "../../app/view-payload/ViewPayload.js";
+import { materializeKnownIdentities } from "../../domain/identity/Identity.js";
 import { HomeRepository } from "../../port/HomeRepository.js";
 import { InteractivePrompt } from "../../port/InteractivePrompt.js";
 import { Prompt } from "../../port/Prompt.js";
@@ -165,8 +166,12 @@ export class InteractiveSession extends Effect.Service<InteractiveSession>()(
 					return;
 				}
 
+				const knownIdentities = materializeKnownIdentities({
+					identities: state.knownIdentities,
+					localAliases: state.localAliases,
+				});
 				const identityRef = yield* interactivePrompt.select<string>({
-					choices: state.knownIdentities.map((identity) => ({
+					choices: knownIdentities.map((identity) => ({
 						title: renderKnownIdentityLabel({
 							displayName: identity.displayName,
 							handle: identity.handle,
