@@ -2,7 +2,6 @@ import { describe, expect, layer } from "@effect/vitest";
 import { Effect, Layer, Schema } from "effect";
 import { DisplayName } from "../../domain/identity/DisplayName.js";
 import { IdentityUpdatedAt } from "../../domain/identity/IdentityUpdatedAt.js";
-import { KeyFingerprint } from "../../domain/identity/KeyFingerprint.js";
 import { OwnerId } from "../../domain/identity/OwnerId.js";
 import { PublicKey } from "../../domain/identity/PublicKey.js";
 import { PayloadEnvelope } from "../../domain/payload/PayloadEnvelope.js";
@@ -19,10 +18,7 @@ const rewriteEnvelope = Schema.decodeUnknownSync(PayloadEnvelope)({
 	payloadId: "bspld_0123456789abcdef",
 	recipients: [
 		{
-			displayNameSnapshot: Schema.decodeUnknownSync(DisplayName)("isaac"),
-			fingerprint: Schema.decodeUnknownSync(KeyFingerprint)(
-				"bs1_1111111111111111",
-			),
+			displayName: Schema.decodeUnknownSync(DisplayName)("isaac"),
 			identityUpdatedAt: Schema.decodeUnknownSync(IdentityUpdatedAt)(
 				"2026-04-14T10:00:00.000Z",
 			),
@@ -30,10 +26,7 @@ const rewriteEnvelope = Schema.decodeUnknownSync(PayloadEnvelope)({
 			publicKey: Schema.decodeUnknownSync(PublicKey)("age1isaac"),
 		},
 		{
-			displayNameSnapshot: Schema.decodeUnknownSync(DisplayName)("paul"),
-			fingerprint: Schema.decodeUnknownSync(KeyFingerprint)(
-				"bs1_aaaaaaaaaaaaaaaa",
-			),
+			displayName: Schema.decodeUnknownSync(DisplayName)("paul"),
 			identityUpdatedAt: Schema.decodeUnknownSync(IdentityUpdatedAt)(
 				"2026-04-14T11:00:00.000Z",
 			),
@@ -41,7 +34,7 @@ const rewriteEnvelope = Schema.decodeUnknownSync(PayloadEnvelope)({
 			publicKey: Schema.decodeUnknownSync(PublicKey)("age1paul"),
 		},
 	],
-	version: 1,
+	version: 2,
 });
 
 describe("RewritePayloadEnvelope", () => {

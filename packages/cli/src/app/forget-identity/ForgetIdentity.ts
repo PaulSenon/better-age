@@ -37,6 +37,7 @@ export class ForgetIdentity extends Effect.Service<ForgetIdentity>()(
 				const resolution = resolveGrantIdentityRef({
 					identityRef: input.identityRef,
 					knownIdentities: state.knownIdentities,
+					localAliases: state.localAliases,
 					selfIdentity: state.self,
 				});
 
@@ -55,7 +56,8 @@ export class ForgetIdentity extends Effect.Service<ForgetIdentity>()(
 					case "resolved": {
 						if (
 							Option.isSome(state.self) &&
-							state.self.value.ownerId === resolution.identity.ownerId
+							state.self.value.publicIdentity.ownerId ===
+								resolution.identity.ownerId
 						) {
 							return yield* new ForgetIdentityForbiddenSelfError({
 								message: "Forgetting current self identity is forbidden in v0",
@@ -77,6 +79,11 @@ export class ForgetIdentity extends Effect.Service<ForgetIdentity>()(
 							.saveState({
 								...state,
 								knownIdentities: nextKnownIdentities,
+								localAliases: Object.fromEntries(
+									Object.entries(state.localAliases).filter(
+										([ownerId]) => ownerId !== resolution.identity.ownerId,
+									),
+								),
 							})
 							.pipe(Effect.mapError(toPersistenceError));
 

@@ -1,9 +1,15 @@
 import { Effect, Either, Option } from "effect";
 import type { HomeState } from "../../domain/home/HomeState.js";
 import { isSelfOwnerId } from "../../domain/home/SelfIdentityGuard.js";
-import type { KnownIdentity } from "../../domain/identity/Identity.js";
+import {
+	getLocalAlias,
+	materializeKnownIdentity,
+	setLocalAlias,
+	type KnownIdentity,
+} from "../../domain/identity/Identity.js";
 import type { IdentityAlias } from "../../domain/identity/IdentityAlias.js";
 import { decodeIdentityString } from "../../domain/identity/IdentityString.js";
+import { derivePublicIdentityHandle } from "../../domain/identity/PublicIdentity.js";
 import { HomeRepository } from "../../port/HomeRepository.js";
 import type {
 	HomeStateDecodeError,
@@ -32,20 +38,17 @@ const toKnownIdentity = (
 	>
 		? A
 		: never,
-): KnownIdentity => ({
-	displayName: payload.displayName,
-	fingerprint: payload.fingerprint,
-	handle: payload.handle,
-	identityUpdatedAt: payload.identityUpdatedAt,
-	localAlias: Option.none(),
-	ownerId: payload.ownerId,
-	publicKey: payload.publicKey,
-});
+): KnownIdentity => {
+	return {
+		displayName: payload.displayName,
+		identityUpdatedAt: payload.identityUpdatedAt,
+		ownerId: payload.ownerId,
+		publicKey: payload.publicKey,
+	};
+};
 
 const sameSnapshot = (left: KnownIdentity, right: KnownIdentity) =>
 	left.displayName === right.displayName &&
-	left.fingerprint === right.fingerprint &&
-	left.handle === right.handle &&
 	left.identityUpdatedAt === right.identityUpdatedAt &&
 	left.ownerId === right.ownerId &&
 	left.publicKey === right.publicKey;
@@ -61,7 +64,7 @@ const replaceKnownIdentity = (
 });
 
 const nextLocalAlias = (input: {
-	readonly existingLocalAlias: KnownIdentity["localAlias"];
+	readonly existingLocalAlias: Option.Option<IdentityAlias>;
 	readonly overrideLocalAlias: Option.Option<IdentityAlias> | undefined;
 }) =>
 	input.overrideLocalAlias === undefined
@@ -104,25 +107,26 @@ export class ImportIdentityString extends Effect.Service<ImportIdentityString>()
 					);
 
 					if (existingIdentity === undefined) {
+						const nextLocalAliases = setLocalAlias({
+							localAlias: nextLocalAlias({
+								existingLocalAlias: Option.none(),
+								overrideLocalAlias: input.localAlias,
+							}),
+							localAliases: state.localAliases,
+							ownerId: importedIdentity.ownerId,
+						});
+
 						yield* homeRepository
 							.saveState({
 								...state,
-								knownIdentities: [
-									...state.knownIdentities,
-									{
-										...importedIdentity,
-										localAlias: nextLocalAlias({
-											existingLocalAlias: importedIdentity.localAlias,
-											overrideLocalAlias: input.localAlias,
-										}),
-									},
-								],
+								knownIdentities: [...state.knownIdentities, importedIdentity],
+								localAliases: nextLocalAliases,
 							})
 							.pipe(Effect.mapError(toPersistenceError));
 
 						return new ImportIdentityStringSuccess({
 							displayName: importedIdentity.displayName,
-							handle: importedIdentity.handle,
+							handle: derivePublicIdentityHandle(importedIdentity),
 							outcome: "added",
 						});
 					}
@@ -130,7 +134,7 @@ export class ImportIdentityString extends Effect.Service<ImportIdentityString>()
 					if (sameSnapshot(existingIdentity, importedIdentity)) {
 						return new ImportIdentityStringSuccess({
 							displayName: importedIdentity.displayName,
-							handle: importedIdentity.handle,
+							handle: derivePublicIdentityHandle(importedIdentity),
 							outcome: "unchanged",
 						});
 					}
@@ -150,28 +154,40 @@ export class ImportIdentityString extends Effect.Service<ImportIdentityString>()
 						existingIdentity.identityUpdatedAt >
 						importedIdentity.identityUpdatedAt
 					) {
+						const existingResolvedIdentity = materializeKnownIdentity({
+							identity: existingIdentity,
+							localAliases: state.localAliases,
+						});
+
 						return new ImportIdentityStringSuccess({
-							displayName: existingIdentity.displayName,
-							handle: existingIdentity.handle,
+							displayName: existingResolvedIdentity.displayName,
+							handle: existingResolvedIdentity.handle,
 							outcome: "unchanged",
 						});
 					}
 
+					const nextLocalAliases = setLocalAlias({
+						localAlias: nextLocalAlias({
+							existingLocalAlias: getLocalAlias(
+								state.localAliases,
+								existingIdentity.ownerId,
+							),
+							overrideLocalAlias: input.localAlias,
+						}),
+						localAliases: state.localAliases,
+						ownerId: importedIdentity.ownerId,
+					});
+
 					yield* homeRepository
-						.saveState(
-							replaceKnownIdentity(state, {
-								...importedIdentity,
-								localAlias: nextLocalAlias({
-									existingLocalAlias: existingIdentity.localAlias,
-									overrideLocalAlias: input.localAlias,
-								}),
-							}),
-						)
+						.saveState({
+							...replaceKnownIdentity(state, importedIdentity),
+							localAliases: nextLocalAliases,
+						})
 						.pipe(Effect.mapError(toPersistenceError));
 
 					return new ImportIdentityStringSuccess({
 						displayName: importedIdentity.displayName,
-						handle: importedIdentity.handle,
+						handle: derivePublicIdentityHandle(importedIdentity),
 						outcome: "updated",
 					});
 				},

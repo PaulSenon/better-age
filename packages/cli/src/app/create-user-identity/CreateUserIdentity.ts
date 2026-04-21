@@ -7,7 +7,7 @@ import {
 	DisplayName,
 	decodeDisplayName,
 } from "../../domain/identity/DisplayName.js";
-import { toHandle } from "../../domain/identity/Handle.js";
+import { derivePublicIdentityHandle } from "../../domain/identity/PublicIdentity.js";
 import { Crypto } from "../../port/Crypto.js";
 import type { IdentityGenerationError } from "../../port/CryptoError.js";
 import { HomeRepository } from "../../port/HomeRepository.js";
@@ -113,17 +113,14 @@ export class CreateUserIdentity extends Effect.Service<CreateUserIdentity>()(
 					).toISOString();
 					const selfIdentity = {
 						createdAt,
-						displayName,
-						fingerprint: generatedIdentity.fingerprint,
-						handle: toHandle({
-							displayName,
-							ownerId: generatedIdentity.ownerId,
-						}),
-						identityUpdatedAt: generatedIdentity.identityUpdatedAt,
 						keyMode: generatedIdentity.keyMode,
-						ownerId: generatedIdentity.ownerId,
 						privateKeyPath,
-						publicKey: generatedIdentity.publicKey,
+						publicIdentity: {
+							displayName,
+							identityUpdatedAt: generatedIdentity.identityUpdatedAt,
+							ownerId: generatedIdentity.ownerId,
+							publicKey: generatedIdentity.publicKey,
+						},
 					} as const;
 					const nextState = {
 						...state,
@@ -162,7 +159,12 @@ export class CreateUserIdentity extends Effect.Service<CreateUserIdentity>()(
 					return new CreateUserIdentitySuccess({
 						displayName,
 						fingerprint: generatedIdentity.fingerprint,
-						handle: selfIdentity.handle,
+						handle: derivePublicIdentityHandle({
+							displayName,
+							identityUpdatedAt: generatedIdentity.identityUpdatedAt,
+							ownerId: generatedIdentity.ownerId,
+							publicKey: generatedIdentity.publicKey,
+						}),
 						ownerId: generatedIdentity.ownerId,
 						privateKeyPath,
 						publicKey: generatedIdentity.publicKey,

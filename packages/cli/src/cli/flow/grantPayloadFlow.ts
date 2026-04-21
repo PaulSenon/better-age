@@ -10,6 +10,7 @@ import {
 	type GrantPayloadRecipientUnchangedSuccess,
 	type GrantPayloadRecipientUpdatedSuccess,
 	GrantPayloadRecipientUpdateRequiredError,
+	type GrantPayloadRecipientVersionError,
 } from "../../app/grant-payload-recipient/GrantPayloadRecipientError.js";
 import { ImportIdentityString } from "../../app/import-identity-string/ImportIdentityString.js";
 import {
@@ -36,10 +37,16 @@ import type {
 	UpdatePayloadFileFormatError,
 	UpdatePayloadNoSelfIdentityError,
 	UpdatePayloadPersistenceError,
+	UpdatePayloadVersionError,
 } from "../../app/update-payload/UpdatePayloadError.js";
 import type { HomeState } from "../../domain/home/HomeState.js";
 import { decodeIdentityAlias } from "../../domain/identity/IdentityAlias.js";
 import { decodeIdentityString } from "../../domain/identity/IdentityString.js";
+import {
+	getLocalAlias,
+	materializeKnownIdentities,
+	materializeSelfIdentity,
+} from "../../domain/identity/Identity.js";
 import { HomeRepository } from "../../port/HomeRepository.js";
 import type {
 	HomeStateDecodeError,
@@ -97,6 +104,7 @@ export type GrantPayloadFlowError =
 	| GrantPayloadRecipientIdentityNotFoundError
 	| GrantPayloadRecipientPersistenceError
 	| GrantPayloadRecipientUpdateRequiredError
+	| GrantPayloadRecipientVersionError
 	| GuidedFlowCancelledError
 	| HomeStateDecodeError
 	| HomeStateLoadError
@@ -118,7 +126,8 @@ export type GrantPayloadFlowError =
 	| UpdatePayloadEnvError
 	| UpdatePayloadFileFormatError
 	| UpdatePayloadNoSelfIdentityError
-	| UpdatePayloadPersistenceError;
+	| UpdatePayloadPersistenceError
+	| UpdatePayloadVersionError;
 
 export type GrantPayloadFlowContext =
 	| GrantPayloadRecipient
@@ -147,9 +156,13 @@ const resolveIdentityRef = (identityRef: Option.Option<string>) =>
 		onNone: () =>
 			Effect.gen(function* () {
 				const state = yield* HomeRepository.loadState;
+				const knownIdentities = materializeKnownIdentities({
+					identities: state.knownIdentities,
+					localAliases: state.localAliases,
+				});
 
 				return yield* resolveGrantIdentityInput({
-					choices: state.knownIdentities.map((identity) => ({
+					choices: knownIdentities.map((identity) => ({
 						title: renderKnownIdentity(identity),
 						value: identity.handle,
 					})),
@@ -174,14 +187,14 @@ const collidingVisibleLabels = (input: {
 }) =>
 	new Set<string>([
 		...(Option.isSome(input.state.self)
-			? [input.state.self.value.displayName]
+			? [materializeSelfIdentity(input.state.self.value).displayName]
 			: []),
 		...input.state.knownIdentities
 			.filter((identity) => identity.ownerId !== input.ownerId)
 			.map((identity) =>
 				visibleLabel({
 					displayName: identity.displayName,
-					localAlias: identity.localAlias,
+					localAlias: getLocalAlias(input.state.localAliases, identity.ownerId),
 				}),
 			),
 	]);
@@ -235,7 +248,7 @@ const localAliasOverrideForGrantImport = (input: {
 
 		if (
 			existingIdentity !== undefined &&
-			Option.isSome(existingIdentity.localAlias)
+			Option.isSome(getLocalAlias(state.localAliases, existingIdentity.ownerId))
 		) {
 			return undefined;
 		}
@@ -255,22 +268,28 @@ const ambiguousMessage = (input: {
 	readonly candidates: ReadonlyArray<string>;
 }) =>
 	HomeRepository.loadState.pipe(
-		Effect.map((state) =>
-			[
+		Effect.map((state) => {
+			const knownIdentities = materializeKnownIdentities({
+				identities: state.knownIdentities,
+				localAliases: state.localAliases,
+			});
+			const resolvedSelfIdentity =
+				state.self._tag === "Some" ? materializeSelfIdentity(state.self.value) : null;
+
+			return [
 				`Identity ref is ambiguous: ${input.identityRef}`,
 				...input.candidates.map((handle) => {
-					const knownIdentity = state.knownIdentities.find(
+					const knownIdentity = knownIdentities.find(
 						(identity) => identity.handle === handle,
 					);
-					const isYou =
-						state.self._tag === "Some" && state.self.value.handle === handle;
+					const isYou = resolvedSelfIdentity?.handle === handle;
 
 					return renderHandleCandidate({
 						displayName:
 							knownIdentity !== undefined
 								? Option.some(knownIdentity.displayName)
-								: isYou && state.self._tag === "Some"
-									? Option.some(state.self.value.displayName)
+								: isYou && resolvedSelfIdentity !== null
+									? Option.some(resolvedSelfIdentity.displayName)
 									: Option.none(),
 						handle,
 						isYou,
@@ -278,8 +297,8 @@ const ambiguousMessage = (input: {
 					});
 				}),
 				"",
-			].join("\n"),
-		),
+			].join("\n");
+		}),
 		Effect.catchAll(() =>
 			Effect.succeed(
 				[
@@ -425,22 +444,30 @@ export const runGrantPayloadFlow = (input: {
 										});
 										yield* Prompt.writeStderr(message);
 										const state = yield* HomeRepository.loadState;
+										const knownIdentities = materializeKnownIdentities({
+											identities: state.knownIdentities,
+											localAliases: state.localAliases,
+										});
+										const resolvedSelfIdentity =
+											state.self._tag === "Some"
+												? materializeSelfIdentity(state.self.value)
+												: null;
 										const action = yield* promptForIdentityErrorAction({
 											candidates: error.candidates.map((handle) => {
-												const knownIdentity = state.knownIdentities.find(
+												const knownIdentity = knownIdentities.find(
 													(identity) => identity.handle === handle,
 												);
-												const isYou =
-													state.self._tag === "Some" &&
-													state.self.value.handle === handle;
+												const isYou = resolvedSelfIdentity?.handle === handle;
 
 												return {
 													title: renderHandleCandidate({
 														displayName:
 															knownIdentity !== undefined
 																? Option.some(knownIdentity.displayName)
-																: isYou && state.self._tag === "Some"
-																	? Option.some(state.self.value.displayName)
+																: isYou && resolvedSelfIdentity !== null
+																	? Option.some(
+																			resolvedSelfIdentity.displayName,
+																		)
 																	: Option.none(),
 														handle,
 														isYou,

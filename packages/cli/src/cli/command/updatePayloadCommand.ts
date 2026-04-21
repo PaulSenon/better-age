@@ -10,6 +10,7 @@ import {
 	UpdatePayloadFileFormatError,
 	UpdatePayloadNoSelfIdentityError,
 	UpdatePayloadPersistenceError,
+	UpdatePayloadVersionError,
 } from "../../app/update-payload/UpdatePayloadError.js";
 import { Prompt } from "../../port/Prompt.js";
 import {
@@ -142,6 +143,15 @@ export const runUpdatePayload = (input: {
 							path,
 						}),
 					),
+			),
+			Effect.catchIf(
+				(error): error is UpdatePayloadVersionError =>
+					error instanceof UpdatePayloadVersionError,
+				(error) =>
+					Effect.gen(function* () {
+						yield* Prompt.writeStderr(`${error.message}\n`);
+						return yield* Effect.fail(new UpdatePayloadCommandFailedError());
+					}),
 			),
 			Effect.catchIf(
 				(error): error is UpdatePayloadEnvError =>

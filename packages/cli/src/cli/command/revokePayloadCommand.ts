@@ -13,6 +13,7 @@ import {
 	RevokePayloadRecipientForbiddenSelfError,
 	RevokePayloadRecipientPersistenceError,
 	RevokePayloadRecipientUpdateRequiredError,
+	RevokePayloadRecipientVersionError,
 } from "../../app/revoke-payload-recipient/RevokePayloadRecipientError.js";
 import { ResolvePayloadTargetError } from "../../app/shared/ResolvePayloadTargetError.js";
 import {
@@ -56,6 +57,15 @@ export const runRevokePayload = (input: {
 					yield* Prompt.writeStderr(
 						renderUpdateRequiredMessage("revoke", error.path),
 					);
+					return yield* Effect.fail(new RevokePayloadCommandFailedError());
+				}),
+		),
+		Effect.catchIf(
+			(error): error is RevokePayloadRecipientVersionError =>
+				error instanceof RevokePayloadRecipientVersionError,
+			(error) =>
+				Effect.gen(function* () {
+					yield* Prompt.writeStderr(`${error.message}\n`);
 					return yield* Effect.fail(new RevokePayloadCommandFailedError());
 				}),
 		),

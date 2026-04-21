@@ -7,6 +7,7 @@ import {
 	ReadPayloadFileFormatError,
 	ReadPayloadPersistenceError,
 	ReadPayloadSuccess,
+	ReadPayloadVersionError,
 } from "./ReadPayloadError.js";
 
 export class ReadPayload extends Effect.Service<ReadPayload>()("ReadPayload", {
@@ -36,11 +37,15 @@ export class ReadPayload extends Effect.Service<ReadPayload>()("ReadPayload", {
 							});
 						case "OpenPayloadEnvelopeError":
 							return new ReadPayloadEnvelopeError({
-								message: error.message,
-							});
-						case "OpenPayloadEnvError":
-							return new ReadPayloadEnvError({
-								message: error.message,
+							message: error.message,
+						});
+					case "OpenPayloadVersionError":
+						return new ReadPayloadVersionError({
+							message: error.message,
+						});
+					case "OpenPayloadEnvError":
+						return new ReadPayloadEnvError({
+							message: error.message,
 							});
 					}
 				}),

@@ -12,6 +12,7 @@ import { InspectPayload } from "../app/inspect-payload/InspectPayload.js";
 import { ReadPayload } from "../app/read-payload/ReadPayload.js";
 import { RevokePayloadRecipient } from "../app/revoke-payload-recipient/RevokePayloadRecipient.js";
 import { RotateUserIdentity } from "../app/rotate-user-identity/RotateUserIdentity.js";
+import { HomeStatePreflight } from "../app/shared/HomeStatePreflight.js";
 import { OpenPayload } from "../app/shared/OpenPayload.js";
 import { ResolveEditorCommand } from "../app/shared/ResolveEditorCommand.js";
 import { ResolveNewPayloadTarget } from "../app/shared/ResolveNewPayloadTarget.js";
@@ -36,6 +37,10 @@ import { NodeSecureViewerLive } from "../infra/view/nodeSecureViewer.js";
 const HomeRepositoryLive = NodeHomeRepositoryLive.pipe(
 	Layer.provide(NodeBetterAgeConfigLive),
 );
+
+const HomeStatePreflightLive = Layer.provide(HomeStatePreflight.Default, [
+	HomeRepositoryLive,
+]);
 
 const PayloadRepositoryLive = NodePayloadRepositoryLive;
 
@@ -199,6 +204,7 @@ export const CliFlowLive = InteractiveSessionLive;
 
 export const BetterAgeLive = Layer.mergeAll(
 	InfraLive,
+	HomeStatePreflightLive,
 	IdentityAppLive,
 	PayloadAppLive,
 	CliFlowLive,

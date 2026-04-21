@@ -407,7 +407,7 @@ const makeInspectPayload = () => {
 							},
 						],
 						secretCount: 1,
-						version: 1,
+						version: 2,
 					});
 				}),
 		}),
@@ -970,7 +970,7 @@ describe("interactiveCommand", () => {
 						[
 							"Payload",
 							"path: ./.env.enc",
-							"version: 1",
+							"version: 2",
 							"payload id: bspld_0123456789abcdef",
 							"created at: 2026-04-14T10:00:00.000Z",
 							"last rewritten at: 2026-04-14T10:00:00.000Z",

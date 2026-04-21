@@ -1,17 +1,23 @@
 import { Option, type Schema } from "effect";
 import type { PayloadRecipient } from "../payload/PayloadEnvelope.js";
-import { toHandle } from "./Handle.js";
-import type { KnownIdentity, SelfIdentity } from "./Identity.js";
+import {
+	type LocalAliasMap,
+	materializeKnownIdentity,
+	materializeSelfIdentity,
+	type KnownIdentity,
+	type ResolvedKnownIdentity,
+	type SelfIdentity,
+} from "./Identity.js";
 import { decodeIdentityString } from "./IdentityString.js";
 
 type IdentityRefResolution =
 	| {
 			readonly _tag: "resolved";
-			readonly identity: KnownIdentity;
+			readonly identity: ResolvedKnownIdentity;
 	  }
 	| {
 			readonly _tag: "ambiguous";
-			readonly candidates: ReadonlyArray<KnownIdentity["handle"]>;
+			readonly candidates: ReadonlyArray<ResolvedKnownIdentity["handle"]>;
 	  }
 	| {
 			readonly _tag: "not-found";
@@ -24,7 +30,7 @@ type RevokeIdentityRefResolution =
 	  }
 	| {
 			readonly _tag: "ambiguous";
-			readonly candidates: ReadonlyArray<KnownIdentity["handle"]>;
+			readonly candidates: ReadonlyArray<ResolvedKnownIdentity["handle"]>;
 	  }
 	| {
 			readonly _tag: "not-found";
@@ -32,39 +38,34 @@ type RevokeIdentityRefResolution =
 
 const toKnownIdentityFromSelf = (
 	selfIdentity: SelfIdentity,
-): KnownIdentity => ({
-	displayName: selfIdentity.displayName,
-	fingerprint: selfIdentity.fingerprint,
-	handle: selfIdentity.handle,
-	identityUpdatedAt: selfIdentity.identityUpdatedAt,
+): ResolvedKnownIdentity => ({
+	...materializeSelfIdentity(selfIdentity),
 	localAlias: Option.none(),
-	ownerId: selfIdentity.ownerId,
-	publicKey: selfIdentity.publicKey,
 });
 
 const toKnownIdentityFromIdentityString = (
 	identityString: string,
-): KnownIdentity | null => {
+): ResolvedKnownIdentity | null => {
 	const decoded = decodeIdentityString(identityString);
 
 	if (decoded._tag === "Left") {
 		return null;
 	}
 
-	return {
-		displayName: decoded.right.displayName,
-		fingerprint: decoded.right.fingerprint,
-		handle: decoded.right.handle,
-		identityUpdatedAt: decoded.right.identityUpdatedAt,
-		localAlias: Option.none(),
-		ownerId: decoded.right.ownerId,
-		publicKey: decoded.right.publicKey,
-	};
+	return materializeKnownIdentity({
+		identity: {
+			displayName: decoded.right.displayName,
+			identityUpdatedAt: decoded.right.identityUpdatedAt,
+			ownerId: decoded.right.ownerId,
+			publicKey: decoded.right.publicKey,
+		},
+		localAliases: {},
+	});
 };
 
 const matchLocalAlias = (
 	identityRef: string,
-	identities: ReadonlyArray<KnownIdentity>,
+	identities: ReadonlyArray<ResolvedKnownIdentity>,
 ): IdentityRefResolution | null => {
 	const matches = identities.filter(
 		(identity) =>
@@ -95,7 +96,7 @@ const matchLocalAlias = (
 
 const matchHandle = (
 	identityRef: string,
-	identities: ReadonlyArray<KnownIdentity>,
+	identities: ReadonlyArray<ResolvedKnownIdentity>,
 ): IdentityRefResolution | null => {
 	const matches = identities.filter(
 		(identity) => identity.handle === identityRef,
@@ -124,7 +125,7 @@ const matchHandle = (
 
 const matchDisplayName = (
 	identityRef: string,
-	identities: ReadonlyArray<KnownIdentity>,
+	identities: ReadonlyArray<ResolvedKnownIdentity>,
 ): IdentityRefResolution => {
 	const matches = identities.filter(
 		(identity) => identity.displayName === identityRef,
@@ -156,6 +157,7 @@ const matchDisplayName = (
 export const resolveGrantIdentityRef = (input: {
 	readonly identityRef: string;
 	readonly knownIdentities: ReadonlyArray<KnownIdentity>;
+	readonly localAliases: LocalAliasMap;
 	readonly selfIdentity: Option.Option<SelfIdentity>;
 }): IdentityRefResolution => {
 	const decodedIdentity = toKnownIdentityFromIdentityString(input.identityRef);
@@ -168,7 +170,12 @@ export const resolveGrantIdentityRef = (input: {
 	}
 
 	const identities = [
-		...input.knownIdentities,
+		...input.knownIdentities.map((identity) =>
+			materializeKnownIdentity({
+				identity,
+				localAliases: input.localAliases,
+			}),
+		),
 		...(Option.isSome(input.selfIdentity)
 			? [toKnownIdentityFromSelf(input.selfIdentity.value)]
 			: []),
@@ -183,12 +190,13 @@ export const resolveGrantIdentityRef = (input: {
 
 const toKnownIdentityFromPayloadRecipient = (input: {
 	readonly knownIdentities: ReadonlyArray<KnownIdentity>;
+	readonly localAliases: LocalAliasMap;
 	readonly recipient: Schema.Schema.Type<typeof PayloadRecipient>;
 	readonly selfIdentity: Option.Option<SelfIdentity>;
-}): KnownIdentity => {
+}): ResolvedKnownIdentity => {
 	if (
 		Option.isSome(input.selfIdentity) &&
-		input.selfIdentity.value.ownerId === input.recipient.ownerId
+		input.selfIdentity.value.publicIdentity.ownerId === input.recipient.ownerId
 	) {
 		return toKnownIdentityFromSelf(input.selfIdentity.value);
 	}
@@ -197,25 +205,22 @@ const toKnownIdentityFromPayloadRecipient = (input: {
 		(identity) => identity.ownerId === input.recipient.ownerId,
 	);
 
-	return {
-		displayName: input.recipient.displayNameSnapshot,
-		fingerprint: input.recipient.fingerprint,
-		handle:
-			knownIdentity?.handle ??
-			toHandle({
-				displayName: input.recipient.displayNameSnapshot,
+	return materializeKnownIdentity({
+		identity:
+			knownIdentity ?? {
+				displayName: input.recipient.displayName,
+				identityUpdatedAt: input.recipient.identityUpdatedAt,
 				ownerId: input.recipient.ownerId,
-			}),
-		identityUpdatedAt: input.recipient.identityUpdatedAt,
-		localAlias: knownIdentity?.localAlias ?? Option.none(),
-		ownerId: input.recipient.ownerId,
-		publicKey: input.recipient.publicKey,
-	};
+				publicKey: input.recipient.publicKey,
+			},
+		localAliases: input.localAliases,
+	});
 };
 
 export const resolveRevokeIdentityRef = (input: {
 	readonly identityRef: string;
 	readonly knownIdentities: ReadonlyArray<KnownIdentity>;
+	readonly localAliases: LocalAliasMap;
 	readonly payloadRecipients: ReadonlyArray<
 		Schema.Schema.Type<typeof PayloadRecipient>
 	>;
@@ -224,6 +229,7 @@ export const resolveRevokeIdentityRef = (input: {
 	const payloadCandidates = input.payloadRecipients.map((recipient) =>
 		toKnownIdentityFromPayloadRecipient({
 			knownIdentities: input.knownIdentities,
+			localAliases: input.localAliases,
 			recipient,
 			selfIdentity: input.selfIdentity,
 		}),

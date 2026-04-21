@@ -11,7 +11,10 @@ export type PayloadNeedsUpdate = ReturnType<typeof toPayloadNeedsUpdate>;
 export const getPayloadNeedsUpdate = (
 	state: HomeState,
 	envelope: PayloadEnvelope,
+	input?: {
+		readonly persistedSchemaVersion?: number;
+	},
 ): PayloadNeedsUpdate =>
-	toPayloadNeedsUpdate(computePayloadUpdateState(state, envelope));
+	toPayloadNeedsUpdate(computePayloadUpdateState(state, envelope, input));
 
 export type { PayloadUpdateState };

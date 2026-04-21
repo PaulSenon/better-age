@@ -23,6 +23,7 @@ import {
 	EditPayloadRewrittenSuccess,
 	EditPayloadUnchangedSuccess,
 	EditPayloadUpdateRequiredError,
+	EditPayloadVersionError,
 } from "./EditPayloadError.js";
 
 const selfDisplayName = Schema.decodeUnknownSync(DisplayName)("isaac-mbp");
@@ -38,6 +39,23 @@ const selfPrivateKeyPath = Schema.decodeUnknownSync(PrivateKeyRelativePath)(
 	"keys/active.key.age",
 );
 const selfPublicKey = Schema.decodeUnknownSync(PublicKey)("age1self");
+const selfIdentity = {
+	createdAt: "2026-04-14T10:00:00.000Z",
+	keyMode: "pq-hybrid" as const,
+	privateKeyPath: selfPrivateKeyPath,
+	publicIdentity: {
+		displayName: selfDisplayName,
+		identityUpdatedAt: selfIdentityUpdatedAt,
+		ownerId: selfOwnerId,
+		publicKey: selfPublicKey,
+	},
+};
+const selfRecipient = {
+	displayName: selfDisplayName,
+	identityUpdatedAt: selfIdentityUpdatedAt,
+	ownerId: selfOwnerId,
+	publicKey: selfPublicKey,
+};
 
 describe("EditPayload", () => {
 	const homeRepository = makeInMemoryHomeRepository();
@@ -66,17 +84,7 @@ describe("EditPayload", () => {
 				yield* homeRepository.saveState({
 					...emptyHomeState(),
 					activeKeyFingerprint: Option.some(selfFingerprint),
-					self: Option.some({
-						createdAt: "2026-04-14T10:00:00.000Z",
-						displayName: selfDisplayName,
-						fingerprint: selfFingerprint,
-						handle: selfHandle,
-						identityUpdatedAt: selfIdentityUpdatedAt,
-						keyMode: "pq-hybrid",
-						ownerId: selfOwnerId,
-						privateKeyPath: selfPrivateKeyPath,
-						publicKey: selfPublicKey,
-					}),
+					self: Option.some(selfIdentity),
 					rotationTtl: "3m",
 				});
 				homeRepository.seedPrivateKey(
@@ -95,15 +103,9 @@ describe("EditPayload", () => {
 					lastRewrittenAt: "2026-04-14T10:00:00.000Z",
 					payloadId: "bspld_0123456789abcdef",
 					recipients: [
-						{
-							displayNameSnapshot: selfDisplayName,
-							fingerprint: selfFingerprint,
-							identityUpdatedAt: selfIdentityUpdatedAt,
-							ownerId: selfOwnerId,
-							publicKey: selfPublicKey,
-						},
+						selfRecipient,
 					],
-					version: 1,
+					version: 2,
 				});
 
 				const result = yield* EditPayload.open({
@@ -128,17 +130,7 @@ describe("EditPayload", () => {
 					yield* homeRepository.saveState({
 						...emptyHomeState(),
 						activeKeyFingerprint: Option.some(selfFingerprint),
-						self: Option.some({
-							createdAt: "2026-04-14T10:00:00.000Z",
-							displayName: selfDisplayName,
-							fingerprint: selfFingerprint,
-							handle: selfHandle,
-							identityUpdatedAt: selfIdentityUpdatedAt,
-							keyMode: "pq-hybrid",
-							ownerId: selfOwnerId,
-							privateKeyPath: selfPrivateKeyPath,
-							publicKey: selfPublicKey,
-						}),
+						self: Option.some(selfIdentity),
 						rotationTtl: "3m",
 					});
 					homeRepository.seedPrivateKey(
@@ -157,15 +149,9 @@ describe("EditPayload", () => {
 						lastRewrittenAt: "2026-04-14T10:00:00.000Z",
 						payloadId: "bspld_0123456789abcdef",
 						recipients: [
-							{
-								displayNameSnapshot: selfDisplayName,
-								fingerprint: selfFingerprint,
-								identityUpdatedAt: selfIdentityUpdatedAt,
-								ownerId: selfOwnerId,
-								publicKey: selfPublicKey,
-							},
+							selfRecipient,
 						],
-						version: 1,
+						version: 2,
 					});
 
 					const result = yield* EditPayload.save({
@@ -191,17 +177,7 @@ describe("EditPayload", () => {
 					yield* homeRepository.saveState({
 						...emptyHomeState(),
 						activeKeyFingerprint: Option.some(selfFingerprint),
-						self: Option.some({
-							createdAt: "2026-04-14T10:00:00.000Z",
-							displayName: selfDisplayName,
-							fingerprint: selfFingerprint,
-							handle: selfHandle,
-							identityUpdatedAt: selfIdentityUpdatedAt,
-							keyMode: "pq-hybrid",
-							ownerId: selfOwnerId,
-							privateKeyPath: selfPrivateKeyPath,
-							publicKey: selfPublicKey,
-						}),
+						self: Option.some(selfIdentity),
 						rotationTtl: "3m",
 					});
 					homeRepository.seedPrivateKey(
@@ -220,15 +196,9 @@ describe("EditPayload", () => {
 						lastRewrittenAt: "2026-04-14T10:00:00.000Z",
 						payloadId: "bspld_0123456789abcdef",
 						recipients: [
-							{
-								displayNameSnapshot: selfDisplayName,
-								fingerprint: selfFingerprint,
-								identityUpdatedAt: selfIdentityUpdatedAt,
-								ownerId: selfOwnerId,
-								publicKey: selfPublicKey,
-							},
+							selfRecipient,
 						],
-						version: 1,
+						version: 2,
 					});
 
 					const result = yield* EditPayload.save({
@@ -251,15 +221,9 @@ describe("EditPayload", () => {
 							envText: "API_TOKEN=secret\nDEBUG=false\n",
 							payloadId: "bspld_0123456789abcdef",
 							recipients: [
-								{
-									displayNameSnapshot: selfDisplayName,
-									fingerprint: selfFingerprint,
-									identityUpdatedAt: selfIdentityUpdatedAt,
-									ownerId: selfOwnerId,
-									publicKey: selfPublicKey,
-								},
+								selfRecipient,
 							],
-							version: 1,
+							version: 2,
 						},
 						recipients: [selfPublicKey],
 					});
@@ -272,17 +236,7 @@ describe("EditPayload", () => {
 				yield* homeRepository.saveState({
 					...emptyHomeState(),
 					activeKeyFingerprint: Option.some(selfFingerprint),
-					self: Option.some({
-						createdAt: "2026-04-14T10:00:00.000Z",
-						displayName: selfDisplayName,
-						fingerprint: selfFingerprint,
-						handle: selfHandle,
-						identityUpdatedAt: selfIdentityUpdatedAt,
-						keyMode: "pq-hybrid",
-						ownerId: selfOwnerId,
-						privateKeyPath: selfPrivateKeyPath,
-						publicKey: selfPublicKey,
-					}),
+					self: Option.some(selfIdentity),
 					rotationTtl: "3m",
 				});
 				homeRepository.seedPrivateKey(
@@ -301,15 +255,9 @@ describe("EditPayload", () => {
 					lastRewrittenAt: "2026-04-14T10:00:00.000Z",
 					payloadId: "bspld_0123456789abcdef",
 					recipients: [
-						{
-							displayNameSnapshot: selfDisplayName,
-							fingerprint: selfFingerprint,
-							identityUpdatedAt: selfIdentityUpdatedAt,
-							ownerId: selfOwnerId,
-							publicKey: selfPublicKey,
-						},
+						selfRecipient,
 					],
-					version: 1,
+					version: 2,
 				});
 
 				const result = yield* EditPayload.save({
@@ -332,17 +280,7 @@ describe("EditPayload", () => {
 				yield* homeRepository.saveState({
 					...emptyHomeState(),
 					activeKeyFingerprint: Option.some(selfFingerprint),
-					self: Option.some({
-						createdAt: "2026-04-14T10:00:00.000Z",
-						displayName: selfDisplayName,
-						fingerprint: selfFingerprint,
-						handle: selfHandle,
-						identityUpdatedAt: selfIdentityUpdatedAt,
-						keyMode: "pq-hybrid",
-						ownerId: selfOwnerId,
-						privateKeyPath: selfPrivateKeyPath,
-						publicKey: selfPublicKey,
-					}),
+					self: Option.some(selfIdentity),
 					rotationTtl: "3m",
 				});
 				homeRepository.seedPrivateKey(
@@ -362,14 +300,13 @@ describe("EditPayload", () => {
 					payloadId: "bspld_0123456789abcdef",
 					recipients: [
 						{
-							displayNameSnapshot: selfDisplayName,
-							fingerprint: "bs1_bbbbbbbbbbbbbbbb",
+							displayName: selfDisplayName,
 							identityUpdatedAt: selfIdentityUpdatedAt,
 							ownerId: selfOwnerId,
 							publicKey: "age1stale",
 						},
 					],
-					version: 1,
+					version: 2,
 				});
 
 				const result = yield* EditPayload.open({
@@ -380,6 +317,51 @@ describe("EditPayload", () => {
 				expect(result._tag).toBe("Left");
 				if (result._tag === "Left") {
 					expect(result.left).toBeInstanceOf(EditPayloadUpdateRequiredError);
+				}
+			}),
+		);
+
+		it.effect("fails with version remediation when payload is newer than CLI", () =>
+			Effect.gen(function* () {
+				resetSnapshots();
+				yield* homeRepository.saveState({
+					...emptyHomeState(),
+					activeKeyFingerprint: Option.some(selfFingerprint),
+					self: Option.some(selfIdentity),
+					rotationTtl: "3m",
+				});
+				homeRepository.seedPrivateKey(
+					"keys/active.key.age",
+					"AGE-ENCRYPTED-ACTIVE-KEY",
+				);
+				payloadRepository.seedFile(
+					"/workspace/newer.env.enc",
+					serializePayloadFile({
+						armoredPayload: "FAKE-ARMORED-PAYLOAD",
+					}),
+				);
+				payloadCrypto.seedDecryptedEnvelope({
+					createdAt: "2026-04-14T10:00:00.000Z",
+					envText: "API_TOKEN=secret\n",
+					lastRewrittenAt: "2026-04-14T10:00:00.000Z",
+					payloadId: "bspld_0123456789abcdef",
+					recipients: [selfRecipient],
+					version: 999,
+				});
+
+				const result = yield* EditPayload.open({
+					passphrase: "test-passphrase",
+					path: "/workspace/newer.env.enc",
+				}).pipe(Effect.either);
+
+				expect(result._tag).toBe("Left");
+				if (result._tag === "Left") {
+					expect(result.left).toEqual(
+						new EditPayloadVersionError({
+							message:
+								"CLI is too old to open this payload. Update CLI to latest version.",
+						}),
+					);
 				}
 			}),
 		);

@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest";
 import type { HomeState } from "../home/HomeState.js";
 import { emptyHomeState } from "../home/HomeState.js";
 import { DisplayName } from "../identity/DisplayName.js";
-import { Handle } from "../identity/Handle.js";
 import { IdentityUpdatedAt } from "../identity/IdentityUpdatedAt.js";
 import { KeyFingerprint } from "../identity/KeyFingerprint.js";
 import { OwnerId } from "../identity/OwnerId.js";
@@ -16,7 +15,6 @@ const selfDisplayName = Schema.decodeUnknownSync(DisplayName)("isaac-mbp");
 const selfFingerprint = Schema.decodeUnknownSync(KeyFingerprint)(
 	"bs1_0123456789abcdef",
 );
-const selfHandle = Schema.decodeUnknownSync(Handle)("isaac-mbp#069f7576");
 const selfIdentityUpdatedAt = Schema.decodeUnknownSync(IdentityUpdatedAt)(
 	"2026-04-14T10:00:00.000Z",
 );
@@ -31,14 +29,14 @@ const makeHomeState = (): HomeState => ({
 	activeKeyFingerprint: Option.some(selfFingerprint),
 	self: Option.some({
 		createdAt: "2026-04-14T10:00:00.000Z",
-		displayName: selfDisplayName,
-		fingerprint: selfFingerprint,
-		handle: selfHandle,
-		identityUpdatedAt: selfIdentityUpdatedAt,
 		keyMode: "pq-hybrid",
-		ownerId: selfOwnerId,
 		privateKeyPath: selfPrivateKeyPath,
-		publicKey: selfPublicKey,
+		publicIdentity: {
+			displayName: selfDisplayName,
+			identityUpdatedAt: selfIdentityUpdatedAt,
+			ownerId: selfOwnerId,
+			publicKey: selfPublicKey,
+		},
 	}),
 });
 
@@ -51,14 +49,13 @@ describe("PayloadNeedsUpdate", () => {
 			payloadId: "bspld_0123456789abcdef",
 			recipients: [
 				{
-					displayNameSnapshot: selfDisplayName,
-					fingerprint: selfFingerprint,
+					displayName: selfDisplayName,
 					identityUpdatedAt: selfIdentityUpdatedAt,
 					ownerId: selfOwnerId,
 					publicKey: selfPublicKey,
 				},
 			],
-			version: 1,
+			version: 2,
 		});
 
 		expect(getPayloadNeedsUpdate(makeHomeState(), envelope)).toEqual({
@@ -75,19 +72,45 @@ describe("PayloadNeedsUpdate", () => {
 			payloadId: "bspld_0123456789abcdef",
 			recipients: [
 				{
-					displayNameSnapshot: selfDisplayName,
-					fingerprint: "bs1_aaaaaaaaaaaaaaaa",
+					displayName: selfDisplayName,
 					identityUpdatedAt: selfIdentityUpdatedAt,
 					ownerId: selfOwnerId,
 					publicKey: "age1stale",
 				},
 			],
-			version: 1,
+			version: 2,
 		});
 
 		expect(getPayloadNeedsUpdate(makeHomeState(), envelope)).toEqual({
 			isRequired: true,
 			reason: Option.some("self key is stale"),
+		});
+	});
+
+	it("returns schema-outdated when persisted schema version is older than runtime", () => {
+		const envelope = Schema.decodeUnknownSync(PayloadEnvelope)({
+			createdAt: "2026-04-14T10:00:00.000Z",
+			envText: "",
+			lastRewrittenAt: "2026-04-14T10:00:00.000Z",
+			payloadId: "bspld_0123456789abcdef",
+			recipients: [
+				{
+					displayName: selfDisplayName,
+					identityUpdatedAt: selfIdentityUpdatedAt,
+					ownerId: selfOwnerId,
+					publicKey: selfPublicKey,
+				},
+			],
+			version: 2,
+		});
+
+		expect(
+			getPayloadNeedsUpdate(makeHomeState(), envelope, {
+				persistedSchemaVersion: 1,
+			}),
+		).toEqual({
+			isRequired: true,
+			reason: Option.some("payload schema is outdated"),
 		});
 	});
 });

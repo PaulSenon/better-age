@@ -31,6 +31,13 @@ export class EditPayloadUpdateRequiredError extends Schema.TaggedError<EditPaylo
 	},
 ) {}
 
+export class EditPayloadVersionError extends Schema.TaggedError<EditPayloadVersionError>()(
+	"EditPayloadVersionError",
+	{
+		message: Schema.String,
+	},
+) {}
+
 export class EditPayloadOpenSuccess extends Schema.TaggedClass<EditPayloadOpenSuccess>()(
 	"EditPayloadOpenSuccess",
 	{

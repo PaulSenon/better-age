@@ -2,9 +2,7 @@ import { Option, Schema } from "effect";
 import { describe, expect, it } from "vitest";
 import { emptyHomeState } from "../home/HomeState.js";
 import { DisplayName } from "../identity/DisplayName.js";
-import { Handle } from "../identity/Handle.js";
 import { IdentityUpdatedAt } from "../identity/IdentityUpdatedAt.js";
-import { KeyFingerprint } from "../identity/KeyFingerprint.js";
 import { OwnerId } from "../identity/OwnerId.js";
 import { PrivateKeyRelativePath } from "../identity/PrivateKeyRelativePath.js";
 import { PublicKey } from "../identity/PublicKey.js";
@@ -12,10 +10,6 @@ import { PayloadEnvelope } from "./PayloadEnvelope.js";
 import { computePayloadUpdateState } from "./PayloadUpdateState.js";
 
 const selfDisplayName = Schema.decodeUnknownSync(DisplayName)("isaac");
-const selfFingerprint = Schema.decodeUnknownSync(KeyFingerprint)(
-	"bs1_1111111111111111",
-);
-const selfHandle = Schema.decodeUnknownSync(Handle)("isaac#069f7576");
 const selfIdentityUpdatedAt = Schema.decodeUnknownSync(IdentityUpdatedAt)(
 	"2026-04-14T10:00:00.000Z",
 );
@@ -24,14 +18,8 @@ const selfPrivateKeyPath = Schema.decodeUnknownSync(PrivateKeyRelativePath)(
 	"keys/active.key.age",
 );
 const selfPublicKey = Schema.decodeUnknownSync(PublicKey)("age1isaac");
-const staleSelfFingerprint = Schema.decodeUnknownSync(KeyFingerprint)(
-	"bs1_9999999999999999",
-);
 const staleSelfPublicKey = Schema.decodeUnknownSync(PublicKey)("age1stale");
 const paulDisplayName = Schema.decodeUnknownSync(DisplayName)("paul");
-const paulFingerprint = Schema.decodeUnknownSync(KeyFingerprint)(
-	"bs1_aaaaaaaaaaaaaaaa",
-);
 const paulIdentityUpdatedAt = Schema.decodeUnknownSync(IdentityUpdatedAt)(
 	"2026-04-14T11:00:00.000Z",
 );
@@ -50,14 +38,14 @@ const state = {
 	...emptyHomeState(),
 	self: Option.some({
 		createdAt: "2026-04-14T10:00:00.000Z",
-		displayName: selfDisplayName,
-		fingerprint: selfFingerprint,
-		handle: selfHandle,
-		identityUpdatedAt: selfIdentityUpdatedAt,
 		keyMode: "pq-hybrid" as const,
-		ownerId: selfOwnerId,
 		privateKeyPath: selfPrivateKeyPath,
-		publicKey: selfPublicKey,
+		publicIdentity: {
+			displayName: selfDisplayName,
+			identityUpdatedAt: selfIdentityUpdatedAt,
+			ownerId: selfOwnerId,
+			publicKey: selfPublicKey,
+		},
 	}),
 };
 
@@ -68,21 +56,19 @@ const currentEnvelope = Schema.decodeUnknownSync(PayloadEnvelope)({
 	payloadId: "bspld_0123456789abcdef",
 	recipients: [
 		{
-			displayNameSnapshot: selfDisplayName,
-			fingerprint: selfFingerprint,
+			displayName: selfDisplayName,
 			identityUpdatedAt: selfIdentityUpdatedAt,
 			ownerId: selfOwnerId,
 			publicKey: selfPublicKey,
 		},
 		{
-			displayNameSnapshot: paulDisplayName,
-			fingerprint: paulFingerprint,
+			displayName: paulDisplayName,
 			identityUpdatedAt: paulIdentityUpdatedAt,
 			ownerId: paulOwnerId,
 			publicKey: paulPublicKey,
 		},
 	],
-	version: 1,
+	version: 2,
 });
 const currentSelfRecipient = expectValue(currentEnvelope.recipients[0]);
 const currentPaulRecipient = expectValue(currentEnvelope.recipients[1]);
@@ -102,7 +88,6 @@ describe("computePayloadUpdateState", () => {
 				recipients: [
 					{
 						...currentSelfRecipient,
-						fingerprint: staleSelfFingerprint,
 						publicKey: staleSelfPublicKey,
 					},
 					currentPaulRecipient,
@@ -122,7 +107,6 @@ describe("computePayloadUpdateState", () => {
 					currentSelfRecipient,
 					{
 						...currentSelfRecipient,
-						fingerprint: staleSelfFingerprint,
 						publicKey: staleSelfPublicKey,
 					},
 					currentPaulRecipient,
@@ -142,7 +126,6 @@ describe("computePayloadUpdateState", () => {
 					currentSelfRecipient,
 					{
 						...currentPaulRecipient,
-						fingerprint: staleSelfFingerprint,
 						publicKey: staleSelfPublicKey,
 					},
 				],
@@ -150,6 +133,17 @@ describe("computePayloadUpdateState", () => {
 		).toEqual({
 			isRequired: false,
 			reasons: [],
+		});
+	});
+
+	it("requires update when persisted schema version is outdated even if normalized envelope is current", () => {
+		expect(
+			computePayloadUpdateState(state, currentEnvelope, {
+				persistedSchemaVersion: 1,
+			}),
+		).toEqual({
+			isRequired: true,
+			reasons: ["schema-outdated"],
 		});
 	});
 });

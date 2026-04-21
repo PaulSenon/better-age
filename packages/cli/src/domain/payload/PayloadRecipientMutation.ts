@@ -6,8 +6,7 @@ const sameRecipientSnapshot = (
 	left: Schema.Schema.Type<typeof PayloadRecipient>,
 	right: Schema.Schema.Type<typeof PayloadRecipient>,
 ) =>
-	left.displayNameSnapshot === right.displayNameSnapshot &&
-	left.fingerprint === right.fingerprint &&
+	left.displayName === right.displayName &&
 	left.identityUpdatedAt === right.identityUpdatedAt &&
 	left.ownerId === right.ownerId &&
 	left.publicKey === right.publicKey;
@@ -16,14 +15,12 @@ export const toPayloadRecipient = (
 	identity: Pick<
 		KnownIdentity,
 		| "displayName"
-		| "fingerprint"
 		| "identityUpdatedAt"
 		| "ownerId"
 		| "publicKey"
 	>,
 ): Schema.Schema.Type<typeof PayloadRecipient> => ({
-	displayNameSnapshot: identity.displayName,
-	fingerprint: identity.fingerprint,
+	displayName: identity.displayName,
 	identityUpdatedAt: identity.identityUpdatedAt,
 	ownerId: identity.ownerId,
 	publicKey: identity.publicKey,

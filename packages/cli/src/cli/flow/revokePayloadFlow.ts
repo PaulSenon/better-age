@@ -17,6 +17,7 @@ import {
 	type RevokePayloadRecipientRemovedSuccess,
 	type RevokePayloadRecipientUnchangedSuccess,
 	RevokePayloadRecipientUpdateRequiredError,
+	type RevokePayloadRecipientVersionError,
 } from "../../app/revoke-payload-recipient/RevokePayloadRecipientError.js";
 import type { ResolvePayloadTarget } from "../../app/shared/ResolvePayloadTarget.js";
 import type { ResolvePayloadTargetError } from "../../app/shared/ResolvePayloadTargetError.js";
@@ -28,6 +29,7 @@ import type {
 	UpdatePayloadFileFormatError,
 	UpdatePayloadNoSelfIdentityError,
 	UpdatePayloadPersistenceError,
+	UpdatePayloadVersionError,
 } from "../../app/update-payload/UpdatePayloadError.js";
 import type { InteractivePrompt } from "../../port/InteractivePrompt.js";
 import { Prompt } from "../../port/Prompt.js";
@@ -87,13 +89,15 @@ export type RevokePayloadFlowError =
 	| RevokePayloadRecipientForbiddenSelfError
 	| RevokePayloadRecipientPersistenceError
 	| RevokePayloadRecipientUpdateRequiredError
+	| RevokePayloadRecipientVersionError
 	| ResolvePayloadTargetError
 	| UpdatePayloadCryptoError
 	| UpdatePayloadEnvError
 	| UpdatePayloadEnvelopeError
 	| UpdatePayloadFileFormatError
 	| UpdatePayloadNoSelfIdentityError
-	| UpdatePayloadPersistenceError;
+	| UpdatePayloadPersistenceError
+	| UpdatePayloadVersionError;
 
 export type RevokePayloadFlowContext =
 	| InspectPayload

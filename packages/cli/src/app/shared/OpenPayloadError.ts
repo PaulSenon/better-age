@@ -29,6 +29,13 @@ export class OpenPayloadEnvelopeError extends Schema.TaggedError<OpenPayloadEnve
 	},
 ) {}
 
+export class OpenPayloadVersionError extends Schema.TaggedError<OpenPayloadVersionError>()(
+	"OpenPayloadVersionError",
+	{
+		message: Schema.String,
+	},
+) {}
+
 export class OpenPayloadEnvError extends Schema.TaggedError<OpenPayloadEnvError>()(
 	"OpenPayloadEnvError",
 	{

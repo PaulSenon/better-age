@@ -5,6 +5,7 @@ import {
 	EditPayloadEnvError,
 	EditPayloadPersistenceError,
 	EditPayloadUpdateRequiredError,
+	EditPayloadVersionError,
 } from "../../app/edit-payload/EditPayloadError.js";
 import {
 	ResolveEditorCommandPersistenceError,
@@ -59,6 +60,15 @@ export const runEditPayload = (input: {
 					yield* Prompt.writeStderr(
 						renderUpdateRequiredMessage("edit", error.path),
 					);
+					return yield* Effect.fail(new EditPayloadCommandFailedError());
+				}),
+		),
+		Effect.catchIf(
+			(error): error is EditPayloadVersionError =>
+				error instanceof EditPayloadVersionError,
+			(error) =>
+				Effect.gen(function* () {
+					yield* Prompt.writeStderr(`${error.message}\n`);
 					return yield* Effect.fail(new EditPayloadCommandFailedError());
 				}),
 		),

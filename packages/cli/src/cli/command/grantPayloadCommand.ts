@@ -6,6 +6,7 @@ import {
 	GrantPayloadRecipientIdentityNotFoundError,
 	GrantPayloadRecipientPersistenceError,
 	GrantPayloadRecipientUpdateRequiredError,
+	GrantPayloadRecipientVersionError,
 } from "../../app/grant-payload-recipient/GrantPayloadRecipientError.js";
 import {
 	ImportIdentityStringConflictError,
@@ -66,6 +67,15 @@ export const runGrantPayload = (input: {
 					yield* Prompt.writeStderr(
 						renderUpdateRequiredMessage("grant", error.path),
 					);
+					return yield* Effect.fail(new GrantPayloadCommandFailedError());
+				}),
+		),
+		Effect.catchIf(
+			(error): error is GrantPayloadRecipientVersionError =>
+				error instanceof GrantPayloadRecipientVersionError,
+			(error) =>
+				Effect.gen(function* () {
+					yield* Prompt.writeStderr(`${error.message}\n`);
 					return yield* Effect.fail(new GrantPayloadCommandFailedError());
 				}),
 		),

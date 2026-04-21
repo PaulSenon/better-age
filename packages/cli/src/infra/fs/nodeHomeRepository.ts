@@ -20,6 +20,7 @@ import {
 } from "../../port/HomeRepositoryError.js";
 
 const HomeStateJson = Schema.parseJson(HomeStateSchema);
+const JsonDocument = Schema.parseJson(Schema.Unknown);
 
 const writeFileAtomically = async (targetPath: string, contents: string) => {
 	const tempPath = `${targetPath}.tmp`;
@@ -35,7 +36,7 @@ export const makeNodeHomeRepository = (rootDirectory: string) => {
 		stateFile: join(rootDirectory, "state.json"),
 	} as const;
 
-	const loadState = Effect.tryPromise({
+	const loadStateFile = Effect.tryPromise({
 		catch: () =>
 			new HomeStateLoadError({
 				message: "Failed to load home state",
@@ -57,7 +58,25 @@ export const makeNodeHomeRepository = (rootDirectory: string) => {
 				throw error;
 			}
 		},
-	}).pipe(
+	});
+
+	const loadStateDocument = loadStateFile.pipe(
+		Effect.flatMap((rawState) =>
+			rawState === null
+				? Effect.succeed(null)
+				: Schema.decodeUnknown(JsonDocument)(rawState).pipe(
+						Effect.mapError(
+							() =>
+								new HomeStateDecodeError({
+									message: "Persisted home state was not valid JSON",
+									stateFile: location.stateFile,
+								}),
+						),
+					),
+		),
+	);
+
+	const loadState = loadStateFile.pipe(
 		Effect.flatMap((rawState) =>
 			rawState === null
 				? Effect.succeed(emptyHomeState())
@@ -90,6 +109,7 @@ export const makeNodeHomeRepository = (rootDirectory: string) => {
 			Effect.succeed(getActiveKey(state)),
 		),
 		getLocation: Effect.succeed(location),
+		loadStateDocument,
 		loadState,
 		readPrivateKey: (privateKeyPath) =>
 			Effect.tryPromise({

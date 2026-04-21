@@ -11,6 +11,7 @@ import {
 	UpdatePayloadNoSelfIdentityError,
 	UpdatePayloadUnchangedSuccess,
 	UpdatePayloadUpdatedSuccess,
+	UpdatePayloadVersionError,
 } from "../../app/update-payload/UpdatePayloadError.js";
 import { HomeRepository } from "../../port/HomeRepository.js";
 import type { InteractiveChoice } from "../../port/InteractivePrompt.js";
@@ -274,6 +275,54 @@ describe("updatePayloadCommand", () => {
 				expect(
 					(prompt as typeof prompt & { stderr: Array<string> }).stderr,
 				).toEqual([["Failed to update payload: ./.env.enc", ""].join("\n")]);
+			}),
+		);
+
+		it.effect("prints update-cli remediation for newer payload versions", () =>
+			Effect.gen(function* () {
+				const prompt = makePrompt();
+				const cli = Command.run(
+					Command.make("bage").pipe(
+						Command.withSubcommands([updatePayloadCommand]),
+					),
+					{ name: "bage", version: "0.0.1" },
+				);
+
+				const result = yield* cli([
+					"node",
+					"bage",
+					"update",
+					"./.env.enc",
+				]).pipe(
+					Effect.provide(
+						Layer.mergeAll(
+							NodeContext.layer,
+							Layer.succeed(
+								UpdatePayload,
+								UpdatePayload.make({
+									execute: () =>
+										Effect.fail(
+											new UpdatePayloadVersionError({
+												message:
+													"CLI is too old to open this payload. Update CLI to latest version.",
+											}),
+										),
+								}),
+							),
+							Layer.succeed(Prompt, prompt),
+							Layer.succeed(ResolvePayloadTarget, makeResolvePayloadTarget()),
+						),
+					),
+					Effect.either,
+				);
+
+				expect(result._tag).toBe("Left");
+				if (result._tag === "Left") {
+					expect(result.left).toBeInstanceOf(UpdatePayloadCommandFailedError);
+				}
+				expect(prompt.stderr).toEqual([
+					"CLI is too old to open this payload. Update CLI to latest version.\n",
+				]);
 			}),
 		);
 

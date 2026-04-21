@@ -36,6 +36,13 @@ export class UpdatePayloadEnvError extends Schema.TaggedError<UpdatePayloadEnvEr
 	},
 ) {}
 
+export class UpdatePayloadVersionError extends Schema.TaggedError<UpdatePayloadVersionError>()(
+	"UpdatePayloadVersionError",
+	{
+		message: Schema.String,
+	},
+) {}
+
 export class UpdatePayloadNoSelfIdentityError extends Schema.TaggedError<UpdatePayloadNoSelfIdentityError>()(
 	"UpdatePayloadNoSelfIdentityError",
 	{

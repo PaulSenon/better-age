@@ -2,12 +2,12 @@ import { describe, expect, layer } from "@effect/vitest";
 import { Effect, Layer, Option, Schema } from "effect";
 import { emptyHomeState } from "../../domain/home/HomeState.js";
 import { DisplayName } from "../../domain/identity/DisplayName.js";
-import { Handle } from "../../domain/identity/Handle.js";
 import { IdentityUpdatedAt } from "../../domain/identity/IdentityUpdatedAt.js";
 import { KeyFingerprint } from "../../domain/identity/KeyFingerprint.js";
 import { OwnerId } from "../../domain/identity/OwnerId.js";
 import { PrivateKeyRelativePath } from "../../domain/identity/PrivateKeyRelativePath.js";
 import { PublicKey } from "../../domain/identity/PublicKey.js";
+import { derivePublicIdentityFingerprint } from "../../domain/identity/PublicIdentity.js";
 import {
 	Crypto,
 	GeneratedIdentity,
@@ -28,7 +28,6 @@ const selfDisplayName = Schema.decodeUnknownSync(DisplayName)("isaac");
 const selfFingerprint = Schema.decodeUnknownSync(KeyFingerprint)(
 	"bs1_1111111111111111",
 );
-const selfHandle = Schema.decodeUnknownSync(Handle)("isaac#069f7576");
 const selfIdentityUpdatedAt = Schema.decodeUnknownSync(IdentityUpdatedAt)(
 	"2026-04-14T10:00:00.000Z",
 );
@@ -108,14 +107,14 @@ describe("RotateUserIdentity", () => {
 						activeKeyFingerprint: Option.some(selfFingerprint),
 						self: Option.some({
 							createdAt: "2026-04-14T10:00:00.000Z",
-							displayName: selfDisplayName,
-							fingerprint: selfFingerprint,
-							handle: selfHandle,
-							identityUpdatedAt: selfIdentityUpdatedAt,
 							keyMode: "pq-hybrid",
-							ownerId: selfOwnerId,
 							privateKeyPath: selfPrivateKeyPath,
-							publicKey: selfPublicKey,
+							publicIdentity: {
+								displayName: selfDisplayName,
+								identityUpdatedAt: selfIdentityUpdatedAt,
+								ownerId: selfOwnerId,
+								publicKey: selfPublicKey,
+							},
 						}),
 					});
 					homeRepository.seedPrivateKey(
@@ -131,7 +130,12 @@ describe("RotateUserIdentity", () => {
 					expect(result).toEqual(
 						new RotateUserIdentitySuccess({
 							newFingerprint: rotatedFingerprint,
-							oldFingerprint: selfFingerprint,
+							oldFingerprint: derivePublicIdentityFingerprint({
+								displayName: selfDisplayName,
+								identityUpdatedAt: selfIdentityUpdatedAt,
+								ownerId: selfOwnerId,
+								publicKey: selfPublicKey,
+							}),
 							ownerId: selfOwnerId,
 						}),
 					);
@@ -139,14 +143,23 @@ describe("RotateUserIdentity", () => {
 						"NEW-ENCRYPTED-KEY",
 					);
 					expect(
-						snapshot.files.get("keys/retired/bs1_1111111111111111.key.age"),
+						snapshot.files.get(
+							`keys/retired/${derivePublicIdentityFingerprint({
+								displayName: selfDisplayName,
+								identityUpdatedAt: selfIdentityUpdatedAt,
+								ownerId: selfOwnerId,
+								publicKey: selfPublicKey,
+							})}.key.age`,
+						),
 					).toBe("OLD-ENCRYPTED-KEY");
 					expect(snapshot.state.retiredKeys).toHaveLength(1);
 					expect(snapshot.state.self._tag).toBe("Some");
 					if (snapshot.state.self._tag === "Some") {
-						expect(snapshot.state.self.value.ownerId).toBe(selfOwnerId);
-						expect(snapshot.state.self.value.fingerprint).toBe(
-							rotatedFingerprint,
+						expect(snapshot.state.self.value.publicIdentity.ownerId).toBe(
+							selfOwnerId,
+						);
+						expect(snapshot.state.activeKeyFingerprint).toEqual(
+							Option.some(rotatedFingerprint),
 						);
 					}
 				}),
@@ -181,14 +194,14 @@ describe("RotateUserIdentity", () => {
 						activeKeyFingerprint: Option.some(selfFingerprint),
 						self: Option.some({
 							createdAt: "2026-04-14T10:00:00.000Z",
-							displayName: selfDisplayName,
-							fingerprint: selfFingerprint,
-							handle: selfHandle,
-							identityUpdatedAt: selfIdentityUpdatedAt,
 							keyMode: "pq-hybrid",
-							ownerId: selfOwnerId,
 							privateKeyPath: selfPrivateKeyPath,
-							publicKey: selfPublicKey,
+							publicIdentity: {
+								displayName: selfDisplayName,
+								identityUpdatedAt: selfIdentityUpdatedAt,
+								ownerId: selfOwnerId,
+								publicKey: selfPublicKey,
+							},
 						}),
 					});
 					authHomeRepository.seedPrivateKey(
@@ -218,14 +231,14 @@ describe("RotateUserIdentity", () => {
 					expect(snapshot.state.self).toEqual(
 						Option.some({
 							createdAt: "2026-04-14T10:00:00.000Z",
-							displayName: selfDisplayName,
-							fingerprint: selfFingerprint,
-							handle: selfHandle,
-							identityUpdatedAt: selfIdentityUpdatedAt,
 							keyMode: "pq-hybrid",
-							ownerId: selfOwnerId,
 							privateKeyPath: selfPrivateKeyPath,
-							publicKey: selfPublicKey,
+							publicIdentity: {
+								displayName: selfDisplayName,
+								identityUpdatedAt: selfIdentityUpdatedAt,
+								ownerId: selfOwnerId,
+								publicKey: selfPublicKey,
+							},
 						}),
 					);
 				}),
@@ -248,14 +261,14 @@ describe("RotateUserIdentity", () => {
 						activeKeyFingerprint: Option.some(selfFingerprint),
 						self: Option.some({
 							createdAt: "2026-04-14T10:00:00.000Z",
-							displayName: selfDisplayName,
-							fingerprint: selfFingerprint,
-							handle: selfHandle,
-							identityUpdatedAt: selfIdentityUpdatedAt,
 							keyMode: "pq-hybrid",
-							ownerId: selfOwnerId,
 							privateKeyPath: selfPrivateKeyPath,
-							publicKey: selfPublicKey,
+							publicIdentity: {
+								displayName: selfDisplayName,
+								identityUpdatedAt: selfIdentityUpdatedAt,
+								ownerId: selfOwnerId,
+								publicKey: selfPublicKey,
+							},
 						}),
 					});
 					rollbackHomeRepository.seedPrivateKey(
@@ -279,7 +292,14 @@ describe("RotateUserIdentity", () => {
 					expect(
 						rollbackHomeRepository
 							.snapshot()
-							.files.get("keys/retired/bs1_1111111111111111.key.age"),
+							.files.get(
+								`keys/retired/${derivePublicIdentityFingerprint({
+									displayName: selfDisplayName,
+									identityUpdatedAt: selfIdentityUpdatedAt,
+									ownerId: selfOwnerId,
+									publicKey: selfPublicKey,
+								})}.key.age`,
+							),
 					).toBeUndefined();
 				}),
 		);

@@ -72,11 +72,15 @@ describe("CreateUserIdentity", () => {
 				expect(result.privateKeyPath).toBe("keys/active.key.age");
 				expect(snapshot.state.self._tag).toBe("Some");
 				if (snapshot.state.self._tag === "Some") {
-					expect(snapshot.state.self.value.ownerId).toBe(
+					expect(snapshot.state.self.value.publicIdentity.ownerId).toBe(
 						"bsid1_069f7576d2ab43ef",
 					);
-					expect(snapshot.state.self.value.handle).toBe("isaac-mbp#069f7576");
-					expect(snapshot.state.self.value.publicKey).toBe("age1testrecipient");
+					expect(snapshot.state.self.value.publicIdentity.displayName).toBe(
+						"isaac-mbp",
+					);
+					expect(snapshot.state.self.value.publicIdentity.publicKey).toBe(
+						"age1testrecipient",
+					);
 				}
 			}),
 		);

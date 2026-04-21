@@ -9,6 +9,7 @@ import {
 	EditPayloadRewrittenSuccess,
 	EditPayloadUnchangedSuccess,
 	EditPayloadUpdateRequiredError,
+	EditPayloadVersionError,
 } from "../../app/edit-payload/EditPayloadError.js";
 import { ResolveEditorCommand } from "../../app/shared/ResolveEditorCommand.js";
 import { ResolveEditorCommandUnavailableError } from "../../app/shared/ResolveEditorCommandError.js";
@@ -654,6 +655,72 @@ describe("editPayloadCommand", () => {
 						"Run: bage update ./.env.enc",
 						"",
 					].join("\n"),
+				]);
+			}),
+		);
+
+		it.effect("prints update-cli remediation when payload version is unsupported", () =>
+			Effect.gen(function* () {
+				const prompt = makePrompt("test-passphrase", "n");
+				const cli = Command.run(
+					Command.make("bage").pipe(
+						Command.withSubcommands([editPayloadCommand]),
+					),
+					{
+						name: "bage",
+						version: "0.0.1",
+					},
+				);
+
+				const result = yield* cli(["node", "bage", "edit", "./.env.enc"]).pipe(
+					Effect.provide(
+						Layer.mergeAll(
+							NodeContext.layer,
+							Layer.succeed(
+								EditPayload,
+								EditPayload.make({
+									open: () =>
+										Effect.fail(
+											new EditPayloadVersionError({
+												message:
+													"CLI is too old to open this payload. Update CLI to latest version.",
+											}),
+										),
+									save: () => Effect.die("unused"),
+								}),
+							),
+							Layer.succeed(
+								UpdatePayload,
+								UpdatePayload.make({
+									execute: () => Effect.die("unused"),
+								}),
+							),
+							Layer.succeed(
+								Editor,
+								Editor.make({
+									editFile: (_input) => Effect.void,
+								}),
+							),
+							Layer.succeed(
+								TempFile,
+								TempFile.make({
+									create: (_input) => Effect.die("unused"),
+									delete: (_path) => Effect.void,
+									read: (_path) => Effect.die("unused"),
+								}),
+							),
+							Layer.succeed(Prompt, prompt),
+							Layer.succeed(InteractivePrompt, makeInteractivePrompt([])),
+							Layer.succeed(ResolveEditorCommand, makeResolveEditorCommand()),
+							Layer.succeed(ResolvePayloadTarget, makeResolvePayloadTarget()),
+						),
+					),
+					Effect.either,
+				);
+
+				expect(result._tag).toBe("Left");
+				expect(prompt.stderr).toEqual([
+					"CLI is too old to open this payload. Update CLI to latest version.\n",
 				]);
 			}),
 		);

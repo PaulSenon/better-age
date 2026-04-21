@@ -22,6 +22,7 @@ import {
 	UpdatePayloadNoSelfIdentityError,
 	UpdatePayloadUnchangedSuccess,
 	UpdatePayloadUpdatedSuccess,
+	UpdatePayloadVersionError,
 } from "./UpdatePayloadError.js";
 
 const selfDisplayName = Schema.decodeUnknownSync(DisplayName)("isaac");
@@ -37,6 +38,17 @@ const selfPrivateKeyPath = Schema.decodeUnknownSync(PrivateKeyRelativePath)(
 	"keys/active.key.age",
 );
 const selfPublicKey = Schema.decodeUnknownSync(PublicKey)("age1isaac");
+const selfIdentity = {
+	createdAt: "2026-04-14T10:00:00.000Z",
+	keyMode: "pq-hybrid" as const,
+	privateKeyPath: selfPrivateKeyPath,
+	publicIdentity: {
+		displayName: selfDisplayName,
+		identityUpdatedAt: selfIdentityUpdatedAt,
+		ownerId: selfOwnerId,
+		publicKey: selfPublicKey,
+	},
+};
 const staleSelfFingerprint = Schema.decodeUnknownSync(KeyFingerprint)(
 	"bs1_9999999999999999",
 );
@@ -54,17 +66,7 @@ const paulPublicKey = Schema.decodeUnknownSync(PublicKey)("age1paul");
 const selfState = {
 	...emptyHomeState(),
 	activeKeyFingerprint: Option.some(selfFingerprint),
-	self: Option.some({
-		createdAt: "2026-04-14T10:00:00.000Z",
-		displayName: selfDisplayName,
-		fingerprint: selfFingerprint,
-		handle: selfHandle,
-		identityUpdatedAt: selfIdentityUpdatedAt,
-		keyMode: "pq-hybrid" as const,
-		ownerId: selfOwnerId,
-		privateKeyPath: selfPrivateKeyPath,
-		publicKey: selfPublicKey,
-	}),
+	self: Option.some(selfIdentity),
 };
 
 const currentEnvelope = {
@@ -74,21 +76,19 @@ const currentEnvelope = {
 	payloadId: "bspld_0123456789abcdef" as const,
 	recipients: [
 		{
-			displayNameSnapshot: selfDisplayName,
-			fingerprint: selfFingerprint,
+			displayName: selfDisplayName,
 			identityUpdatedAt: selfIdentityUpdatedAt,
 			ownerId: selfOwnerId,
 			publicKey: selfPublicKey,
 		},
 		{
-			displayNameSnapshot: paulDisplayName,
-			fingerprint: paulFingerprint,
+			displayName: paulDisplayName,
 			identityUpdatedAt: paulIdentityUpdatedAt,
 			ownerId: paulOwnerId,
 			publicKey: paulPublicKey,
 		},
 	],
-	version: 1 as const,
+	version: 2 as const,
 };
 
 describe("UpdatePayload", () => {
@@ -135,6 +135,147 @@ describe("UpdatePayload", () => {
 		);
 
 		it.effect(
+			"rewrites outdated payload schema and reports format migration only",
+			() =>
+				Effect.gen(function* () {
+					payloadCrypto.snapshot().encryptCalls.length = 0;
+					payloadRepository.snapshot().writeCalls.length = 0;
+					yield* homeRepository.saveState(selfState);
+					homeRepository.seedPrivateKey("keys/active.key.age", "AGE-ENCRYPTED");
+					payloadRepository.seedFile(
+						"/workspace/legacy-v1.env.enc",
+						serializePayloadFile({ armoredPayload: "FAKE-ARMORED-PAYLOAD" }),
+					);
+					payloadCrypto.seedDecryptedEnvelope({
+						...currentEnvelope,
+						version: 1 as const,
+					});
+
+					const result = yield* UpdatePayload.execute({
+						passphrase: "test-passphrase",
+						path: "/workspace/legacy-v1.env.enc",
+					});
+
+					expect(result).toEqual(
+						new UpdatePayloadUpdatedSuccess({
+							path: "/workspace/legacy-v1.env.enc",
+							payloadId: "bspld_0123456789abcdef",
+							reasons: ["payload schema is outdated"],
+						}),
+					);
+					expect(payloadRepository.snapshot().writeCalls).toHaveLength(1);
+					expect(payloadCrypto.snapshot().encryptCalls).toHaveLength(1);
+					expect(
+						payloadCrypto.snapshot().encryptCalls[0]?.envelope,
+					).toMatchObject({
+						recipients: currentEnvelope.recipients,
+						version: 2,
+					});
+				}),
+		);
+
+		it.effect(
+			"rewrites oldest supported payload schema and reports format migration only",
+			() =>
+				Effect.gen(function* () {
+					payloadCrypto.snapshot().encryptCalls.length = 0;
+					payloadRepository.snapshot().writeCalls.length = 0;
+					yield* homeRepository.saveState(selfState);
+					homeRepository.seedPrivateKey("keys/active.key.age", "AGE-ENCRYPTED");
+					payloadRepository.seedFile(
+						"/workspace/legacy-v0.env.enc",
+						serializePayloadFile({ armoredPayload: "FAKE-ARMORED-PAYLOAD" }),
+					);
+					payloadCrypto.seedDecryptedEnvelope({
+						createdAt: currentEnvelope.createdAt,
+						envText: currentEnvelope.envText,
+						lastRewrittenAt: currentEnvelope.lastRewrittenAt,
+						payloadId: currentEnvelope.payloadId,
+						recipients: [
+							{
+								...currentEnvelope.recipients[0],
+								fingerprint: selfFingerprint,
+								handle: selfHandle,
+							},
+							{
+								...currentEnvelope.recipients[1],
+								fingerprint: paulFingerprint,
+								handle: "paul#aaaaaaaa",
+							},
+						],
+						version: 0 as const,
+					});
+
+					const result = yield* UpdatePayload.execute({
+						passphrase: "test-passphrase",
+						path: "/workspace/legacy-v0.env.enc",
+					});
+
+					expect(result).toEqual(
+						new UpdatePayloadUpdatedSuccess({
+							path: "/workspace/legacy-v0.env.enc",
+							payloadId: "bspld_0123456789abcdef",
+							reasons: ["payload schema is outdated"],
+						}),
+					);
+					expect(payloadRepository.snapshot().writeCalls).toHaveLength(1);
+					expect(payloadCrypto.snapshot().encryptCalls).toHaveLength(1);
+					expect(
+						payloadCrypto.snapshot().encryptCalls[0]?.envelope,
+					).toMatchObject({
+						recipients: currentEnvelope.recipients,
+						version: 2,
+					});
+				}),
+		);
+
+		it.effect(
+			"rewrites once when payload needs format migration and self refresh", () =>
+				Effect.gen(function* () {
+					payloadCrypto.snapshot().encryptCalls.length = 0;
+					payloadRepository.snapshot().writeCalls.length = 0;
+					yield* homeRepository.saveState(selfState);
+					homeRepository.seedPrivateKey("keys/active.key.age", "AGE-ENCRYPTED");
+					payloadRepository.seedFile(
+						"/workspace/legacy-and-stale.env.enc",
+						serializePayloadFile({ armoredPayload: "FAKE-ARMORED-PAYLOAD" }),
+					);
+					payloadCrypto.seedDecryptedEnvelope({
+						...currentEnvelope,
+						recipients: [
+							{
+								...currentEnvelope.recipients[0],
+								publicKey: staleSelfPublicKey,
+							},
+							currentEnvelope.recipients[1],
+						],
+						version: 1 as const,
+					});
+
+					const result = yield* UpdatePayload.execute({
+						passphrase: "test-passphrase",
+						path: "/workspace/legacy-and-stale.env.enc",
+					});
+
+					expect(result).toEqual(
+						new UpdatePayloadUpdatedSuccess({
+							path: "/workspace/legacy-and-stale.env.enc",
+							payloadId: "bspld_0123456789abcdef",
+							reasons: ["payload schema is outdated", "self key is stale"],
+						}),
+					);
+					expect(payloadRepository.snapshot().writeCalls).toHaveLength(1);
+					expect(payloadCrypto.snapshot().encryptCalls).toHaveLength(1);
+					expect(
+						payloadCrypto.snapshot().encryptCalls[0]?.envelope,
+					).toMatchObject({
+						recipients: currentEnvelope.recipients,
+						version: 2,
+					});
+				}),
+		);
+
+		it.effect(
 			"rewrites stale self recipient and preserves non-self recipients",
 			() =>
 				Effect.gen(function* () {
@@ -151,7 +292,6 @@ describe("UpdatePayload", () => {
 						recipients: [
 							{
 								...currentEnvelope.recipients[0],
-								fingerprint: staleSelfFingerprint,
 								publicKey: staleSelfPublicKey,
 							},
 							currentEnvelope.recipients[1],
@@ -171,8 +311,8 @@ describe("UpdatePayload", () => {
 					).toMatchObject({
 						payloadId: "bspld_0123456789abcdef",
 						recipients: [
-							currentEnvelope.recipients[1],
 							currentEnvelope.recipients[0],
+							currentEnvelope.recipients[1],
 						],
 					});
 				}),
@@ -196,7 +336,6 @@ describe("UpdatePayload", () => {
 							currentEnvelope.recipients[0],
 							{
 								...currentEnvelope.recipients[0],
-								fingerprint: staleSelfFingerprint,
 								publicKey: staleSelfPublicKey,
 							},
 							currentEnvelope.recipients[1],
@@ -212,11 +351,57 @@ describe("UpdatePayload", () => {
 						payloadCrypto.snapshot().encryptCalls[0]?.envelope,
 					).toMatchObject({
 						recipients: [
-							currentEnvelope.recipients[1],
 							currentEnvelope.recipients[0],
+							currentEnvelope.recipients[1],
 						],
 					});
 				}),
+		);
+
+		it.effect("is idempotent when rerun after successful update", () =>
+			Effect.gen(function* () {
+				payloadCrypto.snapshot().encryptCalls.length = 0;
+				payloadRepository.snapshot().writeCalls.length = 0;
+				yield* homeRepository.saveState(selfState);
+				homeRepository.seedPrivateKey("keys/active.key.age", "AGE-ENCRYPTED");
+				payloadRepository.seedFile(
+					"/workspace/idempotent.env.enc",
+					serializePayloadFile({ armoredPayload: "FAKE-ARMORED-PAYLOAD" }),
+				);
+				payloadCrypto.seedDecryptedEnvelope({
+					...currentEnvelope,
+					version: 1 as const,
+				});
+
+				const firstResult = yield* UpdatePayload.execute({
+					passphrase: "test-passphrase",
+					path: "/workspace/idempotent.env.enc",
+				});
+
+				expect(firstResult).toBeInstanceOf(UpdatePayloadUpdatedSuccess);
+				expect(payloadRepository.snapshot().writeCalls).toHaveLength(1);
+				expect(payloadCrypto.snapshot().encryptCalls).toHaveLength(1);
+
+				payloadCrypto.seedDecryptedEnvelope(
+					payloadCrypto.snapshot().encryptCalls[0]?.envelope,
+				);
+				payloadRepository.snapshot().writeCalls.length = 0;
+				payloadCrypto.snapshot().encryptCalls.length = 0;
+
+				const secondResult = yield* UpdatePayload.execute({
+					passphrase: "test-passphrase",
+					path: "/workspace/idempotent.env.enc",
+				});
+
+				expect(secondResult).toEqual(
+					new UpdatePayloadUnchangedSuccess({
+						path: "/workspace/idempotent.env.enc",
+						reasons: [],
+					}),
+				);
+				expect(payloadRepository.snapshot().writeCalls).toHaveLength(0);
+				expect(payloadCrypto.snapshot().encryptCalls).toHaveLength(0);
+			}),
 		);
 	});
 
@@ -233,6 +418,40 @@ describe("UpdatePayload", () => {
 			]),
 		]),
 	)("failure", (it) => {
+		it.effect("fails fast when payload version is newer than current CLI", () =>
+			Effect.gen(function* () {
+				payloadCrypto.snapshot().encryptCalls.length = 0;
+				payloadRepository.snapshot().writeCalls.length = 0;
+				yield* homeRepository.saveState(selfState);
+				homeRepository.seedPrivateKey("keys/active.key.age", "AGE-ENCRYPTED");
+				payloadRepository.seedFile(
+					"/workspace/newer.env.enc",
+					serializePayloadFile({ armoredPayload: "FAKE-ARMORED-PAYLOAD" }),
+				);
+				payloadCrypto.seedDecryptedEnvelope({
+					...currentEnvelope,
+					version: 999,
+				});
+
+				const result = yield* UpdatePayload.execute({
+					passphrase: "test-passphrase",
+					path: "/workspace/newer.env.enc",
+				}).pipe(Effect.either);
+
+				expect(result._tag).toBe("Left");
+				if (result._tag === "Left") {
+					expect(result.left).toEqual(
+						new UpdatePayloadVersionError({
+							message:
+								"CLI is too old to open this payload. Update CLI to latest version.",
+						}),
+					);
+				}
+				expect(payloadRepository.snapshot().writeCalls).toHaveLength(0);
+				expect(payloadCrypto.snapshot().encryptCalls).toHaveLength(0);
+			}),
+		);
+
 		it.effect("fails when no local self identity exists", () =>
 			Effect.gen(function* () {
 				payloadCrypto.snapshot().encryptCalls.length = 0;

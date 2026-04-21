@@ -31,6 +31,13 @@ export class GrantPayloadRecipientUpdateRequiredError extends Schema.TaggedError
 	},
 ) {}
 
+export class GrantPayloadRecipientVersionError extends Schema.TaggedError<GrantPayloadRecipientVersionError>()(
+	"GrantPayloadRecipientVersionError",
+	{
+		message: Schema.String,
+	},
+) {}
+
 export class GrantPayloadRecipientIdentityNotFoundError extends Schema.TaggedError<GrantPayloadRecipientIdentityNotFoundError>()(
 	"GrantPayloadRecipientIdentityNotFoundError",
 	{

@@ -26,6 +26,7 @@ import {
 	GrantPayloadRecipientUnchangedSuccess,
 	GrantPayloadRecipientUpdatedSuccess,
 	GrantPayloadRecipientUpdateRequiredError,
+	GrantPayloadRecipientVersionError,
 } from "./GrantPayloadRecipientError.js";
 
 const selfDisplayName = Schema.decodeUnknownSync(DisplayName)("isaac");
@@ -41,31 +42,45 @@ const selfPrivateKeyPath = Schema.decodeUnknownSync(PrivateKeyRelativePath)(
 	"keys/active.key.age",
 );
 const selfPublicKey = Schema.decodeUnknownSync(PublicKey)("age1isaac");
+const selfIdentity = {
+	createdAt: "2026-04-14T10:00:00.000Z",
+	keyMode: "pq-hybrid" as const,
+	privateKeyPath: selfPrivateKeyPath,
+	publicIdentity: {
+		displayName: selfDisplayName,
+		identityUpdatedAt: selfIdentityUpdatedAt,
+		ownerId: selfOwnerId,
+		publicKey: selfPublicKey,
+	},
+};
+const selfRecipient = {
+	displayName: selfDisplayName,
+	identityUpdatedAt: selfIdentityUpdatedAt,
+	ownerId: selfOwnerId,
+	publicKey: selfPublicKey,
+};
 
+const paulHandle = Schema.decodeUnknownSync(Handle)("paul#aaaaaaaa");
 const paulOld = Schema.decodeUnknownSync(KnownIdentity)({
 	displayName: Schema.decodeUnknownSync(DisplayName)("paul"),
-	fingerprint: Schema.decodeUnknownSync(KeyFingerprint)("bs1_aaaaaaaaaaaaaaaa"),
-	handle: Schema.decodeUnknownSync(Handle)("paul#aaaaaaaa"),
 	identityUpdatedAt: Schema.decodeUnknownSync(IdentityUpdatedAt)(
 		"2026-04-14T10:00:00.000Z",
 	),
-	localAlias: null,
 	ownerId: Schema.decodeUnknownSync(OwnerId)("bsid1_aaaaaaaaaaaaaaaa"),
 	publicKey: Schema.decodeUnknownSync(PublicKey)("age1paulold"),
 });
 
 const paulNew = {
 	...paulOld,
-	fingerprint: Schema.decodeUnknownSync(KeyFingerprint)("bs1_bbbbbbbbbbbbbbbb"),
 	identityUpdatedAt: Schema.decodeUnknownSync(IdentityUpdatedAt)(
 		"2026-04-15T10:00:00.000Z",
 	),
 	publicKey: Schema.decodeUnknownSync(PublicKey)("age1paulnew"),
 };
 
+const otherPaulHandle = Schema.decodeUnknownSync(Handle)("paul#bbbbbbbb");
 const otherPaul = {
 	...paulOld,
-	handle: Schema.decodeUnknownSync(Handle)("paul#bbbbbbbb"),
 	ownerId: Schema.decodeUnknownSync(OwnerId)("bsid1_bbbbbbbbbbbbbbbb"),
 	publicKey: Schema.decodeUnknownSync(PublicKey)("age1otherpaul"),
 };
@@ -79,14 +94,12 @@ const toRecipient = (
 	identity: Pick<
 		typeof paulOld,
 		| "displayName"
-		| "fingerprint"
 		| "identityUpdatedAt"
 		| "ownerId"
 		| "publicKey"
 	>,
 ) => ({
-	displayNameSnapshot: identity.displayName,
-	fingerprint: identity.fingerprint,
+	displayName: identity.displayName,
 	identityUpdatedAt: identity.identityUpdatedAt,
 	ownerId: identity.ownerId,
 	publicKey: identity.publicKey,
@@ -116,17 +129,7 @@ describe("GrantPayloadRecipient", () => {
 					...emptyHomeState(),
 					activeKeyFingerprint: Option.some(selfFingerprint),
 					knownIdentities: [paulNew],
-					self: Option.some({
-						createdAt: "2026-04-14T10:00:00.000Z",
-						displayName: selfDisplayName,
-						fingerprint: selfFingerprint,
-						handle: selfHandle,
-						identityUpdatedAt: selfIdentityUpdatedAt,
-						keyMode: "pq-hybrid",
-						ownerId: selfOwnerId,
-						privateKeyPath: selfPrivateKeyPath,
-						publicKey: selfPublicKey,
-					}),
+					self: Option.some(selfIdentity),
 					rotationTtl: "3m",
 				});
 				homeRepository.seedPrivateKey("keys/active.key.age", "AGE-ENCRYPTED");
@@ -140,15 +143,9 @@ describe("GrantPayloadRecipient", () => {
 					lastRewrittenAt: "2026-04-14T10:00:00.000Z",
 					payloadId: "bspld_0123456789abcdef",
 					recipients: [
-						toRecipient({
-							displayName: selfDisplayName,
-							fingerprint: selfFingerprint,
-							identityUpdatedAt: selfIdentityUpdatedAt,
-							ownerId: selfOwnerId,
-							publicKey: selfPublicKey,
-						}),
+						selfRecipient,
 					],
-					version: 1,
+					version: 2,
 				});
 
 				const result = yield* GrantPayloadRecipient.execute({
@@ -159,7 +156,7 @@ describe("GrantPayloadRecipient", () => {
 
 				expect(result).toEqual(
 					new GrantPayloadRecipientAddedSuccess({
-						handle: paulNew.handle,
+						handle: paulHandle,
 						path: "/workspace/.env.enc",
 					}),
 				);
@@ -168,13 +165,7 @@ describe("GrantPayloadRecipient", () => {
 					payloadCrypto.snapshot().encryptCalls[0]?.envelope,
 				).toMatchObject({
 					recipients: [
-						toRecipient({
-							displayName: selfDisplayName,
-							fingerprint: selfFingerprint,
-							identityUpdatedAt: selfIdentityUpdatedAt,
-							ownerId: selfOwnerId,
-							publicKey: selfPublicKey,
-						}),
+						selfRecipient,
 						toRecipient(paulNew),
 					],
 				});
@@ -191,17 +182,7 @@ describe("GrantPayloadRecipient", () => {
 						...emptyHomeState(),
 						activeKeyFingerprint: Option.some(selfFingerprint),
 						knownIdentities: [paulNew],
-						self: Option.some({
-							createdAt: "2026-04-14T10:00:00.000Z",
-							displayName: selfDisplayName,
-							fingerprint: selfFingerprint,
-							handle: selfHandle,
-							identityUpdatedAt: selfIdentityUpdatedAt,
-							keyMode: "pq-hybrid",
-							ownerId: selfOwnerId,
-							privateKeyPath: selfPrivateKeyPath,
-							publicKey: selfPublicKey,
-						}),
+						self: Option.some(selfIdentity),
 						rotationTtl: "3m",
 					});
 					homeRepository.seedPrivateKey("keys/active.key.age", "AGE-ENCRYPTED");
@@ -215,16 +196,10 @@ describe("GrantPayloadRecipient", () => {
 						lastRewrittenAt: "2026-04-14T10:00:00.000Z",
 						payloadId: "bspld_0123456789abcdef",
 						recipients: [
-							toRecipient({
-								displayName: selfDisplayName,
-								fingerprint: selfFingerprint,
-								identityUpdatedAt: selfIdentityUpdatedAt,
-								ownerId: selfOwnerId,
-								publicKey: selfPublicKey,
-							}),
+							selfRecipient,
 							toRecipient(paulOld),
 						],
-						version: 1,
+						version: 2,
 					});
 
 					const result = yield* GrantPayloadRecipient.execute({
@@ -235,7 +210,7 @@ describe("GrantPayloadRecipient", () => {
 
 					expect(result).toEqual(
 						new GrantPayloadRecipientUpdatedSuccess({
-							handle: paulNew.handle,
+							handle: paulHandle,
 							path: "/workspace/.env.enc",
 						}),
 					);
@@ -252,17 +227,7 @@ describe("GrantPayloadRecipient", () => {
 						...emptyHomeState(),
 						activeKeyFingerprint: Option.some(selfFingerprint),
 						knownIdentities: [paulNew],
-						self: Option.some({
-							createdAt: "2026-04-14T10:00:00.000Z",
-							displayName: selfDisplayName,
-							fingerprint: selfFingerprint,
-							handle: selfHandle,
-							identityUpdatedAt: selfIdentityUpdatedAt,
-							keyMode: "pq-hybrid",
-							ownerId: selfOwnerId,
-							privateKeyPath: selfPrivateKeyPath,
-							publicKey: selfPublicKey,
-						}),
+						self: Option.some(selfIdentity),
 						rotationTtl: "3m",
 					});
 					homeRepository.seedPrivateKey("keys/active.key.age", "AGE-ENCRYPTED");
@@ -276,16 +241,10 @@ describe("GrantPayloadRecipient", () => {
 						lastRewrittenAt: "2026-04-14T10:00:00.000Z",
 						payloadId: "bspld_0123456789abcdef",
 						recipients: [
-							toRecipient({
-								displayName: selfDisplayName,
-								fingerprint: selfFingerprint,
-								identityUpdatedAt: selfIdentityUpdatedAt,
-								ownerId: selfOwnerId,
-								publicKey: selfPublicKey,
-							}),
+							selfRecipient,
 							toRecipient(paulNew),
 						],
-						version: 1,
+						version: 2,
 					});
 
 					const result = yield* GrantPayloadRecipient.execute({
@@ -296,7 +255,7 @@ describe("GrantPayloadRecipient", () => {
 
 					expect(result).toEqual(
 						new GrantPayloadRecipientUnchangedSuccess({
-							handle: paulNew.handle,
+							handle: paulHandle,
 							path: "/workspace/.env.enc",
 							reason: "already-granted",
 						}),
@@ -313,17 +272,7 @@ describe("GrantPayloadRecipient", () => {
 					...emptyHomeState(),
 					activeKeyFingerprint: Option.some(selfFingerprint),
 					knownIdentities: [paulOld],
-					self: Option.some({
-						createdAt: "2026-04-14T10:00:00.000Z",
-						displayName: selfDisplayName,
-						fingerprint: selfFingerprint,
-						handle: selfHandle,
-						identityUpdatedAt: selfIdentityUpdatedAt,
-						keyMode: "pq-hybrid",
-						ownerId: selfOwnerId,
-						privateKeyPath: selfPrivateKeyPath,
-						publicKey: selfPublicKey,
-					}),
+					self: Option.some(selfIdentity),
 					rotationTtl: "3m",
 				});
 				homeRepository.seedPrivateKey("keys/active.key.age", "AGE-ENCRYPTED");
@@ -337,23 +286,15 @@ describe("GrantPayloadRecipient", () => {
 					lastRewrittenAt: "2026-04-14T10:00:00.000Z",
 					payloadId: "bspld_0123456789abcdef",
 					recipients: [
-						toRecipient({
-							displayName: selfDisplayName,
-							fingerprint: selfFingerprint,
-							identityUpdatedAt: selfIdentityUpdatedAt,
-							ownerId: selfOwnerId,
-							publicKey: selfPublicKey,
-						}),
+						selfRecipient,
 						toRecipient(paulNew),
 					],
-					version: 1,
+					version: 2,
 				});
 
 				const result = yield* GrantPayloadRecipient.execute({
 					identityRef: encodeIdentityString({
 						displayName: paulOld.displayName,
-						fingerprint: paulOld.fingerprint,
-						handle: paulOld.handle,
 						identityUpdatedAt: paulOld.identityUpdatedAt,
 						ownerId: paulOld.ownerId,
 						publicKey: paulOld.publicKey,
@@ -365,7 +306,7 @@ describe("GrantPayloadRecipient", () => {
 
 				expect(result).toEqual(
 					new GrantPayloadRecipientUnchangedSuccess({
-						handle: paulOld.handle,
+						handle: paulHandle,
 						path: "/workspace/.env.enc",
 						reason: "outdated-input",
 					}),
@@ -379,17 +320,7 @@ describe("GrantPayloadRecipient", () => {
 					...emptyHomeState(),
 					activeKeyFingerprint: Option.some(selfFingerprint),
 					knownIdentities: [paulOld, otherPaul],
-					self: Option.some({
-						createdAt: "2026-04-14T10:00:00.000Z",
-						displayName: selfDisplayName,
-						fingerprint: selfFingerprint,
-						handle: selfHandle,
-						identityUpdatedAt: selfIdentityUpdatedAt,
-						keyMode: "pq-hybrid",
-						ownerId: selfOwnerId,
-						privateKeyPath: selfPrivateKeyPath,
-						publicKey: selfPublicKey,
-					}),
+					self: Option.some(selfIdentity),
 					rotationTtl: "3m",
 				});
 				homeRepository.seedPrivateKey("keys/active.key.age", "AGE-ENCRYPTED");
@@ -403,15 +334,9 @@ describe("GrantPayloadRecipient", () => {
 					lastRewrittenAt: "2026-04-14T10:00:00.000Z",
 					payloadId: "bspld_0123456789abcdef",
 					recipients: [
-						toRecipient({
-							displayName: selfDisplayName,
-							fingerprint: selfFingerprint,
-							identityUpdatedAt: selfIdentityUpdatedAt,
-							ownerId: selfOwnerId,
-							publicKey: selfPublicKey,
-						}),
+						selfRecipient,
 					],
-					version: 1,
+					version: 2,
 				});
 
 				const result = yield* GrantPayloadRecipient.execute({
@@ -435,17 +360,7 @@ describe("GrantPayloadRecipient", () => {
 					...emptyHomeState(),
 					activeKeyFingerprint: Option.some(selfFingerprint),
 					knownIdentities: [paulNew],
-					self: Option.some({
-						createdAt: "2026-04-14T10:00:00.000Z",
-						displayName: selfDisplayName,
-						fingerprint: selfFingerprint,
-						handle: selfHandle,
-						identityUpdatedAt: selfIdentityUpdatedAt,
-						keyMode: "pq-hybrid",
-						ownerId: selfOwnerId,
-						privateKeyPath: selfPrivateKeyPath,
-						publicKey: selfPublicKey,
-					}),
+					self: Option.some(selfIdentity),
 					rotationTtl: "3m",
 				});
 				homeRepository.seedPrivateKey("keys/active.key.age", "AGE-ENCRYPTED");
@@ -460,14 +375,13 @@ describe("GrantPayloadRecipient", () => {
 					payloadId: "bspld_0123456789abcdef",
 					recipients: [
 						{
-							displayNameSnapshot: selfDisplayName,
-							fingerprint: staleSelfFingerprint,
+							displayName: selfDisplayName,
 							identityUpdatedAt: selfIdentityUpdatedAt,
 							ownerId: selfOwnerId,
 							publicKey: staleSelfPublicKey,
 						},
 					],
-					version: 1,
+					version: 2,
 				});
 
 				const result = yield* GrantPayloadRecipient.execute({
@@ -480,6 +394,47 @@ describe("GrantPayloadRecipient", () => {
 				if (result._tag === "Left") {
 					expect(result.left).toBeInstanceOf(
 						GrantPayloadRecipientUpdateRequiredError,
+					);
+				}
+			}),
+		);
+
+		it.effect("fails with version remediation when payload is newer than CLI", () =>
+			Effect.gen(function* () {
+				yield* homeRepository.saveState({
+					...emptyHomeState(),
+					activeKeyFingerprint: Option.some(selfFingerprint),
+					knownIdentities: [paulNew],
+					self: Option.some(selfIdentity),
+					rotationTtl: "3m",
+				});
+				homeRepository.seedPrivateKey("keys/active.key.age", "AGE-ENCRYPTED");
+				payloadRepository.seedFile(
+					"/workspace/newer.env.enc",
+					serializePayloadFile({ armoredPayload: "FAKE-ARMORED-PAYLOAD" }),
+				);
+				payloadCrypto.seedDecryptedEnvelope({
+					createdAt: "2026-04-14T10:00:00.000Z",
+					envText: "API_TOKEN=secret\n",
+					lastRewrittenAt: "2026-04-14T10:00:00.000Z",
+					payloadId: "bspld_0123456789abcdef",
+					recipients: [selfRecipient],
+					version: 999,
+				});
+
+				const result = yield* GrantPayloadRecipient.execute({
+					identityRef: "paul#aaaaaaaa",
+					passphrase: "test-passphrase",
+					path: "/workspace/newer.env.enc",
+				}).pipe(Effect.either);
+
+				expect(result._tag).toBe("Left");
+				if (result._tag === "Left") {
+					expect(result.left).toEqual(
+						new GrantPayloadRecipientVersionError({
+							message:
+								"CLI is too old to open this payload. Update CLI to latest version.",
+						}),
 					);
 				}
 			}),

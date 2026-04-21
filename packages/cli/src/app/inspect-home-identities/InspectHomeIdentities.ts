@@ -6,6 +6,14 @@ import type {
 	RetiredKey,
 	SelfIdentity,
 } from "../../domain/identity/Identity.js";
+import {
+	getLocalAlias,
+	materializeSelfIdentity,
+} from "../../domain/identity/Identity.js";
+import {
+	derivePublicIdentityFingerprint,
+	derivePublicIdentityHandle,
+} from "../../domain/identity/PublicIdentity.js";
 import { HomeRepository } from "../../port/HomeRepository.js";
 import type {
 	HomeStateDecodeError,
@@ -70,23 +78,24 @@ export class InspectHomeIdentities extends Effect.Service<InspectHomeIdentities>
 				return {
 					knownIdentities: state.knownIdentities.map((identity) => ({
 						displayName: identity.displayName,
-						fingerprint: identity.fingerprint,
-						handle: identity.handle,
+						fingerprint: derivePublicIdentityFingerprint(identity),
+						handle: derivePublicIdentityHandle(identity),
 						identityUpdatedAt: identity.identityUpdatedAt,
-						localAlias: identity.localAlias,
+						localAlias: getLocalAlias(state.localAliases, identity.ownerId),
 					})),
 					me: Option.map(selfIdentity, (identity) => {
+						const resolvedSelfIdentity = materializeSelfIdentity(identity);
 						const dueAt = getRotationDueAt(
-							identity.identityUpdatedAt,
+							resolvedSelfIdentity.identityUpdatedAt,
 							state.rotationTtl,
 						);
 
 						return {
-							displayName: identity.displayName,
-							fingerprint: identity.fingerprint,
-							handle: identity.handle,
-							identityUpdatedAt: identity.identityUpdatedAt,
-							ownerId: identity.ownerId,
+							displayName: resolvedSelfIdentity.displayName,
+							fingerprint: resolvedSelfIdentity.fingerprint,
+							handle: resolvedSelfIdentity.handle,
+							identityUpdatedAt: resolvedSelfIdentity.identityUpdatedAt,
+							ownerId: resolvedSelfIdentity.ownerId,
 							rotationStatus: {
 								dueAt,
 								isOverdue: new Date(dueAt).getTime() <= now,

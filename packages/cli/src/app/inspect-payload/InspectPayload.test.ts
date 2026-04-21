@@ -8,6 +8,7 @@ import { KeyFingerprint } from "../../domain/identity/KeyFingerprint.js";
 import { OwnerId } from "../../domain/identity/OwnerId.js";
 import { PrivateKeyRelativePath } from "../../domain/identity/PrivateKeyRelativePath.js";
 import { PublicKey } from "../../domain/identity/PublicKey.js";
+import { derivePublicIdentityFingerprint } from "../../domain/identity/PublicIdentity.js";
 import { serializePayloadFile } from "../../domain/payload/PayloadFile.js";
 import { HomeRepository } from "../../port/HomeRepository.js";
 import {
@@ -31,6 +32,23 @@ const selfPrivateKeyPath = Schema.decodeUnknownSync(PrivateKeyRelativePath)(
 	"keys/active.key.age",
 );
 const selfPublicKey = Schema.decodeUnknownSync(PublicKey)("age1self");
+const selfIdentity = {
+	createdAt: "2026-04-14T10:00:00.000Z",
+	keyMode: "pq-hybrid" as const,
+	privateKeyPath: selfPrivateKeyPath,
+	publicIdentity: {
+		displayName: selfDisplayName,
+		identityUpdatedAt: selfIdentityUpdatedAt,
+		ownerId: selfOwnerId,
+		publicKey: selfPublicKey,
+	},
+};
+const selfRecipient = {
+	displayName: selfDisplayName,
+	identityUpdatedAt: selfIdentityUpdatedAt,
+	ownerId: selfOwnerId,
+	publicKey: selfPublicKey,
+};
 
 const paulDisplayName = Schema.decodeUnknownSync(DisplayName)("paul");
 const paulFingerprint = Schema.decodeUnknownSync(KeyFingerprint)(
@@ -42,6 +60,12 @@ const paulIdentityUpdatedAt = Schema.decodeUnknownSync(IdentityUpdatedAt)(
 );
 const paulOwnerId = Schema.decodeUnknownSync(OwnerId)("bsid1_aaaaaaaaaaaaaaaa");
 const paulPublicKey = Schema.decodeUnknownSync(PublicKey)("age1paulnew");
+const paulRecipient = {
+	displayName: paulDisplayName,
+	identityUpdatedAt: paulIdentityUpdatedAt,
+	ownerId: paulOwnerId,
+	publicKey: paulPublicKey,
+};
 
 describe("InspectPayload", () => {
 	const homeRepository = makeInMemoryHomeRepository();
@@ -64,17 +88,7 @@ describe("InspectPayload", () => {
 					yield* homeRepository.saveState({
 						...emptyHomeState(),
 						activeKeyFingerprint: Option.some(selfFingerprint),
-						self: Option.some({
-							createdAt: "2026-04-14T10:00:00.000Z",
-							displayName: selfDisplayName,
-							fingerprint: selfFingerprint,
-							handle: selfHandle,
-							identityUpdatedAt: selfIdentityUpdatedAt,
-							keyMode: "pq-hybrid",
-							ownerId: selfOwnerId,
-							privateKeyPath: selfPrivateKeyPath,
-							publicKey: selfPublicKey,
-						}),
+						self: Option.some(selfIdentity),
 						knownIdentities: [],
 						retiredKeys: [],
 						rotationTtl: "3m",
@@ -95,22 +109,10 @@ describe("InspectPayload", () => {
 						lastRewrittenAt: "2026-04-14T10:00:00.000Z",
 						payloadId: "bspld_0123456789abcdef",
 						recipients: [
-							{
-								displayNameSnapshot: selfDisplayName,
-								fingerprint: selfFingerprint,
-								identityUpdatedAt: selfIdentityUpdatedAt,
-								ownerId: selfOwnerId,
-								publicKey: selfPublicKey,
-							},
-							{
-								displayNameSnapshot: paulDisplayName,
-								fingerprint: paulFingerprint,
-								identityUpdatedAt: paulIdentityUpdatedAt,
-								ownerId: paulOwnerId,
-								publicKey: paulPublicKey,
-							},
+							selfRecipient,
+							paulRecipient,
 						],
-						version: 1,
+						version: 2,
 					});
 
 					const result = yield* InspectPayload.execute({
@@ -119,7 +121,7 @@ describe("InspectPayload", () => {
 					});
 
 					expect(result.path).toBe("/workspace/.env.enc");
-					expect(result.version).toBe(1);
+					expect(result.version).toBe(2);
 					expect(result.payloadId).toBe("bspld_0123456789abcdef");
 					expect(result.secretCount).toBe(3);
 					expect(result.recipientCount).toBe(2);
@@ -131,7 +133,7 @@ describe("InspectPayload", () => {
 					expect(result.recipients).toEqual([
 						{
 							displayName: selfDisplayName,
-							fingerprint: selfFingerprint,
+							fingerprint: derivePublicIdentityFingerprint(selfRecipient),
 							handle: selfHandle,
 							isMe: true,
 							isStaleSelf: false,
@@ -139,7 +141,7 @@ describe("InspectPayload", () => {
 						},
 						{
 							displayName: paulDisplayName,
-							fingerprint: paulFingerprint,
+							fingerprint: derivePublicIdentityFingerprint(paulRecipient),
 							handle: paulHandle,
 							isMe: false,
 							isStaleSelf: false,
@@ -149,10 +151,7 @@ describe("InspectPayload", () => {
 					expect(homeRepository.snapshot().state.knownIdentities).toEqual([
 						{
 							displayName: paulDisplayName,
-							fingerprint: paulFingerprint,
-							handle: paulHandle,
 							identityUpdatedAt: paulIdentityUpdatedAt,
-							localAlias: Option.none(),
 							ownerId: paulOwnerId,
 							publicKey: paulPublicKey,
 						},
@@ -173,17 +172,7 @@ describe("InspectPayload", () => {
 				yield* homeRepository.saveState({
 					...emptyHomeState(),
 					activeKeyFingerprint: Option.some(selfFingerprint),
-					self: Option.some({
-						createdAt: "2026-04-14T10:00:00.000Z",
-						displayName: selfDisplayName,
-						fingerprint: selfFingerprint,
-						handle: selfHandle,
-						identityUpdatedAt: selfIdentityUpdatedAt,
-						keyMode: "pq-hybrid",
-						ownerId: selfOwnerId,
-						privateKeyPath: selfPrivateKeyPath,
-						publicKey: selfPublicKey,
-					}),
+					self: Option.some(selfIdentity),
 					knownIdentities: [],
 					retiredKeys: [],
 					rotationTtl: "3m",
@@ -205,14 +194,13 @@ describe("InspectPayload", () => {
 					payloadId: "bspld_fedcba9876543210",
 					recipients: [
 						{
-							displayNameSnapshot: selfDisplayName,
-							fingerprint: "bs1_bbbbbbbbbbbbbbbb",
+							displayName: selfDisplayName,
 							identityUpdatedAt: selfIdentityUpdatedAt,
 							ownerId: selfOwnerId,
 							publicKey: "age1stale",
 						},
 					],
-					version: 1,
+					version: 2,
 				});
 
 				const result = yield* InspectPayload.execute({
@@ -227,7 +215,12 @@ describe("InspectPayload", () => {
 				expect(result.recipients).toEqual([
 					{
 						displayName: selfDisplayName,
-						fingerprint: "bs1_bbbbbbbbbbbbbbbb",
+						fingerprint: derivePublicIdentityFingerprint({
+							displayName: selfDisplayName,
+							identityUpdatedAt: selfIdentityUpdatedAt,
+							ownerId: selfOwnerId,
+							publicKey: "age1stale" as never,
+						}),
 						handle: selfHandle,
 						isMe: true,
 						isStaleSelf: true,

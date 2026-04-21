@@ -1,6 +1,13 @@
 import { Effect, Option, Schema } from "effect";
 import { getSelfIdentity } from "../../domain/home/HomeState.js";
-import { Handle } from "../../domain/identity/Handle.js";
+import {
+	getLocalAlias,
+	materializeSelfIdentity,
+} from "../../domain/identity/Identity.js";
+import {
+	derivePublicIdentityFingerprint,
+	derivePublicIdentityHandle,
+} from "../../domain/identity/PublicIdentity.js";
 import { OpenPayload } from "../shared/OpenPayload.js";
 import {
 	InspectPayloadCryptoError,
@@ -9,6 +16,7 @@ import {
 	InspectPayloadFileFormatError,
 	InspectPayloadPersistenceError,
 	InspectPayloadSuccess,
+	InspectPayloadVersionError,
 } from "./InspectPayloadError.js";
 
 export class InspectPayload extends Effect.Service<InspectPayload>()(
@@ -40,6 +48,10 @@ export class InspectPayload extends Effect.Service<InspectPayload>()(
 								});
 							case "OpenPayloadEnvelopeError":
 								return new InspectPayloadEnvelopeError({
+								message: error.message,
+							});
+							case "OpenPayloadVersionError":
+								return new InspectPayloadVersionError({
 									message: error.message,
 								});
 							case "OpenPayloadEnvError":
@@ -66,24 +78,28 @@ export class InspectPayload extends Effect.Service<InspectPayload>()(
 						);
 						const isMe =
 							Option.isSome(selfIdentity) &&
-							selfIdentity.value.ownerId === recipient.ownerId;
+							selfIdentity.value.publicIdentity.ownerId === recipient.ownerId;
+						const resolvedSelfIdentity =
+							Option.isSome(selfIdentity)
+								? materializeSelfIdentity(selfIdentity.value)
+								: null;
 
 						return {
-							displayName: recipient.displayNameSnapshot,
-							fingerprint: recipient.fingerprint,
+							displayName: recipient.displayName,
+							fingerprint: derivePublicIdentityFingerprint(recipient),
 							handle:
-								isMe && Option.isSome(selfIdentity)
-									? selfIdentity.value.handle
-									: (knownIdentity?.handle ??
-										Schema.decodeUnknownSync(Handle)(
-											`${recipient.displayNameSnapshot}#${recipient.ownerId.slice("bsid1_".length, "bsid1_".length + 8)}`,
-										)),
+								isMe && resolvedSelfIdentity !== null
+									? resolvedSelfIdentity.handle
+									: derivePublicIdentityHandle(knownIdentity ?? recipient),
 							isMe,
 							isStaleSelf:
 								isMe &&
 								needsUpdate.isRequired &&
-								recipient.ownerId === selfIdentity.value?.ownerId,
-							localAlias: knownIdentity?.localAlias ?? Option.none(),
+								recipient.ownerId === selfIdentity.value?.publicIdentity.ownerId,
+							localAlias:
+								knownIdentity === undefined
+									? Option.none()
+									: getLocalAlias(nextState.localAliases, knownIdentity.ownerId),
 						};
 					}),
 					secretCount: envKeys.length,

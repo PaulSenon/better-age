@@ -8,6 +8,10 @@ import {
 	type ForgetIdentityRemovedSuccess,
 	type ForgetIdentityUnchangedSuccess,
 } from "../../app/forget-identity/ForgetIdentityError.js";
+import {
+	materializeKnownIdentities,
+	materializeSelfIdentity,
+} from "../../domain/identity/Identity.js";
 import { HomeRepository } from "../../port/HomeRepository.js";
 import type {
 	HomeStateDecodeError,
@@ -71,9 +75,13 @@ const resolveIdentityRef = (identityRef: Option.Option<string>) =>
 		onNone: () =>
 			Effect.gen(function* () {
 				const state = yield* HomeRepository.loadState;
+				const knownIdentities = materializeKnownIdentities({
+					identities: state.knownIdentities,
+					localAliases: state.localAliases,
+				});
 
 				return yield* resolveForgetIdentityInput({
-					choices: state.knownIdentities.map((identity) => ({
+					choices: knownIdentities.map((identity) => ({
 						title: renderIdentityLabel({
 							displayName: identity.displayName,
 							handle: identity.handle,
@@ -104,20 +112,25 @@ const renderCandidateChoices = (input: {
 			if (state === null) {
 				return { title: handle, value: handle };
 			}
+			const knownIdentities = materializeKnownIdentities({
+				identities: state.knownIdentities,
+				localAliases: state.localAliases,
+			});
+			const resolvedSelfIdentity =
+				state.self._tag === "Some" ? materializeSelfIdentity(state.self.value) : null;
 
-			const knownIdentity = state.knownIdentities.find(
+			const knownIdentity = knownIdentities.find(
 				(identity) => identity.handle === handle,
 			);
-			const isYou =
-				state.self._tag === "Some" && state.self.value.handle === handle;
+			const isYou = resolvedSelfIdentity?.handle === handle;
 
 			return {
 				title: renderHandleCandidate({
 					displayName:
 						knownIdentity !== undefined
 							? Option.some(knownIdentity.displayName)
-							: state.self._tag === "Some" && state.self.value.handle === handle
-								? Option.some(state.self.value.displayName)
+							: resolvedSelfIdentity?.handle === handle
+								? Option.some(resolvedSelfIdentity.displayName)
 								: Option.none(),
 					handle,
 					isYou,
@@ -209,19 +222,24 @@ const renderAmbiguousMessage = (input: {
 			if (state === null) {
 				return handle;
 			}
+			const knownIdentities = materializeKnownIdentities({
+				identities: state.knownIdentities,
+				localAliases: state.localAliases,
+			});
+			const resolvedSelfIdentity =
+				state.self._tag === "Some" ? materializeSelfIdentity(state.self.value) : null;
 
-			const knownIdentity = state.knownIdentities.find(
+			const knownIdentity = knownIdentities.find(
 				(identity) => identity.handle === handle,
 			);
-			const isYou =
-				state.self._tag === "Some" && state.self.value.handle === handle;
+			const isYou = resolvedSelfIdentity?.handle === handle;
 
 			return renderHandleCandidate({
 				displayName:
 					knownIdentity !== undefined
 						? Option.some(knownIdentity.displayName)
-						: state.self._tag === "Some" && state.self.value.handle === handle
-							? Option.some(state.self.value.displayName)
+						: resolvedSelfIdentity?.handle === handle
+							? Option.some(resolvedSelfIdentity.displayName)
 							: Option.none(),
 				handle,
 				isYou,

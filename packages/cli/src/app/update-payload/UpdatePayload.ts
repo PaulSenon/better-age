@@ -1,6 +1,8 @@
 import { Clock, Effect, Option } from "effect";
 import { getSelfIdentity } from "../../domain/home/HomeState.js";
+import { materializeSelfIdentity } from "../../domain/identity/Identity.js";
 import type { PayloadRecipient } from "../../domain/payload/PayloadEnvelope.js";
+import type { PayloadUpdateReason } from "../../domain/payload/PayloadUpdateState.js";
 import {
 	computePayloadUpdateState,
 	getPayloadUpdateReasonMessage,
@@ -17,33 +19,40 @@ import {
 	UpdatePayloadPersistenceError,
 	UpdatePayloadUnchangedSuccess,
 	UpdatePayloadUpdatedSuccess,
+	UpdatePayloadVersionError,
 } from "./UpdatePayloadError.js";
 
-const chooseSelfRecipient = (
-	selfRecipients: ReadonlyArray<PayloadRecipient>,
-	currentSelfRecipient: PayloadRecipient,
-): PayloadRecipient => {
-	const matchingCurrentRecipient = selfRecipients.find(
-		(recipient) =>
-			recipient.displayNameSnapshot ===
-				currentSelfRecipient.displayNameSnapshot &&
-			recipient.fingerprint === currentSelfRecipient.fingerprint &&
-			recipient.identityUpdatedAt === currentSelfRecipient.identityUpdatedAt &&
-			recipient.ownerId === currentSelfRecipient.ownerId &&
-			recipient.publicKey === currentSelfRecipient.publicKey,
-	);
-
-	if (matchingCurrentRecipient !== undefined) {
-		return matchingCurrentRecipient;
+const synthesizeNextRecipients = (input: {
+	readonly currentSelfRecipient: PayloadRecipient;
+	readonly ownerId: string;
+	readonly reasons: ReadonlyArray<PayloadUpdateReason>;
+	readonly recipients: ReadonlyArray<PayloadRecipient>;
+}): ReadonlyArray<PayloadRecipient> => {
+	if (
+		!input.reasons.includes("self-stale") &&
+		!input.reasons.includes("duplicate-self-recipient")
+	) {
+		return input.recipients;
 	}
 
-	return (
-		selfRecipients
-			.slice()
-			.sort((left, right) =>
-				left.identityUpdatedAt > right.identityUpdatedAt ? -1 : 1,
-			)[0] ?? currentSelfRecipient
-	);
+	const nextRecipients: Array<PayloadRecipient> = [];
+	let didWriteSelfRecipient = false;
+
+	for (const recipient of input.recipients) {
+		if (recipient.ownerId !== input.ownerId) {
+			nextRecipients.push(recipient);
+			continue;
+		}
+
+		if (didWriteSelfRecipient) {
+			continue;
+		}
+
+		nextRecipients.push(input.currentSelfRecipient);
+		didWriteSelfRecipient = true;
+	}
+
+	return nextRecipients;
 };
 
 export class UpdatePayload extends Effect.Service<UpdatePayload>()(
@@ -78,6 +87,10 @@ export class UpdatePayload extends Effect.Service<UpdatePayload>()(
 								return new UpdatePayloadEnvelopeError({
 									message: error.message,
 								});
+							case "OpenPayloadVersionError":
+								return new UpdatePayloadVersionError({
+									message: error.message,
+								});
 							case "OpenPayloadEnvError":
 								return new UpdatePayloadEnvError({
 									message: error.message,
@@ -88,6 +101,9 @@ export class UpdatePayload extends Effect.Service<UpdatePayload>()(
 				const updateState = computePayloadUpdateState(
 					openedPayload.nextState,
 					openedPayload.envelope,
+					{
+						persistedSchemaVersion: openedPayload.persistedSchemaVersion,
+					},
 				);
 				const reasons = updateState.reasons.map(getPayloadUpdateReasonMessage);
 				const selfIdentity = getSelfIdentity(openedPayload.nextState);
@@ -110,21 +126,13 @@ export class UpdatePayload extends Effect.Service<UpdatePayload>()(
 				const currentSelfRecipient = toPayloadRecipientFromSelfIdentity(
 					selfIdentity.value,
 				);
-				const selfRecipients = openedPayload.envelope.recipients.filter(
-					(recipient) => recipient.ownerId === selfIdentity.value.ownerId,
-				);
-				const fallbackSelfRecipient = chooseSelfRecipient(
-					selfRecipients,
+				const resolvedSelfIdentity = materializeSelfIdentity(selfIdentity.value);
+				const nextRecipients = synthesizeNextRecipients({
 					currentSelfRecipient,
-				);
-				const nextRecipients = [
-					...openedPayload.envelope.recipients.filter(
-						(recipient) => recipient.ownerId !== selfIdentity.value.ownerId,
-					),
-					updateState.reasons.includes("self-stale")
-						? currentSelfRecipient
-						: fallbackSelfRecipient,
-				];
+					ownerId: resolvedSelfIdentity.ownerId,
+					reasons: updateState.reasons,
+					recipients: openedPayload.envelope.recipients,
+				});
 				const now = new Date(yield* Clock.currentTimeMillis).toISOString();
 
 				yield* rewritePayloadEnvelope
