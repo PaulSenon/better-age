@@ -11,8 +11,10 @@
 | **Handle** | The ergonomic reference formed as `<display-name>#<first-8-hex-of-owner-id-body>`. Example: `toto#069f7576`. | Alias, identity id, key id |
 | **Identity String** | The versioned shareable one-line export of an **Identity** used by `me` and `add-identity`. Any future plaintext URL path hints are cosmetic only; decoded payload is authoritative. | Shared ref, identity ref, pubkey string |
 | **Identity Updated At** | The UTC timestamp for when an **Identity** snapshot became current. | Last seen at, exported at, rotated at |
+| **Passphrase** | The required secret that protects the local private key material and gates decrypt operations. | Password, unlock code |
 | **Known Identity** | A home-local address-book entry for an external **Identity**. | Contact, saved recipient, known host |
-| **Local Alias** | A home-local nickname pointing to one **Known Identity**. | Display name, handle, identity id |
+| **Local Alias** | A home-local nickname pointing to one **Known Identity** (used to overlay identity `Display Name` in case of name colision, just for convenience). | Display name, handle, identity id |
+| **Key Mode** | The cryptographic key mode carried by local identity records. Current canonical value: `pq-hybrid`. | Crypto mode, algorithm preset |
 | **Forget Identity** | The local-only operation that removes one **Known Identity** from **Home State** without touching any **Payload**. | Revoke identity, delete recipient, unshare |
 
 ## Payload model
@@ -27,7 +29,9 @@
 | **Revoke** | The operation that removes one **Recipient** from future rewritten versions of a **Payload**. | Delete, unshare, ban |
 | **Inspect** | The operation that reads non-secret **Payload** metadata and env key names. | Show recipients, ls, show |
 | **View** | The human plaintext-reading operation that opens one **Payload** inside the secure in-process viewer. | Read, cat, open |
-| **Update** | The explicit maintenance operation that rewrites a **Payload** only for schema migration or stale self-recipient refresh. | Repair, migrate, refresh |
+| **Load** | The machine-only operation that decrypts one **Payload** and writes raw `.env` text to `stdout` for another process to consume. | Read, view, export, decrypt |
+| **Update** | The explicit maintenance operation that rewrites a **Payload** only for schema migration or refreshing a stale **Self Recipient**. | Repair, migrate, refresh |
+| **Self Recipient** | The **Recipient Entry** in a payload whose `ownerId` matches the current local self identity. | Owner row, local recipient, self key row |
 
 ## Local state and lifecycle
 
@@ -43,11 +47,23 @@
 | **Interactive Session** | The guided keyboard-navigable CLI mode entered through `bage interactive`. | Wizard, shell, menu mode |
 | **Secure Viewer** | The in-process scrollable readonly terminal surface used by **View**. It may render plaintext to the terminal UI, but it must never fall back to plaintext `stdout`. | Pager, less, cat view |
 
+## Interaction model
+
+| Term | Definition | Aliases to avoid |
+| --- | --- | --- |
+| **Exact Invocation** | A command call that supplies every required operand up front and does not rely on guided completion. | Full command mode, non-interactive mode |
+| **Guided Invocation** | A command call that omits one or more operands and lets the CLI complete intent through prompts, pickers, or viewers. | Wizard mode, convenience mode |
+| **Interactive Terminal** | A runtime where prompts, menus, and the secure viewer can open safely. | TTY mode |
+| **Headless Terminal** | A runtime where guided human surfaces are unavailable even if a command still runs. | Non-interactive mode |
+| **Flow Outcome** | The semantic result of one guided step: `OK`, `BACK`, `CANCEL`, or `ERROR`. | Return code, result state |
+| **Back Transition** | A local navigation return from a nested step without committing new mutation. | Cancel, quit |
+| **Cancel Outcome** | An intentional stop of the current command flow by the user. | Error, back |
+| **Message Id** | A stable semantic identifier for one user-facing branch independent from exact rendered copy. | Error string, status text |
+
 ## Varlock integration
 
 | Term | Definition | Aliases to avoid |
 | --- | --- | --- |
-| **Load** | The machine-only operation that decrypts one **Payload** and writes raw `.env` text to `stdout` for another process to consume. | Read, view, export, decrypt |
 | **Load Protocol** | The versioned stdout/stderr/exit-code contract used by other tools to invoke **Load** safely. | Machine interface, API, machine mode |
 | **Varlock Plugin** | The thin adapter that invokes `better-age` **Load** and injects the resulting env text into one `varlock` run. | Core, second CLI, loader |
 | **Launcher Prefix** | The user-configured command prefix that starts the `better-age` CLI before the plugin appends fixed `load` arguments. | Full command, runner, shell script |
@@ -61,13 +77,17 @@
 - A **Known Identity** belongs to one local **Home State**.
 - A **Local Alias** points to exactly one **Known Identity**.
 - A **Forget Identity** removes one **Known Identity** from **Home State** only.
+- A **Passphrase** is required for local private-key protection.
+- A **Key Mode** belongs to one concrete local identity record.
 - A **Payload** has exactly one stable **Payload Id**.
 - A **Payload** contains zero or more **Recipient Entries**.
 - A **Recipient Entry** refers to one **Identity** by **Owner Id** and current key snapshot.
 - A **Grant** adds or refreshes one **Recipient Entry** in a **Payload**.
 - A **Revoke** removes one **Recipient Entry** from future rewritten versions of a **Payload**.
 - A **View** opens one **Payload** in the **Secure Viewer** for human reading.
+- A **Load** reads exactly one **Payload** path per invocation.
 - An **Update** may rewrite a **Payload** without changing non-self access intent.
+- A **Self Recipient** may become stale after **Key Rotation**.
 - A **Key Rotation** keeps the same **Owner Id** but changes the current **Fingerprint**.
 - A **Retired Key** belongs to one local **Identity** history in **Home State**.
 - A **Preamble** belongs to one **Payload** file but carries no sensitive metadata.
@@ -75,7 +95,11 @@
 - A **You Marker** is computed at render time from current local self identity.
 - An **Interactive Session** routes human workflows through keyboard-select navigation.
 - A **Secure Viewer** belongs to the human UX path and is distinct from **Load**.
-- A **Load** reads exactly one **Payload** path per invocation.
+- An **Exact Invocation** must not rely on an **Interactive Terminal** to complete missing operands.
+- A **Guided Invocation** may require an **Interactive Terminal**.
+- A **Back Transition** is one possible **Flow Outcome** of a guided subflow.
+- A **Cancel Outcome** stops the current command flow and is not the same as **Back Transition**.
+- A **Message Id** belongs to one semantic user-facing branch.
 - A **Load Protocol** versions one stable contract for **Load** behavior.
 - A **Varlock Plugin** depends on the **Load Protocol** of the CLI.
 - A **Launcher Prefix** starts the CLI, but the plugin owns the appended `load` arguments.
@@ -83,29 +107,25 @@
 
 ## Example dialogue
 
-> **Dev:** "When I paste someone's `me` output into `grant`, am I granting an **Identity String** or a **Recipient**?"
+> **Dev:** "When I paste someone's `me` output into `add-identity`, what am I storing?"
 
-> **Domain expert:** "You pass an **Identity String**, but the payload stores a **Recipient Entry** for that **Identity**."
+> **Domain expert:** "A **Known Identity** derived from an **Identity String**. The payload is untouched."
 
-> **Dev:** "So if `paul#1234abcd` rotates his key, is that still the same **Recipient**?"
+> **Dev:** "Then `grant` changes the payload by adding a **Recipient Entry** for that **Identity**?"
 
-> **Domain expert:** "It is the same long-lived **Identity** by **Owner Id**, but the payload may need an **Update** or fresh **Grant** to store the new key snapshot."
+> **Domain expert:** "Exactly. The **Identity** exists independently. A **Recipient** is that identity granted on one **Payload**."
 
-> **Dev:** "And my `Local Alias` for that Paul?"
+> **Dev:** "If I run `grant` without enough args in CI, should it open a picker?"
 
-> **Domain expert:** "Purely local. It lives in **Home State** and must never leak into the **Payload**."
+> **Domain expert:** "No. That is a **Guided Invocation** attempted in a **Headless Terminal**. It should fail instead of opening human UI."
 
-> **Dev:** "What does `inspect` actually read then?"
+> **Dev:** "And when I rotate locally, what becomes stale?"
 
-> **Domain expert:** "The **Envelope** inside the **Payload**. It shows non-secret metadata, **Recipient Entries**, and env key names, but never secret values."
+> **Domain expert:** "Your **Self Recipient** inside older payloads. Same **Owner Id**, new **Fingerprint**, explicit **Update** later."
 
-> **Dev:** "So how do humans read actual secret values now?"
+> **Dev:** "So varlock never gets the human viewer path?"
 
-> **Domain expert:** "Through **View**, which opens the **Payload** inside the **Secure Viewer**. That is distinct from machine-only **Load**."
-
-> **Dev:** "And what does the varlock integration call?"
-
-> **Domain expert:** "The **Varlock Plugin** calls machine-only **Load** through a versioned **Load Protocol**. The plugin may use a custom **Launcher Prefix**, but it still owns the fixed `load` arguments."
+> **Domain expert:** "Correct. The **Varlock Plugin** depends only on **Load** through the **Load Protocol**."
 
 ## Flagged ambiguities
 
@@ -119,3 +139,6 @@
 - "machine interface" and "protocol" were used for the same CLI compatibility boundary. Recommendation: standardize on **Load Protocol** and reserve "protocol version" for the explicit `--protocol-version` flag.
 - "plugin", "core", and "adapter" were drifting. Recommendation: standardize on **Varlock Plugin** as a thin adapter and avoid implying a second core implementation.
 - "command" was ambiguous between a full shell command and a fixed binary name. Recommendation: standardize on **Launcher Prefix** for the user-provided shell string prefix that the plugin extends.
+- "mode" was used to mean both command completeness and terminal capability. Recommendation: use **Exact Invocation** / **Guided Invocation** for command shape, and **Interactive Terminal** / **Headless Terminal** for runtime capability.
+- "back", "cancel", and "quit" were drifting together. Recommendation: **Back Transition** is local navigation; **Cancel Outcome** stops the current command.
+- CLI flag `--alias` currently sets **Display Name** during `setup`. Recommendation: keep **Display Name** as canonical domain term and treat the flag name as legacy CLI wording.

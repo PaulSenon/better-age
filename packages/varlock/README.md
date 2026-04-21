@@ -1,30 +1,40 @@
 # @better-age/varlock
 
-Varlock plugin package for `better-age`.
+Thin varlock adapter for `better-age`.
 
-Current status:
-- package scaffold exists
-- plugin entrypoint exists
-- minimal v0 runtime exists
+Design constraints:
+- plugin stays thin
+- CLI stays source of truth
+- plugin shells out to `bage load --protocol-version=1 <path>`
+- one varlock process caches one load result in memory
 
-Current minimal runtime contract:
-- plugin stays a thin adapter
-- `better-age` CLI stays source of truth
-- plugin invokes `bage load --protocol-version=1 <path>`
-- plugin supports:
-  - `@initBetterAge(path=...)`
-  - `betterAgeLoad()`
-- `@initBetterAge(path=..., command=...)` may override the launcher prefix
-- plugin caches one load result in memory for one varlock process
-- Unix/WSL only in v0
+For product context:
+- [../../README.md](../../README.md)
+- [../../VISION.md](../../VISION.md)
 
-Expected package export:
+## Contract
+
+Plugin API:
+- `@initBetterAge(path=...)`
+- `betterAgeLoad()`
+
+Optional override:
+- `@initBetterAge(path=..., command=...)`
+
+What `command=` means:
+- launcher prefix only
+- plugin still appends `load --protocol-version=1 <path>`
+
+Default launcher:
+- `bage`
+
+Export:
 - `./plugin` -> `./dist/plugin.cjs`
 
-Local-file dev target:
+Local build artifact:
 - `packages/varlock/dist/plugin.cjs`
 
-Minimal schema shape:
+## Minimal usage
 
 ```env
 # @plugin(./packages/varlock/dist/plugin.cjs)
@@ -32,7 +42,7 @@ Minimal schema shape:
 # @setValuesBulk(betterAgeLoad(), format=env)
 ```
 
-Custom launcher examples:
+## Custom launcher examples
 
 ```env
 # @plugin(./packages/varlock/dist/plugin.cjs)
@@ -40,21 +50,21 @@ Custom launcher examples:
 # @setValuesBulk(betterAgeLoad(), format=env)
 ```
 
-```env
-# @plugin(./packages/varlock/dist/plugin.cjs)
-# @initBetterAge(path=.env.enc, command="npm exec --package @better-age/cli -- bage")
-# @setValuesBulk(betterAgeLoad(), format=env)
+## Runtime behavior
+
+- stdout from `bage load` becomes env text for varlock
+- stderr stays attached to the invoking shell
+- plugin errors if the launcher cannot start
+- plugin errors if `bage load` exits non-zero
+- v0 supports one `initBetterAge` config per process
+
+## Development
+
+```sh
+pnpm -F @better-age/varlock build
+pnpm -F @better-age/varlock check
+pnpm -F @better-age/varlock test
 ```
 
-```env
-# @plugin(./packages/varlock/dist/plugin.cjs)
-# @initBetterAge(path=.env.enc, command="npx @better-age/cli")
-# @setValuesBulk(betterAgeLoad(), format=env)
-```
-
-`command=` is launcher prefix only. The plugin still appends:
-- `load`
-- `--protocol-version=1`
-- explicit payload path
-
-If `command=` is omitted, launcher defaults to `bage`.
+More context:
+- [../../.llms/projects/3-varlock-plugin/1-VARLOCK_PRD.md](../../.llms/projects/3-varlock-plugin/1-VARLOCK_PRD.md)
