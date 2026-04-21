@@ -230,7 +230,8 @@ describe("UpdatePayload", () => {
 		);
 
 		it.effect(
-			"rewrites once when payload needs format migration and self refresh", () =>
+			"rewrites once when payload needs format migration and self refresh",
+			() =>
 				Effect.gen(function* () {
 					payloadCrypto.snapshot().encryptCalls.length = 0;
 					payloadRepository.snapshot().writeCalls.length = 0;

@@ -53,7 +53,7 @@ type HomeRepositoryShape = {
 	}) => Effect.Effect<void, PrivateKeyPathWriteError>;
 };
 
-const missingHomeRepository = {
+const missingHomeRepository: HomeRepositoryShape = {
 	deletePrivateKey: (_privateKeyPath: PrivateKeyRelativePath) =>
 		Effect.dieMessage(
 			"HomeRepository implementation not provided",
@@ -92,7 +92,7 @@ const missingHomeRepository = {
 		Effect.dieMessage(
 			"HomeRepository implementation not provided",
 		) as Effect.Effect<void, PrivateKeyPathWriteError>,
-} satisfies HomeRepositoryShape;
+};
 
 export class HomeRepository extends Effect.Service<HomeRepository>()(
 	"HomeRepository",

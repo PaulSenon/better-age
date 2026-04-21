@@ -3,6 +3,7 @@ import {
 	parseEnvDocument,
 	serializeEnvDocument,
 } from "../../domain/payload/EnvDocument.js";
+import type { PayloadEnvelope } from "../../domain/payload/PayloadEnvelope.js";
 import { serializePayloadFile } from "../../domain/payload/PayloadFile.js";
 import { PayloadCrypto } from "../../port/PayloadCrypto.js";
 import type { PayloadEncryptError } from "../../port/PayloadCryptoError.js";
@@ -156,7 +157,7 @@ export class EditPayload extends Effect.Service<EditPayload>()("EditPayload", {
 			}
 
 			const now = new Date(yield* Clock.currentTimeMillis).toISOString();
-			const nextEnvelope = {
+			const nextEnvelope: PayloadEnvelope = {
 				...openedPayload.envelope,
 				envText: normalizedEnvText,
 				lastRewrittenAt: now as typeof openedPayload.envelope.lastRewrittenAt,

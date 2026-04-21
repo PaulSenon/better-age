@@ -113,6 +113,7 @@ describe("CreatePayload", () => {
 					deletePrivateKey: () => Effect.void,
 					getActiveKey: Effect.succeed(Option.none()),
 					getLocation: Effect.die("unused"),
+					loadStateDocument: Effect.die("unused"),
 					loadState: Effect.fail(
 						new HomeStateLoadError({
 							message: "Failed to load home state",

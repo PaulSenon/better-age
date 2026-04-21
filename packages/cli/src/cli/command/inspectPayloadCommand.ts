@@ -138,9 +138,11 @@ export const runInspectPayload = (input: {
 
 		if (result.needsUpdate.isRequired) {
 			yield* Prompt.writeStderr(
-				["Warning: payload should be updated", `Run: bage update ${result.path}`, ""].join(
-					"\n",
-				),
+				[
+					"Warning: payload should be updated",
+					`Run: bage update ${result.path}`,
+					"",
+				].join("\n"),
 			);
 		}
 

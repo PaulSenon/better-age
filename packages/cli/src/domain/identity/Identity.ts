@@ -1,17 +1,17 @@
 import { Option, Schema } from "effect";
-import { DisplayName } from "./DisplayName.js";
-import { Handle } from "./Handle.js";
+import type { DisplayName } from "./DisplayName.js";
+import type { Handle } from "./Handle.js";
 import { IdentityAlias } from "./IdentityAlias.js";
-import { IdentityUpdatedAt } from "./IdentityUpdatedAt.js";
+import type { IdentityUpdatedAt } from "./IdentityUpdatedAt.js";
 import { KeyFingerprint } from "./KeyFingerprint.js";
-import { OwnerId } from "./OwnerId.js";
+import type { OwnerId } from "./OwnerId.js";
 import { PrivateKeyRelativePath } from "./PrivateKeyRelativePath.js";
 import {
 	derivePublicIdentityFingerprint,
 	derivePublicIdentityHandle,
 	PublicIdentity,
 } from "./PublicIdentity.js";
-import { PublicKey } from "./PublicKey.js";
+import type { PublicKey } from "./PublicKey.js";
 import { Recipient } from "./Recipient.js";
 
 export const IdentityKind = Schema.Literal("user", "machine");
@@ -139,7 +139,10 @@ export const materializeKnownIdentity = (input: {
 	fingerprint: derivePublicIdentityFingerprint(input.identity),
 	handle: derivePublicIdentityHandle(input.identity),
 	localAlias: (() => {
-		const localAlias = getLocalAlias(input.localAliases, input.identity.ownerId);
+		const localAlias = getLocalAlias(
+			input.localAliases,
+			input.identity.ownerId,
+		);
 
 		if (Option.isSome(localAlias)) {
 			return localAlias;
@@ -147,7 +150,10 @@ export const materializeKnownIdentity = (input: {
 
 		const legacyLocalAlias = (
 			input.identity as KnownIdentity & {
-				readonly localAlias?: Option.Option<IdentityAlias> | IdentityAlias | null;
+				readonly localAlias?:
+					| Option.Option<IdentityAlias>
+					| IdentityAlias
+					| null;
 			}
 		).localAlias;
 
@@ -175,42 +181,40 @@ export const materializeKnownIdentities = (input: {
 export const materializeSelfIdentity = (
 	selfIdentity: SelfIdentity,
 ): ResolvedSelfIdentity => {
-	const publicIdentity =
-		(
+	const publicIdentity = (
+		selfIdentity as SelfIdentity & {
+			readonly displayName?: DisplayName;
+			readonly identityUpdatedAt?: IdentityUpdatedAt;
+			readonly ownerId?: OwnerId;
+			readonly publicIdentity?: KnownIdentity;
+			readonly publicKey?: PublicKey;
+		}
+	).publicIdentity ?? {
+		displayName: (
+			selfIdentity as SelfIdentity & { readonly displayName: DisplayName }
+		).displayName,
+		identityUpdatedAt: (
 			selfIdentity as SelfIdentity & {
-				readonly displayName?: DisplayName;
-				readonly identityUpdatedAt?: IdentityUpdatedAt;
-				readonly ownerId?: OwnerId;
-				readonly publicIdentity?: KnownIdentity;
-				readonly publicKey?: PublicKey;
+				readonly identityUpdatedAt: IdentityUpdatedAt;
 			}
-		).publicIdentity ?? {
-			displayName: (
-				selfIdentity as SelfIdentity & { readonly displayName: DisplayName }
-			).displayName,
-			identityUpdatedAt: (
-				selfIdentity as SelfIdentity & {
-					readonly identityUpdatedAt: IdentityUpdatedAt;
-				}
-			).identityUpdatedAt,
-			ownerId: (
-				selfIdentity as SelfIdentity & { readonly ownerId: OwnerId }
-			).ownerId,
-			publicKey: (
-				selfIdentity as SelfIdentity & { readonly publicKey: PublicKey }
-			).publicKey,
-		};
+		).identityUpdatedAt,
+		ownerId: (selfIdentity as SelfIdentity & { readonly ownerId: OwnerId })
+			.ownerId,
+		publicKey: (
+			selfIdentity as SelfIdentity & { readonly publicKey: PublicKey }
+		).publicKey,
+	};
 
 	return {
-	createdAt: selfIdentity.createdAt,
-	displayName: publicIdentity.displayName,
-	fingerprint: derivePublicIdentityFingerprint(publicIdentity),
-	handle: derivePublicIdentityHandle(publicIdentity),
-	identityUpdatedAt: publicIdentity.identityUpdatedAt,
-	keyMode: selfIdentity.keyMode,
-	ownerId: publicIdentity.ownerId,
-	privateKeyPath: selfIdentity.privateKeyPath,
-	publicKey: publicIdentity.publicKey,
+		createdAt: selfIdentity.createdAt,
+		displayName: publicIdentity.displayName,
+		fingerprint: derivePublicIdentityFingerprint(publicIdentity),
+		handle: derivePublicIdentityHandle(publicIdentity),
+		identityUpdatedAt: publicIdentity.identityUpdatedAt,
+		keyMode: selfIdentity.keyMode,
+		ownerId: publicIdentity.ownerId,
+		privateKeyPath: selfIdentity.privateKeyPath,
+		publicKey: publicIdentity.publicKey,
 	};
 };
 

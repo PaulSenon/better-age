@@ -754,80 +754,82 @@ describe("revokePayloadCommand", () => {
 				}),
 		);
 
-		it.effect("prints update-cli remediation when payload version is unsupported", () =>
-			Effect.gen(function* () {
-				const prompt = makePrompt("n");
-				const cli = Command.run(
-					Command.make("bage").pipe(
-						Command.withSubcommands([revokePayloadCommand]),
-					),
-					{ name: "bage", version: "0.0.1" },
-				);
-
-				const result = yield* cli([
-					"node",
-					"bage",
-					"revoke",
-					"./.env.enc",
-					"paul#aaaaaaaa",
-				]).pipe(
-					Effect.provide(
-						Layer.mergeAll(
-							NodeContext.layer,
-							Layer.succeed(
-								InspectPayload,
-								InspectPayload.make({
-									execute: ({ path }) =>
-										Effect.succeed(
-											new InspectPayloadSuccess({
-												createdAt: "2026-04-14T10:00:00.000Z",
-												envKeys: ["API_TOKEN"],
-												lastRewrittenAt: "2026-04-14T10:00:00.000Z",
-												needsUpdate: {
-													isRequired: false,
-													reason: Option.none(),
-												},
-												path,
-												payloadId: "bspld_0123456789abcdef" as never,
-												recipientCount: 1,
-												recipients: [],
-												secretCount: 1,
-												version: 2,
-											}),
-										),
-								}),
-							),
-							Layer.succeed(
-								UpdatePayload,
-								UpdatePayload.make({
-									execute: () => Effect.die("unused"),
-								}),
-							),
-							Layer.succeed(
-								RevokePayloadRecipient,
-								RevokePayloadRecipient.make({
-									execute: () =>
-										Effect.fail(
-											new RevokePayloadRecipientVersionError({
-												message:
-													"CLI is too old to open this payload. Update CLI to latest version.",
-											}),
-										),
-								}),
-							),
-							Layer.succeed(Prompt, prompt),
-							Layer.succeed(InteractivePrompt, makeInteractivePrompt([])),
-							Layer.succeed(ResolvePayloadTarget, makeResolvePayloadTarget()),
+		it.effect(
+			"prints update-cli remediation when payload version is unsupported",
+			() =>
+				Effect.gen(function* () {
+					const prompt = makePrompt("n");
+					const cli = Command.run(
+						Command.make("bage").pipe(
+							Command.withSubcommands([revokePayloadCommand]),
 						),
-					),
-					Effect.either,
-				);
+						{ name: "bage", version: "0.0.1" },
+					);
 
-				expect(result._tag).toBe("Left");
-				expect(prompt.stderr).toEqual([
-					"CLI is too old to open this payload. Update CLI to latest version.\n",
-				]);
-			}),
+					const result = yield* cli([
+						"node",
+						"bage",
+						"revoke",
+						"./.env.enc",
+						"paul#aaaaaaaa",
+					]).pipe(
+						Effect.provide(
+							Layer.mergeAll(
+								NodeContext.layer,
+								Layer.succeed(
+									InspectPayload,
+									InspectPayload.make({
+										execute: ({ path }) =>
+											Effect.succeed(
+												new InspectPayloadSuccess({
+													createdAt: "2026-04-14T10:00:00.000Z",
+													envKeys: ["API_TOKEN"],
+													lastRewrittenAt: "2026-04-14T10:00:00.000Z",
+													needsUpdate: {
+														isRequired: false,
+														reason: Option.none(),
+													},
+													path,
+													payloadId: "bspld_0123456789abcdef" as never,
+													recipientCount: 1,
+													recipients: [],
+													secretCount: 1,
+													version: 2,
+												}),
+											),
+									}),
+								),
+								Layer.succeed(
+									UpdatePayload,
+									UpdatePayload.make({
+										execute: () => Effect.die("unused"),
+									}),
+								),
+								Layer.succeed(
+									RevokePayloadRecipient,
+									RevokePayloadRecipient.make({
+										execute: () =>
+											Effect.fail(
+												new RevokePayloadRecipientVersionError({
+													message:
+														"CLI is too old to open this payload. Update CLI to latest version.",
+												}),
+											),
+									}),
+								),
+								Layer.succeed(Prompt, prompt),
+								Layer.succeed(InteractivePrompt, makeInteractivePrompt([])),
+								Layer.succeed(ResolvePayloadTarget, makeResolvePayloadTarget()),
+							),
+						),
+						Effect.either,
+					);
+
+					expect(result._tag).toBe("Left");
+					expect(prompt.stderr).toEqual([
+						"CLI is too old to open this payload. Update CLI to latest version.\n",
+					]);
+				}),
 		);
 
 		it.effect("runs update then retries revoke when accepted", () =>

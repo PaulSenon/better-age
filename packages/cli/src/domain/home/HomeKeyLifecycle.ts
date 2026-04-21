@@ -19,9 +19,9 @@ export const buildRotatedHomeState = (input: {
 	readonly privateKeyPath: PrivateKeyRelativePathType;
 	readonly rotatedIdentity: GeneratedIdentity;
 }) => {
-	const selfIdentity = input.previousState.self.pipe(
-		Option.getOrUndefined,
-	) as SelfIdentity | undefined;
+	const selfIdentity = input.previousState.self.pipe(Option.getOrUndefined) as
+		| SelfIdentity
+		| undefined;
 
 	if (selfIdentity === undefined) {
 		throw new Error(
@@ -34,7 +34,9 @@ export const buildRotatedHomeState = (input: {
 		activeKeyFingerprint: Option.some(input.rotatedIdentity.fingerprint),
 		retiredKeys: [
 			{
-				fingerprint: derivePublicIdentityFingerprint(selfIdentity.publicIdentity),
+				fingerprint: derivePublicIdentityFingerprint(
+					selfIdentity.publicIdentity,
+				),
 				privateKeyPath: toRetiredPrivateKeyPath(
 					derivePublicIdentityFingerprint(selfIdentity.publicIdentity),
 				),

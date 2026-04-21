@@ -6,4 +6,11 @@ catalog:
   typescript: ^5.9.3
 
 onlyBuiltDependencies:
+  - '@parcel/watcher'
+  - better-sqlite3
+  - cbor-extract
+  - cpu-features
   - esbuild
+  - msgpackr-extract
+  - protobufjs
+  - ssh2

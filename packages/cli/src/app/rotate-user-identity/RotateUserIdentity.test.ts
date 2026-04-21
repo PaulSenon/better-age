@@ -6,8 +6,8 @@ import { IdentityUpdatedAt } from "../../domain/identity/IdentityUpdatedAt.js";
 import { KeyFingerprint } from "../../domain/identity/KeyFingerprint.js";
 import { OwnerId } from "../../domain/identity/OwnerId.js";
 import { PrivateKeyRelativePath } from "../../domain/identity/PrivateKeyRelativePath.js";
-import { PublicKey } from "../../domain/identity/PublicKey.js";
 import { derivePublicIdentityFingerprint } from "../../domain/identity/PublicIdentity.js";
+import { PublicKey } from "../../domain/identity/PublicKey.js";
 import {
 	Crypto,
 	GeneratedIdentity,
@@ -290,16 +290,14 @@ describe("RotateUserIdentity", () => {
 						rollbackHomeRepository.snapshot().files.get("keys/active.key.age"),
 					).toBe("OLD-ENCRYPTED-KEY");
 					expect(
-						rollbackHomeRepository
-							.snapshot()
-							.files.get(
-								`keys/retired/${derivePublicIdentityFingerprint({
-									displayName: selfDisplayName,
-									identityUpdatedAt: selfIdentityUpdatedAt,
-									ownerId: selfOwnerId,
-									publicKey: selfPublicKey,
-								})}.key.age`,
-							),
+						rollbackHomeRepository.snapshot().files.get(
+							`keys/retired/${derivePublicIdentityFingerprint({
+								displayName: selfDisplayName,
+								identityUpdatedAt: selfIdentityUpdatedAt,
+								ownerId: selfOwnerId,
+								publicKey: selfPublicKey,
+							})}.key.age`,
+						),
 					).toBeUndefined();
 				}),
 		);

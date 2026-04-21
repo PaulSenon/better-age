@@ -1,19 +1,19 @@
 import { Schema } from "effect";
-import {
-	type ArtifactMigrationPolicy,
-	normalizeArtifactToCurrent,
-	type NormalizeArtifactResult,
-	type VersionedArtifactDefinition,
-} from "../migration/ArtifactMigration.js";
+import { IdentityUpdatedAt } from "../identity/IdentityUpdatedAt.js";
 import {
 	LegacyPayloadRecipientV0,
 	migrateLegacyPayloadRecipientV0,
 } from "../identity/PublicIdentityMigration.js";
-import { IdentityUpdatedAt } from "../identity/IdentityUpdatedAt.js";
 import {
+	type ArtifactMigrationPolicy,
+	type NormalizeArtifactResult,
+	normalizeArtifactToCurrent,
+	type VersionedArtifactDefinition,
+} from "../migration/ArtifactMigration.js";
+import {
+	type PayloadEnvelope as CurrentPayloadEnvelope,
 	PayloadEnvelope,
 	PayloadRecipient,
-	type PayloadEnvelope as CurrentPayloadEnvelope,
 } from "./PayloadEnvelope.js";
 import { PayloadId } from "./PayloadId.js";
 
@@ -91,12 +91,14 @@ export const PayloadEnvelopeMigrationDefinition: VersionedArtifactDefinition<Ver
 		steps: [
 			{
 				fromVersion: 0,
-				migrate: upgradeLegacyPayloadEnvelopeV0,
+				migrate: (artifact) =>
+					upgradeLegacyPayloadEnvelopeV0(artifact as LegacyPayloadEnvelopeV0),
 				toVersion: 1,
 			},
 			{
 				fromVersion: 1,
-				migrate: upgradeLegacyPayloadEnvelopeV1,
+				migrate: (artifact) =>
+					upgradeLegacyPayloadEnvelopeV1(artifact as LegacyPayloadEnvelopeV1),
 				toVersion: 2,
 			},
 		],
@@ -109,5 +111,5 @@ export const normalizePayloadEnvelopeToCurrent = (input: {
 	normalizeArtifactToCurrent({
 		artifact: input.envelope,
 		definition: PayloadEnvelopeMigrationDefinition,
-		policy: input.policy,
+		...(input.policy === undefined ? {} : { policy: input.policy }),
 	});

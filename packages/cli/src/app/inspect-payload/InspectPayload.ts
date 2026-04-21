@@ -48,8 +48,8 @@ export class InspectPayload extends Effect.Service<InspectPayload>()(
 								});
 							case "OpenPayloadEnvelopeError":
 								return new InspectPayloadEnvelopeError({
-								message: error.message,
-							});
+									message: error.message,
+								});
 							case "OpenPayloadVersionError":
 								return new InspectPayloadVersionError({
 									message: error.message,
@@ -79,10 +79,9 @@ export class InspectPayload extends Effect.Service<InspectPayload>()(
 						const isMe =
 							Option.isSome(selfIdentity) &&
 							selfIdentity.value.publicIdentity.ownerId === recipient.ownerId;
-						const resolvedSelfIdentity =
-							Option.isSome(selfIdentity)
-								? materializeSelfIdentity(selfIdentity.value)
-								: null;
+						const resolvedSelfIdentity = Option.isSome(selfIdentity)
+							? materializeSelfIdentity(selfIdentity.value)
+							: null;
 
 						return {
 							displayName: recipient.displayName,
@@ -95,11 +94,15 @@ export class InspectPayload extends Effect.Service<InspectPayload>()(
 							isStaleSelf:
 								isMe &&
 								needsUpdate.isRequired &&
-								recipient.ownerId === selfIdentity.value?.publicIdentity.ownerId,
+								recipient.ownerId ===
+									selfIdentity.value?.publicIdentity.ownerId,
 							localAlias:
 								knownIdentity === undefined
 									? Option.none()
-									: getLocalAlias(nextState.localAliases, knownIdentity.ownerId),
+									: getLocalAlias(
+											nextState.localAliases,
+											knownIdentity.ownerId,
+										),
 						};
 					}),
 					secretCount: envKeys.length,

@@ -3,9 +3,9 @@ import type { HomeState } from "../../domain/home/HomeState.js";
 import { isSelfOwnerId } from "../../domain/home/SelfIdentityGuard.js";
 import {
 	getLocalAlias,
+	type KnownIdentity,
 	materializeKnownIdentity,
 	setLocalAlias,
-	type KnownIdentity,
 } from "../../domain/identity/Identity.js";
 import type { IdentityAlias } from "../../domain/identity/IdentityAlias.js";
 import { decodeIdentityString } from "../../domain/identity/IdentityString.js";

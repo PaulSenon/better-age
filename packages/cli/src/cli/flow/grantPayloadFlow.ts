@@ -26,6 +26,7 @@ import type {
 	InspectPayloadEnvelopeError,
 	InspectPayloadFileFormatError,
 	InspectPayloadPersistenceError,
+	InspectPayloadVersionError,
 } from "../../app/inspect-payload/InspectPayloadError.js";
 import type { ResolvePayloadTarget } from "../../app/shared/ResolvePayloadTarget.js";
 import type { ResolvePayloadTargetError } from "../../app/shared/ResolvePayloadTargetError.js";
@@ -40,13 +41,13 @@ import type {
 	UpdatePayloadVersionError,
 } from "../../app/update-payload/UpdatePayloadError.js";
 import type { HomeState } from "../../domain/home/HomeState.js";
-import { decodeIdentityAlias } from "../../domain/identity/IdentityAlias.js";
-import { decodeIdentityString } from "../../domain/identity/IdentityString.js";
 import {
 	getLocalAlias,
 	materializeKnownIdentities,
 	materializeSelfIdentity,
 } from "../../domain/identity/Identity.js";
+import { decodeIdentityAlias } from "../../domain/identity/IdentityAlias.js";
+import { decodeIdentityString } from "../../domain/identity/IdentityString.js";
 import { HomeRepository } from "../../port/HomeRepository.js";
 import type {
 	HomeStateDecodeError,
@@ -117,6 +118,7 @@ export type GrantPayloadFlowError =
 	| InspectPayloadEnvelopeError
 	| InspectPayloadFileFormatError
 	| InspectPayloadPersistenceError
+	| InspectPayloadVersionError
 	| PromptReadAbortedError
 	| PromptUnavailableError
 	| ResolveIdentityInputError
@@ -274,7 +276,9 @@ const ambiguousMessage = (input: {
 				localAliases: state.localAliases,
 			});
 			const resolvedSelfIdentity =
-				state.self._tag === "Some" ? materializeSelfIdentity(state.self.value) : null;
+				state.self._tag === "Some"
+					? materializeSelfIdentity(state.self.value)
+					: null;
 
 			return [
 				`Identity ref is ambiguous: ${input.identityRef}`,

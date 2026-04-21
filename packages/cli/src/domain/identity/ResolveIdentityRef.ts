@@ -1,10 +1,10 @@
 import { Option, type Schema } from "effect";
 import type { PayloadRecipient } from "../payload/PayloadEnvelope.js";
 import {
+	type KnownIdentity,
 	type LocalAliasMap,
 	materializeKnownIdentity,
 	materializeSelfIdentity,
-	type KnownIdentity,
 	type ResolvedKnownIdentity,
 	type SelfIdentity,
 } from "./Identity.js";
@@ -206,13 +206,12 @@ const toKnownIdentityFromPayloadRecipient = (input: {
 	);
 
 	return materializeKnownIdentity({
-		identity:
-			knownIdentity ?? {
-				displayName: input.recipient.displayName,
-				identityUpdatedAt: input.recipient.identityUpdatedAt,
-				ownerId: input.recipient.ownerId,
-				publicKey: input.recipient.publicKey,
-			},
+		identity: knownIdentity ?? {
+			displayName: input.recipient.displayName,
+			identityUpdatedAt: input.recipient.identityUpdatedAt,
+			ownerId: input.recipient.ownerId,
+			publicKey: input.recipient.publicKey,
+		},
 		localAliases: input.localAliases,
 	});
 };

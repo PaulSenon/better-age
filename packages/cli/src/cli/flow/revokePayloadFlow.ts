@@ -6,6 +6,7 @@ import type {
 	InspectPayloadEnvelopeError,
 	InspectPayloadFileFormatError,
 	InspectPayloadPersistenceError,
+	InspectPayloadVersionError,
 } from "../../app/inspect-payload/InspectPayloadError.js";
 import { RevokePayloadRecipient } from "../../app/revoke-payload-recipient/RevokePayloadRecipient.js";
 import {
@@ -80,6 +81,7 @@ export type RevokePayloadFlowError =
 	| InspectPayloadEnvelopeError
 	| InspectPayloadFileFormatError
 	| InspectPayloadPersistenceError
+	| InspectPayloadVersionError
 	| PromptReadAbortedError
 	| PromptUnavailableError
 	| ResolveIdentityInputError

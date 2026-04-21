@@ -98,6 +98,7 @@ describe("CreateUserIdentity", () => {
 						rootDirectory: "/tmp/home",
 						stateFile: "/tmp/home/state.json",
 					}),
+					loadStateDocument: Effect.die("unused"),
 					loadState: Effect.die("should not load state"),
 					readPrivateKey: (_privateKeyPath) => Effect.die("unused"),
 					saveState: () => Effect.void,

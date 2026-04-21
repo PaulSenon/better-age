@@ -21,7 +21,9 @@ describe("PayloadEnvelopeMigration", () => {
 				payloadId: "bspld_2222222222222222",
 				recipients: [currentRecipient],
 				version: 2,
-			},
+			} as unknown as Parameters<
+				typeof normalizePayloadEnvelopeToCurrent
+			>[0]["envelope"],
 		});
 		const legacyV1Result = normalizePayloadEnvelopeToCurrent({
 			envelope: {
@@ -31,7 +33,9 @@ describe("PayloadEnvelopeMigration", () => {
 				payloadId: "bspld_1111111111111111",
 				recipients: [currentRecipient],
 				version: 1,
-			},
+			} as unknown as Parameters<
+				typeof normalizePayloadEnvelopeToCurrent
+			>[0]["envelope"],
 		});
 		const legacyV0Result = normalizePayloadEnvelopeToCurrent({
 			envelope: {
@@ -47,7 +51,9 @@ describe("PayloadEnvelopeMigration", () => {
 					},
 				],
 				version: 0,
-			},
+			} as unknown as Parameters<
+				typeof normalizePayloadEnvelopeToCurrent
+			>[0]["envelope"],
 		});
 
 		expect(currentResult._tag).toBe("current");
@@ -81,7 +87,9 @@ describe("PayloadEnvelopeMigration", () => {
 					},
 				],
 				version: 0,
-			},
+			} as unknown as Parameters<
+				typeof normalizePayloadEnvelopeToCurrent
+			>[0]["envelope"],
 		});
 
 		expect(result).toMatchObject({
@@ -102,7 +110,9 @@ describe("PayloadEnvelopeMigration", () => {
 			payloadId: "bspld_1111111111111111",
 			recipients: [currentRecipient],
 			version: 1 as const,
-		};
+		} as unknown as Parameters<
+			typeof normalizePayloadEnvelopeToCurrent
+		>[0]["envelope"];
 
 		expect(
 			normalizePayloadEnvelopeToCurrent({
@@ -134,7 +144,9 @@ describe("PayloadEnvelopeMigration", () => {
 					payloadId: "bspld_1111111111111111",
 					recipients: [currentRecipient],
 					version: 1,
-				},
+				} as unknown as Parameters<
+					typeof normalizePayloadEnvelopeToCurrent
+				>[0]["envelope"],
 				policy: {
 					hardBreakVersions: [1],
 				},
@@ -148,16 +160,20 @@ describe("PayloadEnvelopeMigration", () => {
 	});
 
 	it("keeps unsupported-newer distinct from intentional hard-broken legacy", () => {
+		const unsupportedNewerEnvelope = {
+			createdAt: "2026-04-14T10:00:00.000Z",
+			envText: "API_TOKEN=secret\n",
+			lastRewrittenAt: "2026-04-14T10:00:00.000Z",
+			payloadId: "bspld_3333333333333333",
+			recipients: [currentRecipient],
+			version: 3,
+		} as unknown as Parameters<
+			typeof normalizePayloadEnvelopeToCurrent
+		>[0]["envelope"];
+
 		expect(
 			normalizePayloadEnvelopeToCurrent({
-				envelope: {
-					createdAt: "2026-04-14T10:00:00.000Z",
-					envText: "API_TOKEN=secret\n",
-					lastRewrittenAt: "2026-04-14T10:00:00.000Z",
-					payloadId: "bspld_3333333333333333",
-					recipients: [currentRecipient],
-					version: 3,
-				},
+				envelope: unsupportedNewerEnvelope,
 			}),
 		).toEqual({
 			_tag: "unsupported-newer",

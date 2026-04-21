@@ -1,15 +1,15 @@
 import { Option, Schema } from "effect";
 import {
 	emptyLocalAliasMap,
-	LocalAliasMap,
 	KnownIdentity,
+	LocalAliasMap,
 	RetiredKey,
 	SelfIdentity,
 	type StoredIdentityRecord,
 	toStoredIdentityRecord,
 } from "../identity/Identity.js";
-import { derivePublicIdentityFingerprint } from "../identity/PublicIdentity.js";
 import { KeyFingerprint } from "../identity/KeyFingerprint.js";
+import { derivePublicIdentityFingerprint } from "../identity/PublicIdentity.js";
 
 export const RotationTtl = Schema.Literal("1w", "1m", "3m", "6m", "9m", "1y");
 export type RotationTtl = Schema.Schema.Type<typeof RotationTtl>;

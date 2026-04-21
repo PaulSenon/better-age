@@ -117,7 +117,9 @@ const renderCandidateChoices = (input: {
 				localAliases: state.localAliases,
 			});
 			const resolvedSelfIdentity =
-				state.self._tag === "Some" ? materializeSelfIdentity(state.self.value) : null;
+				state.self._tag === "Some"
+					? materializeSelfIdentity(state.self.value)
+					: null;
 
 			const knownIdentity = knownIdentities.find(
 				(identity) => identity.handle === handle,
@@ -227,7 +229,9 @@ const renderAmbiguousMessage = (input: {
 				localAliases: state.localAliases,
 			});
 			const resolvedSelfIdentity =
-				state.self._tag === "Some" ? materializeSelfIdentity(state.self.value) : null;
+				state.self._tag === "Some"
+					? materializeSelfIdentity(state.self.value)
+					: null;
 
 			const knownIdentity = knownIdentities.find(
 				(identity) => identity.handle === handle,

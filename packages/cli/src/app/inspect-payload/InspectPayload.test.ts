@@ -7,8 +7,8 @@ import { IdentityUpdatedAt } from "../../domain/identity/IdentityUpdatedAt.js";
 import { KeyFingerprint } from "../../domain/identity/KeyFingerprint.js";
 import { OwnerId } from "../../domain/identity/OwnerId.js";
 import { PrivateKeyRelativePath } from "../../domain/identity/PrivateKeyRelativePath.js";
-import { PublicKey } from "../../domain/identity/PublicKey.js";
 import { derivePublicIdentityFingerprint } from "../../domain/identity/PublicIdentity.js";
+import { PublicKey } from "../../domain/identity/PublicKey.js";
 import { serializePayloadFile } from "../../domain/payload/PayloadFile.js";
 import { HomeRepository } from "../../port/HomeRepository.js";
 import {
@@ -108,10 +108,7 @@ describe("InspectPayload", () => {
 						envText: "API_TOKEN=secret\nEMPTY=\nDEBUG=true\n",
 						lastRewrittenAt: "2026-04-14T10:00:00.000Z",
 						payloadId: "bspld_0123456789abcdef",
-						recipients: [
-							selfRecipient,
-							paulRecipient,
-						],
+						recipients: [selfRecipient, paulRecipient],
 						version: 2,
 					});
 

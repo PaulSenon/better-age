@@ -1,5 +1,8 @@
 import { Either, Encoding, Schema } from "effect";
-import { PublicIdentity, type PublicIdentity as PublicIdentityType } from "./PublicIdentity.js";
+import {
+	PublicIdentity,
+	type PublicIdentity as PublicIdentityType,
+} from "./PublicIdentity.js";
 
 export class IdentityStringDecodeError extends Schema.TaggedError<IdentityStringDecodeError>()(
 	"IdentityStringDecodeError",

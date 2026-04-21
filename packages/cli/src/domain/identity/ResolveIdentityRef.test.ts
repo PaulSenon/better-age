@@ -2,21 +2,24 @@ import { Option, Schema } from "effect";
 import { describe, expect, it } from "vitest";
 import { PayloadRecipient } from "../payload/PayloadEnvelope.js";
 import { DisplayName } from "./DisplayName.js";
-import { IdentityAlias } from "./IdentityAlias.js";
 import {
 	KnownIdentity,
 	SelfIdentity,
 	toPublicIdentityFromSelfIdentity,
 } from "./Identity.js";
-import { encodeIdentityString, toIdentityStringPayload } from "./IdentityString.js";
+import { IdentityAlias } from "./IdentityAlias.js";
+import {
+	encodeIdentityString,
+	toIdentityStringPayload,
+} from "./IdentityString.js";
 import { IdentityUpdatedAt } from "./IdentityUpdatedAt.js";
 import { OwnerId } from "./OwnerId.js";
 import { PrivateKeyRelativePath } from "./PrivateKeyRelativePath.js";
-import { PublicKey } from "./PublicKey.js";
 import {
 	derivePublicIdentityFingerprint,
 	derivePublicIdentityHandle,
 } from "./PublicIdentity.js";
+import { PublicKey } from "./PublicKey.js";
 import {
 	resolveGrantIdentityRef,
 	resolveRevokeIdentityRef,

@@ -3,13 +3,16 @@ import { getSelfIdentity } from "../../domain/home/HomeState.js";
 import { getRotationDueAt } from "../../domain/home/RotationSchedule.js";
 import type {
 	KnownIdentity,
+	ResolvedSelfIdentity,
 	RetiredKey,
-	SelfIdentity,
 } from "../../domain/identity/Identity.js";
 import {
 	getLocalAlias,
 	materializeSelfIdentity,
 } from "../../domain/identity/Identity.js";
+import type { IdentityAlias } from "../../domain/identity/IdentityAlias.js";
+import type { IdentityUpdatedAt } from "../../domain/identity/IdentityUpdatedAt.js";
+import type { KeyFingerprint } from "../../domain/identity/KeyFingerprint.js";
 import {
 	derivePublicIdentityFingerprint,
 	derivePublicIdentityHandle,
@@ -27,11 +30,11 @@ const toPersistenceError = (error: HomeStateDecodeError | HomeStateLoadError) =>
 	});
 
 type MeInspection = {
-	readonly displayName: SelfIdentity["displayName"];
-	readonly fingerprint: SelfIdentity["fingerprint"];
-	readonly handle: SelfIdentity["handle"];
-	readonly identityUpdatedAt: SelfIdentity["identityUpdatedAt"];
-	readonly ownerId: SelfIdentity["ownerId"];
+	readonly displayName: ResolvedSelfIdentity["displayName"];
+	readonly fingerprint: ResolvedSelfIdentity["fingerprint"];
+	readonly handle: ResolvedSelfIdentity["handle"];
+	readonly identityUpdatedAt: ResolvedSelfIdentity["identityUpdatedAt"];
+	readonly ownerId: ResolvedSelfIdentity["ownerId"];
 	readonly rotationStatus: {
 		readonly dueAt: string;
 		readonly isOverdue: boolean;
@@ -42,10 +45,10 @@ type MeInspection = {
 
 type KnownIdentityInspection = {
 	readonly displayName: KnownIdentity["displayName"];
-	readonly fingerprint: KnownIdentity["fingerprint"];
-	readonly handle: KnownIdentity["handle"];
-	readonly identityUpdatedAt: KnownIdentity["identityUpdatedAt"];
-	readonly localAlias: KnownIdentity["localAlias"];
+	readonly fingerprint: KeyFingerprint;
+	readonly handle: string;
+	readonly identityUpdatedAt: IdentityUpdatedAt;
+	readonly localAlias: Option.Option<IdentityAlias>;
 };
 
 type RetiredKeyInspection = {

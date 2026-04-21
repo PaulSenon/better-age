@@ -205,14 +205,9 @@ const makeHomeRepository = (
 	knownIdentities: HomeState["knownIdentities"] = [
 		{
 			displayName: Schema.decodeUnknownSync(DisplayName)("paul"),
-			fingerprint: Schema.decodeUnknownSync(KeyFingerprint)(
-				"bs1_aaaaaaaaaaaaaaaa",
-			),
-			handle: Schema.decodeUnknownSync(Handle)("paul#aaaaaaaa"),
 			identityUpdatedAt: Schema.decodeUnknownSync(IdentityUpdatedAt)(
 				"2026-04-14T10:00:00.000Z",
 			),
-			localAlias: Option.none(),
 			ownerId: Schema.decodeUnknownSync(OwnerId)("bsid1_aaaaaaaaaaaaaaaa"),
 			publicKey: Schema.decodeUnknownSync(PublicKey)("age1paul"),
 		},
@@ -227,20 +222,18 @@ const makeHomeRepository = (
 			knownIdentities,
 			self: Option.some({
 				createdAt: "2026-04-14T10:00:00.000Z",
-				displayName: Schema.decodeUnknownSync(DisplayName)("isaac"),
-				fingerprint: Schema.decodeUnknownSync(KeyFingerprint)(
-					"bs1_1111111111111111",
-				),
-				handle: selfHandle,
-				identityUpdatedAt: Schema.decodeUnknownSync(IdentityUpdatedAt)(
-					"2026-04-14T10:00:00.000Z",
-				),
 				keyMode: "pq-hybrid",
-				ownerId: Schema.decodeUnknownSync(OwnerId)("bsid1_069f7576d2ab43ef"),
 				privateKeyPath: Schema.decodeUnknownSync(PrivateKeyRelativePath)(
 					"keys/active.key.age",
 				),
-				publicKey: Schema.decodeUnknownSync(PublicKey)("age1isaac"),
+				publicIdentity: {
+					displayName: Schema.decodeUnknownSync(DisplayName)("isaac"),
+					identityUpdatedAt: Schema.decodeUnknownSync(IdentityUpdatedAt)(
+						"2026-04-14T10:00:00.000Z",
+					),
+					ownerId: Schema.decodeUnknownSync(OwnerId)("bsid1_069f7576d2ab43ef"),
+					publicKey: Schema.decodeUnknownSync(PublicKey)("age1isaac"),
+				},
 			}),
 		}),
 		readPrivateKey: (_privateKeyPath) => Effect.die("unused"),
@@ -1279,84 +1272,91 @@ describe("grantPayloadCommand", () => {
 				}),
 		);
 
-		it.effect("prints update-cli remediation when payload version is unsupported", () =>
-			Effect.gen(function* () {
-				const prompt = makePrompt("n");
-				const cli = Command.run(
-					Command.make("bage").pipe(
-						Command.withSubcommands([grantPayloadCommand]),
-					),
-					{ name: "bage", version: "0.0.1" },
-				);
-
-				const result = yield* cli(["node", "bage", "grant", "./.env.enc"]).pipe(
-					Effect.provide(
-						Layer.mergeAll(
-							NodeContext.layer,
-							Layer.succeed(HomeRepository, makeHomeRepository()),
-							Layer.succeed(
-								ImportIdentityString,
-								ImportIdentityString.make({
-									execute: () => Effect.die("unused"),
-								}),
-							),
-							Layer.succeed(
-								UpdatePayload,
-								UpdatePayload.make({
-									execute: () => Effect.die("unused"),
-								}),
-							),
-							Layer.succeed(
-								GrantPayloadRecipient,
-								GrantPayloadRecipient.make({
-									execute: () =>
-										Effect.fail(
-											new GrantPayloadRecipientVersionError({
-												message:
-													"CLI is too old to open this payload. Update CLI to latest version.",
-											}),
-										),
-								}),
-							),
-							Layer.succeed(Prompt, prompt),
-							Layer.succeed(
-								InteractivePrompt,
-								makeInteractivePrompt(["paul (paul#aaaaaaaa)"]),
-							),
-							Layer.succeed(
-								InspectPayload,
-								InspectPayload.make({
-									execute: ({ path }) =>
-										Effect.succeed(
-											new InspectPayloadSuccess({
-												createdAt: "2026-04-14T10:00:00.000Z",
-												envKeys: ["API_TOKEN"],
-												lastRewrittenAt: "2026-04-14T10:00:00.000Z",
-												needsUpdate: {
-													isRequired: false,
-													reason: Option.none(),
-												},
-												path,
-												payloadId: "bspld_0123456789abcdef" as never,
-												recipientCount: 2,
-												recipients: [],
-												secretCount: 1,
-												version: 2,
-											}),
-										),
-								}),
-							),
-							Layer.succeed(ResolvePayloadTarget, makeResolvePayloadTarget()),
+		it.effect(
+			"prints update-cli remediation when payload version is unsupported",
+			() =>
+				Effect.gen(function* () {
+					const prompt = makePrompt("n");
+					const cli = Command.run(
+						Command.make("bage").pipe(
+							Command.withSubcommands([grantPayloadCommand]),
 						),
-					),
-					Effect.either,
-				);
+						{ name: "bage", version: "0.0.1" },
+					);
 
-				expect(result._tag).toBe("Left");
-				expect(prompt.stderr).toEqual([
-					"CLI is too old to open this payload. Update CLI to latest version.\n",
-				]);
-			}),
+					const result = yield* cli([
+						"node",
+						"bage",
+						"grant",
+						"./.env.enc",
+					]).pipe(
+						Effect.provide(
+							Layer.mergeAll(
+								NodeContext.layer,
+								Layer.succeed(HomeRepository, makeHomeRepository()),
+								Layer.succeed(
+									ImportIdentityString,
+									ImportIdentityString.make({
+										execute: () => Effect.die("unused"),
+									}),
+								),
+								Layer.succeed(
+									UpdatePayload,
+									UpdatePayload.make({
+										execute: () => Effect.die("unused"),
+									}),
+								),
+								Layer.succeed(
+									GrantPayloadRecipient,
+									GrantPayloadRecipient.make({
+										execute: () =>
+											Effect.fail(
+												new GrantPayloadRecipientVersionError({
+													message:
+														"CLI is too old to open this payload. Update CLI to latest version.",
+												}),
+											),
+									}),
+								),
+								Layer.succeed(Prompt, prompt),
+								Layer.succeed(
+									InteractivePrompt,
+									makeInteractivePrompt(["paul (paul#aaaaaaaa)"]),
+								),
+								Layer.succeed(
+									InspectPayload,
+									InspectPayload.make({
+										execute: ({ path }) =>
+											Effect.succeed(
+												new InspectPayloadSuccess({
+													createdAt: "2026-04-14T10:00:00.000Z",
+													envKeys: ["API_TOKEN"],
+													lastRewrittenAt: "2026-04-14T10:00:00.000Z",
+													needsUpdate: {
+														isRequired: false,
+														reason: Option.none(),
+													},
+													path,
+													payloadId: "bspld_0123456789abcdef" as never,
+													recipientCount: 2,
+													recipients: [],
+													secretCount: 1,
+													version: 2,
+												}),
+											),
+									}),
+								),
+								Layer.succeed(ResolvePayloadTarget, makeResolvePayloadTarget()),
+							),
+						),
+						Effect.either,
+					);
+
+					expect(result._tag).toBe("Left");
+					expect(prompt.stderr).toEqual([
+						"CLI is too old to open this payload. Update CLI to latest version.\n",
+					]);
+				}),
 		);
 
 		it.effect("runs update then retries grant when accepted", () =>
@@ -1510,19 +1510,13 @@ describe("grantPayloadCommand", () => {
 									makeHomeRepository([
 										{
 											displayName: importedPaulDisplayName,
-											fingerprint: "bs1_aaaaaaaaaaaaaaaa" as never,
-											handle: importedPaulHandle,
 											identityUpdatedAt: "2026-04-14T10:00:00.000Z" as never,
-											localAlias: Option.none(),
 											ownerId: "bsid1_aaaaaaaaaaaaaaaa" as never,
 											publicKey: "age1paul" as never,
 										},
 										{
 											displayName: importedAnneDisplayName,
-											fingerprint: "bs1_cccccccccccccccc" as never,
-											handle: importedAnneHandle,
 											identityUpdatedAt: "2026-04-14T10:00:00.000Z" as never,
-											localAlias: Option.none(),
 											ownerId: "bsid1_cccccccccccccccc" as never,
 											publicKey: "age1anne" as never,
 										},

@@ -14,10 +14,7 @@ const sameRecipientSnapshot = (
 export const toPayloadRecipient = (
 	identity: Pick<
 		KnownIdentity,
-		| "displayName"
-		| "identityUpdatedAt"
-		| "ownerId"
-		| "publicKey"
+		"displayName" | "identityUpdatedAt" | "ownerId" | "publicKey"
 	>,
 ): Schema.Schema.Type<typeof PayloadRecipient> => ({
 	displayName: identity.displayName,

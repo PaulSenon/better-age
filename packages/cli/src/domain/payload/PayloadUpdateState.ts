@@ -3,8 +3,8 @@ import type { HomeState } from "../home/HomeState.js";
 import { getSelfIdentity } from "../home/HomeState.js";
 import {
 	materializeSelfIdentity,
-	toPublicIdentityFromSelfIdentity,
 	type SelfIdentity,
+	toPublicIdentityFromSelfIdentity,
 } from "../identity/Identity.js";
 import type { PayloadEnvelope, PayloadRecipient } from "./PayloadEnvelope.js";
 
@@ -24,11 +24,14 @@ const isSameSelfSnapshot = (
 	selfIdentity: SelfIdentity,
 	recipient: PayloadRecipient,
 ): boolean =>
-	toPublicIdentityFromSelfIdentity(selfIdentity).displayName === recipient.displayName &&
+	toPublicIdentityFromSelfIdentity(selfIdentity).displayName ===
+		recipient.displayName &&
 	toPublicIdentityFromSelfIdentity(selfIdentity).identityUpdatedAt ===
 		recipient.identityUpdatedAt &&
-	toPublicIdentityFromSelfIdentity(selfIdentity).ownerId === recipient.ownerId &&
-	toPublicIdentityFromSelfIdentity(selfIdentity).publicKey === recipient.publicKey;
+	toPublicIdentityFromSelfIdentity(selfIdentity).ownerId ===
+		recipient.ownerId &&
+	toPublicIdentityFromSelfIdentity(selfIdentity).publicKey ===
+		recipient.publicKey;
 
 export const computePayloadUpdateState = (
 	state: HomeState,
