@@ -30,7 +30,7 @@ const HomeStateVersion = Schema.Number.pipe(
 	Schema.greaterThanOrEqualTo(0),
 );
 
-const LegacyHomeStateV1 = Schema.Struct({
+export const LegacyHomeStateV1 = Schema.Struct({
 	activeKeyFingerprint: Schema.OptionFromNullOr(KeyFingerprint),
 	defaultEditorCommand: Schema.OptionFromNullOr(Schema.String),
 	homeSchemaVersion: Schema.Literal(1),
@@ -42,7 +42,7 @@ const LegacyHomeStateV1 = Schema.Struct({
 
 type LegacyHomeStateV1 = Schema.Schema.Type<typeof LegacyHomeStateV1>;
 
-const LegacyHomeStateV0 = Schema.Struct({
+export const LegacyHomeStateV0 = Schema.Struct({
 	activeKeyFingerprint: Schema.OptionFromNullOr(KeyFingerprint),
 	defaultEditorCommand: Schema.OptionFromNullOr(Schema.String),
 	homeSchemaVersion: Schema.Literal(0),
