@@ -53,6 +53,15 @@ export type NormalizeArtifactResult<TArtifact> =
 			readonly currentVersion: number;
 			readonly missingFromVersion: number;
 			readonly missingToVersion: number;
+	  }
+	| {
+			readonly _tag: "invalid-step";
+			readonly actualVersion: number;
+			readonly artifactId: string;
+			readonly artifactVersion: number;
+			readonly currentVersion: number;
+			readonly expectedToVersion: number;
+			readonly fromVersion: number;
 	  };
 
 const isHardBrokenVersion = (
@@ -134,6 +143,19 @@ export const normalizeArtifactToCurrent = <TArtifact>(input: {
 
 		nextArtifact = adjacentStep.migrate(nextArtifact);
 		nextVersion = input.definition.readVersion(nextArtifact);
+
+		if (nextVersion !== adjacentStep.toVersion) {
+			return {
+				_tag: "invalid-step",
+				actualVersion: nextVersion,
+				artifactId: input.definition.artifactId,
+				artifactVersion,
+				currentVersion: input.definition.currentVersion,
+				expectedToVersion: adjacentStep.toVersion,
+				fromVersion: adjacentStep.fromVersion,
+			};
+		}
+
 		appliedSteps.push({
 			fromVersion: adjacentStep.fromVersion,
 			toVersion: adjacentStep.toVersion,

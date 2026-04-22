@@ -138,33 +138,7 @@ export const materializeKnownIdentity = (input: {
 	...input.identity,
 	fingerprint: derivePublicIdentityFingerprint(input.identity),
 	handle: derivePublicIdentityHandle(input.identity),
-	localAlias: (() => {
-		const localAlias = getLocalAlias(
-			input.localAliases,
-			input.identity.ownerId,
-		);
-
-		if (Option.isSome(localAlias)) {
-			return localAlias;
-		}
-
-		const legacyLocalAlias = (
-			input.identity as KnownIdentity & {
-				readonly localAlias?:
-					| Option.Option<IdentityAlias>
-					| IdentityAlias
-					| null;
-			}
-		).localAlias;
-
-		if (legacyLocalAlias === undefined || legacyLocalAlias === null) {
-			return Option.none();
-		}
-
-		return typeof legacyLocalAlias === "object" && "_tag" in legacyLocalAlias
-			? (legacyLocalAlias as Option.Option<IdentityAlias>)
-			: Option.some(legacyLocalAlias as IdentityAlias);
-	})(),
+	localAlias: getLocalAlias(input.localAliases, input.identity.ownerId),
 });
 
 export const materializeKnownIdentities = (input: {
@@ -181,29 +155,7 @@ export const materializeKnownIdentities = (input: {
 export const materializeSelfIdentity = (
 	selfIdentity: SelfIdentity,
 ): ResolvedSelfIdentity => {
-	const publicIdentity = (
-		selfIdentity as SelfIdentity & {
-			readonly displayName?: DisplayName;
-			readonly identityUpdatedAt?: IdentityUpdatedAt;
-			readonly ownerId?: OwnerId;
-			readonly publicIdentity?: KnownIdentity;
-			readonly publicKey?: PublicKey;
-		}
-	).publicIdentity ?? {
-		displayName: (
-			selfIdentity as SelfIdentity & { readonly displayName: DisplayName }
-		).displayName,
-		identityUpdatedAt: (
-			selfIdentity as SelfIdentity & {
-				readonly identityUpdatedAt: IdentityUpdatedAt;
-			}
-		).identityUpdatedAt,
-		ownerId: (selfIdentity as SelfIdentity & { readonly ownerId: OwnerId })
-			.ownerId,
-		publicKey: (
-			selfIdentity as SelfIdentity & { readonly publicKey: PublicKey }
-		).publicKey,
-	};
+	const publicIdentity = selfIdentity.publicIdentity;
 
 	return {
 		createdAt: selfIdentity.createdAt,
@@ -220,27 +172,4 @@ export const materializeSelfIdentity = (
 
 export const toPublicIdentityFromSelfIdentity = (
 	selfIdentity: SelfIdentity,
-): KnownIdentity =>
-	(
-		selfIdentity as SelfIdentity & {
-			readonly displayName?: DisplayName;
-			readonly identityUpdatedAt?: IdentityUpdatedAt;
-			readonly ownerId?: OwnerId;
-			readonly publicIdentity?: KnownIdentity;
-			readonly publicKey?: PublicKey;
-		}
-	).publicIdentity ?? {
-		displayName: (
-			selfIdentity as SelfIdentity & { readonly displayName: DisplayName }
-		).displayName,
-		identityUpdatedAt: (
-			selfIdentity as SelfIdentity & {
-				readonly identityUpdatedAt: IdentityUpdatedAt;
-			}
-		).identityUpdatedAt,
-		ownerId: (selfIdentity as SelfIdentity & { readonly ownerId: OwnerId })
-			.ownerId,
-		publicKey: (
-			selfIdentity as SelfIdentity & { readonly publicKey: PublicKey }
-		).publicKey,
-	};
+): KnownIdentity => selfIdentity.publicIdentity;

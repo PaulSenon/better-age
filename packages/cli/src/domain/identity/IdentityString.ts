@@ -17,18 +17,24 @@ export class IdentityStringDecodeError extends Schema.TaggedError<IdentityString
 	},
 ) {}
 
+export const CURRENT_IDENTITY_STRING_SCHEMA_VERSION = 1;
+
+const CURRENT_IDENTITY_STRING_SCHEMA_LITERAL = `v${CURRENT_IDENTITY_STRING_SCHEMA_VERSION}`;
+
 export const IdentityString = Schema.String.pipe(
-	Schema.pattern(/^better-age:\/\/identity\/v1\/[A-Za-z0-9_-]+$/),
+	Schema.pattern(
+		new RegExp(
+			`^better-age://identity/${CURRENT_IDENTITY_STRING_SCHEMA_LITERAL}/[A-Za-z0-9_-]+$`,
+		),
+	),
 	Schema.brand("@better-age/IdentityString"),
 );
 
 export type IdentityString = Schema.Schema.Type<typeof IdentityString>;
 
-export const CURRENT_IDENTITY_STRING_SCHEMA_VERSION = 1;
-
 export const IdentityStringPayload = Schema.Struct({
 	...PublicIdentity.fields,
-	version: Schema.Literal("v1"),
+	version: Schema.Literal(CURRENT_IDENTITY_STRING_SCHEMA_LITERAL),
 });
 
 export type IdentityStringPayload = Schema.Schema.Type<
@@ -39,7 +45,7 @@ export const toIdentityStringPayload = (
 	publicIdentity: PublicIdentityType,
 ): IdentityStringPayload => ({
 	...publicIdentity,
-	version: "v1",
+	version: CURRENT_IDENTITY_STRING_SCHEMA_LITERAL,
 });
 
 export const toPublicIdentityFromIdentityStringPayload = (
@@ -248,6 +254,12 @@ export const decodeIdentityString = (
 			return Either.left(
 				invalidIdentityStringPayload(
 					"CLI cannot migrate this identity string because a migration step is missing.",
+				),
+			);
+		case "invalid-step":
+			return Either.left(
+				invalidIdentityStringPayload(
+					"CLI cannot migrate this identity string because a migration step produced an invalid version.",
 				),
 			);
 	}

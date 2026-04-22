@@ -58,6 +58,17 @@ const normalizeOrFail = (
 					missingToVersion: result.missingToVersion,
 				}),
 			);
+		case "invalid-step":
+			return Effect.fail(
+				new HomeStatePreflightMissingPathError({
+					currentVersion: result.currentVersion,
+					homeVersion: result.artifactVersion,
+					message:
+						"CLI cannot migrate this managed home state because a migration step produced an invalid version.",
+					missingFromVersion: result.fromVersion,
+					missingToVersion: result.expectedToVersion,
+				}),
+			);
 	}
 };
 
