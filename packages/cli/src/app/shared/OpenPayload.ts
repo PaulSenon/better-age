@@ -249,6 +249,13 @@ export class OpenPayload extends Effect.Service<OpenPayload>()("OpenPayload", {
 				});
 			}
 
+			if (normalizedEnvelope._tag === "invalid-step") {
+				return yield* new OpenPayloadVersionError({
+					message:
+						"CLI cannot migrate this payload because a payload migration step produced an invalid version.",
+				});
+			}
+
 			const envelope = decodeCurrentPayloadEnvelope(
 				normalizedEnvelope.artifact,
 			);

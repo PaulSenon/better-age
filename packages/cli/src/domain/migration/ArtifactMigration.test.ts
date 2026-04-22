@@ -178,6 +178,53 @@ describe("ArtifactMigration", () => {
 		});
 	});
 
+	it("fails fast when an adjacent step does not advance to its declared target version", () => {
+		const definition: VersionedArtifactDefinition<FakeArtifact> = {
+			artifactId: "fake-artifact",
+			currentVersion: 3,
+			readVersion: (artifact) => artifact.schemaVersion,
+			steps: [
+				{
+					fromVersion: 1,
+					migrate: (artifact) => ({
+						...artifact,
+						history: [...(artifact.history ?? []), "1->2-buggy"],
+						schemaVersion: 1,
+					}),
+					toVersion: 2,
+				},
+				{
+					fromVersion: 2,
+					migrate: (artifact) => ({
+						...artifact,
+						history: [...(artifact.history ?? []), "2->3"],
+						schemaVersion: 3,
+					}),
+					toVersion: 3,
+				},
+			],
+		};
+
+		expect(
+			normalizeArtifactToCurrent({
+				artifact: {
+					history: [],
+					payload: "legacy",
+					schemaVersion: 1,
+				},
+				definition,
+			}),
+		).toEqual({
+			_tag: "invalid-step",
+			actualVersion: 1,
+			artifactId: "fake-artifact",
+			artifactVersion: 1,
+			currentVersion: 3,
+			expectedToVersion: 2,
+			fromVersion: 1,
+		});
+	});
+
 	it("fails as unsupported-newer when artifact version is ahead of runtime", () => {
 		const definition: VersionedArtifactDefinition<FakeArtifact> = {
 			artifactId: "fake-artifact",
@@ -285,7 +332,7 @@ describe("ArtifactMigration", () => {
 		});
 	});
 
-	it("distinguishes current, migrated, unsupported-newer, hard-broken, and missing-path branches", () => {
+	it("distinguishes current, migrated, unsupported-newer, hard-broken, missing-path, and invalid-step branches", () => {
 		const fullDefinition: VersionedArtifactDefinition<FakeArtifact> = {
 			artifactId: "fake-artifact",
 			currentVersion: 3,
@@ -322,6 +369,27 @@ describe("ArtifactMigration", () => {
 				},
 			],
 		};
+		const invalidStepDefinition: VersionedArtifactDefinition<FakeArtifact> = {
+			...fullDefinition,
+			steps: [
+				{
+					fromVersion: 1,
+					migrate: (artifact) => ({
+						...artifact,
+						schemaVersion: 1,
+					}),
+					toVersion: 2,
+				},
+				{
+					fromVersion: 2,
+					migrate: (artifact) => ({
+						...artifact,
+						schemaVersion: 3,
+					}),
+					toVersion: 3,
+				},
+			],
+		};
 
 		const outcomes = [
 			normalizeArtifactToCurrent({
@@ -345,6 +413,10 @@ describe("ArtifactMigration", () => {
 				artifact: { payload: "missing", schemaVersion: 2 },
 				definition: missingPathDefinition,
 			}),
+			normalizeArtifactToCurrent({
+				artifact: { payload: "invalid", schemaVersion: 1 },
+				definition: invalidStepDefinition,
+			}),
 		];
 
 		expect(outcomes.map((outcome) => outcome._tag)).toEqual([
@@ -353,6 +425,7 @@ describe("ArtifactMigration", () => {
 			"unsupported-newer",
 			"hard-broken",
 			"missing-path",
+			"invalid-step",
 		]);
 	});
 });
