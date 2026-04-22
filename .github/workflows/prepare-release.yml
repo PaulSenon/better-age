@@ -14,12 +14,20 @@ concurrency:
 jobs:
   prepare:
     runs-on: ubuntu-latest
+    environment: release-control
 
     steps:
       - name: Checkout repo
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
+
+      - name: Require main branch
+        run: |
+          if [ "${GITHUB_REF_NAME}" != "main" ]; then
+            echo "Prepare Release must run from main. Got ${GITHUB_REF_NAME}."
+            exit 1
+          fi
 
       - name: Setup Node
         uses: actions/setup-node@v4

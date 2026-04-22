@@ -121,6 +121,9 @@ Repo-owned release boundaries live in:
 - [.changeset/config.json](.changeset/config.json)
 - [tools/release/release-config.mjs](tools/release/release-config.mjs)
 
+Maintainer/operator runbook lives in:
+- [docs/release-operations.md](docs/release-operations.md)
+
 ## Architecture rules
 
 - keep v0 simple

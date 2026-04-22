@@ -74,6 +74,7 @@ Current release stance:
 - prerelease/test publishes use npm dist-tag `next`
 
 Contributor-facing release policy lives in [CONTRIBUTING.md](CONTRIBUTING.md).
+Maintainer/operator release runbook lives in [docs/release-operations.md](docs/release-operations.md).
 
 ## Repo map
 
