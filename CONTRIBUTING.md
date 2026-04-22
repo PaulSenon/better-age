@@ -87,6 +87,40 @@ pnpm -F @better-age/varlock check
 pnpm -F @better-age/varlock test
 ```
 
+## Release intent
+
+Release-worthy package PRs must add a changeset.
+
+Use:
+
+```sh
+pnpm changeset
+```
+
+Add a changeset when a PR changes released behavior for:
+- `@better-age/cli`
+- `@better-age/varlock`
+
+This includes:
+- CLI flags, commands, prompts, output, or compatibility
+- varlock plugin runtime behavior or integration contract
+- install/runtime requirements users must know about
+
+Do not add a changeset for:
+- docs-only changes
+- CI or repo-maintenance changes
+- internal refactors with no released behavior change
+- future private app/site work
+
+Current release model:
+- published packages share one version line
+- stable releases are prepared manually through a release PR
+- prerelease/test publishes use npm dist-tag `next`
+
+Repo-owned release boundaries live in:
+- [.changeset/config.json](.changeset/config.json)
+- [tools/release/release-config.mjs](tools/release/release-config.mjs)
+
 ## Architecture rules
 
 - keep v0 simple
