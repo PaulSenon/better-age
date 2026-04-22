@@ -31,16 +31,28 @@ jobs:
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v6
-        with:
-          cache: true
 
       - name: Setup Node
         uses: actions/setup-node@v6
         with:
           node-version: "24"
+          package-manager-cache: false
 
       - name: Enable Corepack
         run: corepack enable
+
+      - name: Configure pnpm store
+        run: |
+          pnpm config set store-dir ~/.pnpm-store
+          mkdir -p ~/.pnpm-store
+
+      - name: Restore pnpm store cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.pnpm-store
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
