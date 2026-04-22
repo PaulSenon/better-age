@@ -42,12 +42,13 @@ jobs:
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v6
+        with:
+          cache: true
 
       - name: Setup Node
         uses: actions/setup-node@v6
         with:
           node-version: "24"
-          cache: pnpm
           registry-url: https://registry.npmjs.org
 
       - name: Enable Corepack
@@ -60,7 +61,7 @@ jobs:
         run: pnpm release:build
 
       - name: Publish packages to npm
-        run: pnpm release:publish:stable
+        run: node tools/release/publish-packages.mjs --tag latest
 
       - name: Resolve release version
         id: release_version
@@ -109,12 +110,13 @@ jobs:
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v6
+        with:
+          cache: true
 
       - name: Setup Node
         uses: actions/setup-node@v6
         with:
           node-version: "24"
-          cache: pnpm
           registry-url: https://registry.npmjs.org
 
       - name: Enable Corepack
@@ -130,4 +132,4 @@ jobs:
         run: pnpm release:build
 
       - name: Publish packages to npm with next tag
-        run: pnpm release:publish:next
+        run: node tools/release/publish-packages.mjs --tag next
