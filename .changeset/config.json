@@ -1,0 +1,16 @@
+{
+	"$schema": "https://unpkg.com/@changesets/config@3.1.1/schema.json",
+	"changelog": [
+		"@changesets/changelog-github",
+		{
+			"repo": "PaulSenon/better-age"
+		}
+	],
+	"commit": false,
+	"fixed": [["@better-age/cli", "@better-age/varlock"]],
+	"linked": [],
+	"access": "public",
+	"baseBranch": "main",
+	"updateInternalDependencies": "patch",
+	"ignore": []
+}

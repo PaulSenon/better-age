@@ -60,6 +60,22 @@ Package-level usage, command docs, and integration details live in package READM
 - [packages/cli/README.md](packages/cli/README.md)
 - [packages/varlock/README.md](packages/varlock/README.md)
 
+## Release model
+
+Published packages:
+- `@better-age/cli`
+- `@better-age/varlock`
+
+Release-worthy package PRs use `pnpm changeset` to declare semver intent.
+
+Current release stance:
+- one shared version for published packages
+- stable releases flow through a manually prepared release PR
+- prerelease/test publishes use npm dist-tag `next`
+
+Contributor-facing release policy lives in [CONTRIBUTING.md](CONTRIBUTING.md).
+Maintainer/operator release runbook lives in [docs/release-operations.md](docs/release-operations.md).
+
 ## Repo map
 
 - product docs: [VISION.md](VISION.md), [UBIQUITOUS_LANGUAGE.md](UBIQUITOUS_LANGUAGE.md), [CONTRIBUTING.md](CONTRIBUTING.md)

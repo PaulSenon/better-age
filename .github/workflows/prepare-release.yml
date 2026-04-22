@@ -1,0 +1,57 @@
+name: Prepare Release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: prepare-release
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    environment: release-control
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Require main branch
+        run: |
+          if [ "${GITHUB_REF_NAME}" != "main" ]; then
+            echo "Prepare Release must run from main. Got ${GITHUB_REF_NAME}."
+            exit 1
+          fi
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: pnpm
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Create or update release PR
+        id: changesets
+        uses: changesets/action@v1
+        with:
+          version: pnpm changeset:version
+          title: chore(release): version packages
+          commit: chore(release): version packages
+          commitMode: github-api
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Release preparation summary
+        if: steps.changesets.outputs.hasChangesets == 'false'
+        run: echo "No pending changesets. Nothing to release."

@@ -2,8 +2,15 @@
 	"name": "@better-age/cli",
 	"version": "0.0.1",
 	"type": "module",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/PaulSenon/better-age.git"
+	},
 	"bin": {
 		"bage": "./dist/cli.cjs"
+	},
+	"publishConfig": {
+		"access": "public"
 	},
 	"files": [
 		"dist"

@@ -2,6 +2,13 @@
 	"name": "@better-age/varlock",
 	"version": "0.0.1",
 	"type": "module",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/PaulSenon/better-age.git"
+	},
+	"publishConfig": {
+		"access": "public"
+	},
 	"files": [
 		"dist"
 	],
