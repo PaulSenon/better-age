@@ -2,6 +2,10 @@
 	"name": "better-age",
 	"private": true,
 	"version": "0.0.1",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/PaulSenon/better-age.git"
+	},
 	"scripts": {
 		"build": "pnpm -r --if-present run build",
 		"clean": "pnpm -r --if-present run clean",
@@ -9,6 +13,9 @@
 		"changeset": "changeset",
 		"changeset:status": "changeset status --verbose",
 		"changeset:version": "changeset version",
+		"release:build": "node tools/release/run-published-package-script.mjs build",
+		"release:publish:stable": "node tools/release/publish-packages.mjs --tag latest",
+		"release:version:read": "node tools/release/read-release-version.mjs",
 		"lint": "biome check .",
 		"lint:fix": "biome check . --write",
 		"format": "biome format --write .",

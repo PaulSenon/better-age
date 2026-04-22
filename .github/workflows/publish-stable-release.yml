@@ -1,0 +1,71 @@
+name: Publish Stable Release
+
+on:
+  pull_request:
+    types:
+      - closed
+
+permissions:
+  contents: write
+  id-token: write
+
+concurrency:
+  group: publish-stable-release
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: |
+      github.event.pull_request.merged == true &&
+      github.event.pull_request.base.ref == 'main' &&
+      (
+        github.event.pull_request.head.ref == 'changeset-release/main' ||
+        github.event.pull_request.title == 'chore(release): version packages'
+      )
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout merged release commit
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.merge_commit_sha }}
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build publishable packages
+        run: pnpm release:build
+
+      - name: Publish packages to npm
+        run: pnpm release:publish:stable
+
+      - name: Resolve release version
+        id: release_version
+        run: node tools/release/read-release-version.mjs --github-output
+
+      - name: Create release tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "${{ steps.release_version.outputs.tag }}" "${{ github.event.pull_request.merge_commit_sha }}" -m "${{ steps.release_version.outputs.tag }}"
+          git push origin "${{ steps.release_version.outputs.tag }}"
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ steps.release_version.outputs.tag }}" \
+            --verify-tag \
+            --title "${{ steps.release_version.outputs.tag }}" \
+            --generate-notes
