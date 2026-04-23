@@ -598,3 +598,17 @@ Confirmed 2 more reusable shell flows should be first-class too:
 Persisted in `1-BOUNDARY_API_SPEC.ts` by extending `BetterAgeCliSharedFlows` with:
 - `runPassphrasePairConfirmationFlow`
 - `runEditorResolutionFlow`
+
+### User
+Accepted grouping shared flows, with one condition:
+- each kind must have a clear definition
+
+### Assistant
+Persisted grouped shared-flow taxonomy in `1-BOUNDARY_API_SPEC.ts`:
+- `BetterAgeCliResolverFlows`
+- `BetterAgeCliGateFlows`
+- `BetterAgeCliCompositeFlows`
+- `BetterAgeCliSessionFlows`
+- aggregate `BetterAgeCliSharedFlows`
+
+Each now has explicit semantic definition comments to prevent drift.

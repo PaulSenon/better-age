@@ -1003,27 +1003,17 @@ export interface BetterAgeCliCommands {
 }
 
 /**
- * CLI interaction owns:
- * - exact vs guided behavior
- * - passphrase retry policy
- * - when to call core queries before commands
- * - interactive session menu loops
+ * Resolver Flows
+ *
+ * Purpose:
+ * - turn incomplete or ambiguous shell input into one exact value
+ *
+ * Rules:
+ * - no domain mutation
+ * - may prompt, select, or locally retry entry
+ * - return either one resolved value, `back`, or `cancel`
  */
-export interface BetterAgeCliSharedFlows {
-	runFileGrantFlow(input: {
-		readonly initialPath?: PayloadPath;
-		readonly initialRecipientReference?: IdentityReferenceInput;
-	}): Promise<CliFlowOutcome>;
-
-	runFileRevokeFlow(input: {
-		readonly initialPath?: PayloadPath;
-		readonly initialRecipientOwnerId?: OwnerId;
-	}): Promise<CliFlowOutcome>;
-
-	runFileEditFlow(input: {
-		readonly initialPath?: PayloadPath;
-	}): Promise<CliFlowOutcome>;
-
+export interface BetterAgeCliResolverFlows {
 	runFilePayloadTargetResolutionFlow(input: {
 		readonly initialPath?: PayloadPath;
 	}): Promise<
@@ -1063,7 +1053,21 @@ export interface BetterAgeCliSharedFlows {
 		CliFlowOutcome
 		| { readonly kind: "resolved"; readonly editorCommand: string }
 	>;
+}
 
+/**
+ * Gate Flows
+ *
+ * Purpose:
+ * - stop before a command step and ask whether or how to proceed
+ *
+ * Rules:
+ * - no domain mutation by themselves
+ * - decide branching, not value resolution
+ * - return semantic branch outcomes such as `proceed`, `retry`,
+ *   `update-now`, `back`, or `cancel`
+ */
+export interface BetterAgeCliGateFlows {
 	runSetupGateFlow(): Promise<
 		CliFlowOutcome
 		| { readonly kind: "proceed" }
@@ -1077,9 +1081,57 @@ export interface BetterAgeCliSharedFlows {
 		CliFlowOutcome
 		| { readonly kind: "update-now" }
 	>;
+}
 
+/**
+ * Composite Flows
+ *
+ * Purpose:
+ * - orchestrate multiple resolver flows, gate flows, and core calls into one
+ *   command-shaped guided flow
+ *
+ * Rules:
+ * - command-scoped rather than generic primitives
+ * - may trigger domain mutation through core commands
+ * - return command-level flow outcomes
+ */
+export interface BetterAgeCliCompositeFlows {
+	runFileGrantFlow(input: {
+		readonly initialPath?: PayloadPath;
+		readonly initialRecipientReference?: IdentityReferenceInput;
+	}): Promise<CliFlowOutcome>;
+
+	runFileRevokeFlow(input: {
+		readonly initialPath?: PayloadPath;
+		readonly initialRecipientOwnerId?: OwnerId;
+	}): Promise<CliFlowOutcome>;
+
+	runFileEditFlow(input: {
+		readonly initialPath?: PayloadPath;
+	}): Promise<CliFlowOutcome>;
+}
+
+/**
+ * Session Flows
+ *
+ * Purpose:
+ * - host navigation across many commands and flows inside one persistent
+ *   interactive shell session
+ *
+ * Rules:
+ * - not one command-shaped flow
+ * - may route into composite flows and direct command handlers
+ * - own session-level back/cancel/menu semantics
+ */
+export interface BetterAgeCliSessionFlows {
 	runInteractiveSession(): Promise<CliFlowOutcome>;
 }
+
+export interface BetterAgeCliSharedFlows
+	extends BetterAgeCliResolverFlows,
+		BetterAgeCliGateFlows,
+		BetterAgeCliCompositeFlows,
+		BetterAgeCliSessionFlows {}
 
 export interface BetterAgeCliCommandAliases {
 	readonly root: {
