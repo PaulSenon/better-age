@@ -1,5 +1,19 @@
 # @better-age/varlock
 
+Install the plugin: `npm add @better-age/varlock`
+
+Add the following in your `.env.schema`
+
+```env
+# @plugin(@better-age/varlock)
+# @initBetterAge(path=.env.enc)
+# @setValuesBulk(betterAgeLoad(), format=env)
+```
+
+Then if you already had configured both varlock in your project, and better-age on you machine, it will just prompt for your passphrase when needing to access `.env.enc`
+
+## Contract
+
 Thin varlock adapter for `better-age`.
 
 Design constraints:
@@ -11,8 +25,6 @@ Design constraints:
 For product context:
 - [../../README.md](../../README.md)
 - [../../VISION.md](../../VISION.md)
-
-## Contract
 
 Plugin API:
 - `@initBetterAge(path=...)`
