@@ -9,13 +9,28 @@
 | **Fingerprint** | The stable identifier of one concrete public key. | Identity id, owner id, key id |
 | **Display Name** | A human-readable name chosen by the identity owner. | Alias, id, username |
 | **Handle** | The ergonomic reference formed as `<display-name>#<first-8-hex-of-owner-id-body>`. Example: `toto#069f7576`. | Alias, identity id, key id |
-| **Identity String** | The versioned shareable one-line export of an **Identity** used by `me` and `add-identity`. Any future plaintext URL path hints are cosmetic only; decoded payload is authoritative. | Shared ref, identity ref, pubkey string |
+| **Identity String** | The versioned shareable one-line export of an **Identity** used by **Identity Export** and **Identity Import**. Any future plaintext URL path hints are cosmetic only; decoded payload is authoritative. | Shared ref, identity ref, pubkey string |
 | **Identity Updated At** | The UTC timestamp for when an **Identity** snapshot became current. | Last seen at, exported at, rotated at |
 | **Passphrase** | The required secret that protects the local private key material and gates decrypt operations. | Password, unlock code |
 | **Known Identity** | A home-local address-book entry for an external **Identity**. | Contact, saved recipient, known host |
 | **Local Alias** | A home-local nickname pointing to one **Known Identity** (used to overlay identity `Display Name` in case of name colision, just for convenience). | Display name, handle, identity id |
 | **Key Mode** | The cryptographic key mode carried by local identity records. Current canonical value: `pq-hybrid`. | Crypto mode, algorithm preset |
 | **Forget Identity** | The local-only operation that removes one **Known Identity** from **Home State** without touching any **Payload**. | Revoke identity, delete recipient, unshare |
+
+## CLI command language
+
+| Term | Definition | Aliases to avoid |
+| --- | --- | --- |
+| **Root Payload Commands** | The short root-level CLI verbs for payload work: `create`, `edit`, `grant`, `revoke`, `inspect`, `view`, `load`, `update`. | File commands, payload namespace |
+| **Identity Command Group** | The grouped CLI surface rooted at `bage identity ...` for local identity and address-book operations. | User commands, local commands |
+| **Identity Setup** | The command `bage identity setup`, which creates the local self identity state. | Setup, init user |
+| **Identity Export** | The command `bage identity export`, which prints the current local **Identity String**. | Me, share identity |
+| **Identity List** | The command `bage identity list`, which inspects local self identity, known identities, and retired keys. | Identities, inspect home |
+| **Identity Import** | The command `bage identity import`, which saves an external **Identity String** as a **Known Identity**. | Add identity, import contact |
+| **Identity Forget** | The command `bage identity forget`, which performs **Forget Identity**. | Forget identity, remove contact |
+| **Identity Rotate** | The command `bage identity rotate`, which performs **Key Rotation** for the local self identity. | Rotate, rekey |
+| **Identity Passphrase** | The command `bage identity passphrase`, which changes the local self identity **Passphrase**. | Change passphrase, passphrase change |
+| **Interactive Command** | The root command `bage interactive`, which opens the **Interactive Session**. | Wizard command, menu command |
 
 ## Payload model
 
@@ -77,6 +92,7 @@
 - A **Known Identity** belongs to one local **Home State**.
 - A **Local Alias** points to exactly one **Known Identity**.
 - A **Forget Identity** removes one **Known Identity** from **Home State** only.
+- An **Identity Command Group** contains **Identity Setup**, **Identity Export**, **Identity List**, **Identity Import**, **Identity Forget**, **Identity Rotate**, and **Identity Passphrase**.
 - A **Passphrase** is required for local private-key protection.
 - A **Key Mode** belongs to one concrete local identity record.
 - A **Payload** has exactly one stable **Payload Id**.
@@ -87,6 +103,7 @@
 - A **View** opens one **Payload** in the **Secure Viewer** for human reading.
 - A **Load** reads exactly one **Payload** path per invocation.
 - An **Update** may rewrite a **Payload** without changing non-self access intent.
+- The **Root Payload Commands** are the canonical short CLI surface for payload work.
 - A **Self Recipient** may become stale after **Key Rotation**.
 - A **Key Rotation** keeps the same **Owner Id** but changes the current **Fingerprint**.
 - A **Retired Key** belongs to one local **Identity** history in **Home State**.
@@ -107,7 +124,7 @@
 
 ## Example dialogue
 
-> **Dev:** "When I paste someone's `me` output into `add-identity`, what am I storing?"
+> **Dev:** "When I paste someone's `identity export` output into `identity import`, what am I storing?"
 
 > **Domain expert:** "A **Known Identity** derived from an **Identity String**. The payload is untouched."
 
@@ -132,7 +149,7 @@
 - "share" was used to mean both **Grant** and file delivery. Recommendation: do not use "share" in the base model.
 - "alias" was used for both owner-provided **Display Name** and local-only **Local Alias**. Recommendation: keep them distinct.
 - "identity id" was used to mean both **Owner Id** and **Fingerprint**. Recommendation: use **Owner Id** for long-lived identity continuity and **Fingerprint** for the current key.
-- "identity ref", "shared string", and "`me` output" were used for the same concept. Recommendation: standardize on **Identity String**.
+- "identity ref", "shared string", and "`identity export` output" were used for the same concept. Recommendation: standardize on **Identity String**.
 - "recipient" and "identity" were sometimes used interchangeably. Recommendation: an **Identity** exists independently; a **Recipient** is an **Identity** granted in a specific **Payload**.
 - "repair", "migrate", and "refresh" overlapped around payload maintenance. Recommendation: standardize on **Update** for the explicit command and reserve migration/refresh for implementation details.
 - "read", "view", "decrypt", and "export" were drifting across human and machine plaintext behavior. Recommendation: standardize on **View** for human reading and **Load** for machine plaintext output.
@@ -141,4 +158,4 @@
 - "command" was ambiguous between a full shell command and a fixed binary name. Recommendation: standardize on **Launcher Prefix** for the user-provided shell string prefix that the plugin extends.
 - "mode" was used to mean both command completeness and terminal capability. Recommendation: use **Exact Invocation** / **Guided Invocation** for command shape, and **Interactive Terminal** / **Headless Terminal** for runtime capability.
 - "back", "cancel", and "quit" were drifting together. Recommendation: **Back Transition** is local navigation; **Cancel Outcome** stops the current command.
-- CLI flag `--alias` currently sets **Display Name** during `setup`. Recommendation: keep **Display Name** as canonical domain term and treat the flag name as legacy CLI wording.
+- CLI flag `--alias` currently sets **Display Name** during **Identity Setup**. Recommendation: keep **Display Name** as canonical domain term and treat the flag name as legacy CLI wording.
