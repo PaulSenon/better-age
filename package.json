@@ -11,6 +11,9 @@
 		"format": "biome format --write .",
 		"typecheck": "pnpm -r --if-present run typecheck",
 		"test": "pnpm -r --if-present run test",
+		"website:infra:deploy": "pnpm -F @infra/website run deploy",
+		"website:infra:dev": "pnpm -F @infra/website run dev",
+		"website:infra:destroy": "pnpm -F @infra/website run destroy",
 		"check": "pnpm -r --if-present run check && biome check .",
 		"check:ci": "pnpm run check"
 	},
