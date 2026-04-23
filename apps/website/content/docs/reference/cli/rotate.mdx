@@ -1,0 +1,31 @@
+---
+title: rotate
+description: Rotate the local identity key while keeping the same long-lived owner identity.
+---
+
+## Purpose
+
+`rotate` replaces the current key of the local identity.
+
+The long-lived identity continuity stays anchored by the same owner id.
+
+## Example
+
+```sh
+bage rotate
+```
+
+## Behavior
+
+- prompts for passphrase
+- creates a new active fingerprint
+- keeps the old key as a retired key for historical decryptability
+- reminds you to share the updated identity with `bage me`
+
+## Follow-up
+
+After rotation:
+
+1. run `bage me`
+2. share the updated identity string
+3. run `bage update <payload>` on older payloads when needed to refresh stale self-recipient state
