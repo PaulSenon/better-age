@@ -23,13 +23,15 @@
 | --- | --- | --- |
 | **Root Payload Commands** | The short root-level CLI verbs for payload work: `create`, `edit`, `grant`, `revoke`, `inspect`, `view`, `load`, `update`. | File commands, payload namespace |
 | **Identity Command Group** | The grouped CLI surface rooted at `bage identity ...` for local identity and address-book operations. | User commands, local commands |
-| **Identity Setup** | The command `bage identity setup`, which creates the local self identity state. | Setup, init user |
+| **Setup Command** | The root command `bage setup`, which creates the local self identity state. | Identity setup, init user |
 | **Identity Export** | The command `bage identity export`, which prints the current local **Identity String**. | Me, share identity |
 | **Identity List** | The command `bage identity list`, which inspects local self identity, known identities, and retired keys. | Identities, inspect home |
 | **Identity Import** | The command `bage identity import`, which saves an external **Identity String** as a **Known Identity**. | Add identity, import contact |
 | **Identity Forget** | The command `bage identity forget`, which performs **Forget Identity**. | Forget identity, remove contact |
 | **Identity Rotate** | The command `bage identity rotate`, which performs **Key Rotation** for the local self identity. | Rotate, rekey |
 | **Identity Passphrase** | The command `bage identity passphrase`, which changes the local self identity **Passphrase**. | Change passphrase, passphrase change |
+| **Interactive Alias** | The short alias `bage i` for the **Interactive Command**. | Shortcut mode, shell alias |
+| **Passphrase Aliases** | The short aliases `bage identity pw` and `bage identity pass` for **Identity Passphrase**. | Password cmd, passphrase shortcut |
 | **Interactive Command** | The root command `bage interactive`, which opens the **Interactive Session**. | Wizard command, menu command |
 
 ## Payload model
@@ -92,7 +94,8 @@
 - A **Known Identity** belongs to one local **Home State**.
 - A **Local Alias** points to exactly one **Known Identity**.
 - A **Forget Identity** removes one **Known Identity** from **Home State** only.
-- An **Identity Command Group** contains **Identity Setup**, **Identity Export**, **Identity List**, **Identity Import**, **Identity Forget**, **Identity Rotate**, and **Identity Passphrase**.
+- An **Identity Command Group** contains **Identity Export**, **Identity List**, **Identity Import**, **Identity Forget**, **Identity Rotate**, and **Identity Passphrase**.
+- The **Setup Command** is root-level even though it creates local identity state.
 - A **Passphrase** is required for local private-key protection.
 - A **Key Mode** belongs to one concrete local identity record.
 - A **Payload** has exactly one stable **Payload Id**.

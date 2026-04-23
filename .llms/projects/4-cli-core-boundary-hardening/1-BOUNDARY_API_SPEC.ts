@@ -101,12 +101,6 @@ export type EnvText = string;
 export type ProtocolVersion = string;
 export type IsoUtcTimestamp = string;
 
-export type InvocationKind =
-	| "exact"
-	| "guided"
-	| "interactive-session"
-	| "machine";
-
 export type TerminalCapability = "interactive-terminal" | "headless-terminal";
 
 export type RotationTtl = "1w" | "1m" | "3m" | "6m" | "9m" | "1y";
@@ -812,11 +806,8 @@ export interface CwdPayloadDiscoveryPort {
 	>;
 }
 
-export interface TerminalContextPort {
-	getInvocationContext(): {
-		readonly invocationKind: InvocationKind;
-		readonly terminalCapability: TerminalCapability;
-	};
+export interface TerminalCapabilityPort {
+	getTerminalCapability(): Promise<TerminalCapability>;
 }
 
 export interface PromptPort {
@@ -938,13 +929,78 @@ export interface CliPresenter {
 }
 
 // ===========================================================================
-// @better-age/cli :: interaction
+// @better-age/cli :: program + commands + shared flows
 // ===========================================================================
 
 export type CliFlowOutcome =
 	| { readonly kind: "done" }
 	| { readonly kind: "back" }
 	| { readonly kind: "cancel" };
+
+export type CliProgramExitCode = 0 | 1;
+
+export interface BetterAgeCliProgram {
+	runCli(argv: ReadonlyArray<string>): Promise<{
+		readonly exitCode: CliProgramExitCode;
+	}>;
+}
+
+export interface BetterAgeCliCommands {
+	runSetupCommand(): Promise<CliFlowOutcome>;
+
+	runFileCreateCommand(input: {
+		readonly initialPath?: PayloadPath;
+	}): Promise<CliFlowOutcome>;
+
+	runFileEditCommand(input: {
+		readonly initialPath?: PayloadPath;
+	}): Promise<CliFlowOutcome>;
+
+	runFileGrantCommand(input: {
+		readonly initialPath?: PayloadPath;
+		readonly initialRecipientReference?: IdentityReferenceInput;
+	}): Promise<CliFlowOutcome>;
+
+	runFileRevokeCommand(input: {
+		readonly initialPath?: PayloadPath;
+		readonly initialRecipientOwnerId?: OwnerId;
+	}): Promise<CliFlowOutcome>;
+
+	runFileInspectCommand(input: {
+		readonly initialPath?: PayloadPath;
+	}): Promise<CliFlowOutcome>;
+
+	runFileViewCommand(input: {
+		readonly initialPath?: PayloadPath;
+	}): Promise<CliFlowOutcome>;
+
+	runFileLoadCommand(input: {
+		readonly path: PayloadPath;
+		readonly protocolVersion?: ProtocolVersion;
+	}): Promise<CliFlowOutcome>;
+
+	runFileUpdateCommand(input: {
+		readonly initialPath?: PayloadPath;
+	}): Promise<CliFlowOutcome>;
+
+	runIdentityExportCommand(): Promise<CliFlowOutcome>;
+
+	runIdentityListCommand(): Promise<CliFlowOutcome>;
+
+	runIdentityImportCommand(input: {
+		readonly initialIdentityString?: IdentityString;
+	}): Promise<CliFlowOutcome>;
+
+	runIdentityForgetCommand(input: {
+		readonly initialIdentityReference?: IdentityReferenceInput;
+	}): Promise<CliFlowOutcome>;
+
+	runIdentityRotateCommand(): Promise<CliFlowOutcome>;
+
+	runIdentityPassphraseCommand(): Promise<CliFlowOutcome>;
+
+	runInteractiveCommand(): Promise<CliFlowOutcome>;
+}
 
 /**
  * CLI interaction owns:
@@ -953,23 +1009,178 @@ export type CliFlowOutcome =
  * - when to call core queries before commands
  * - interactive session menu loops
  */
-export interface BetterAgeCliInteraction {
-	runGrantFlow(input: {
+export interface BetterAgeCliSharedFlows {
+	runFileGrantFlow(input: {
 		readonly initialPath?: PayloadPath;
 		readonly initialRecipientReference?: IdentityReferenceInput;
 	}): Promise<CliFlowOutcome>;
 
-	runRevokeFlow(input: {
+	runFileRevokeFlow(input: {
 		readonly initialPath?: PayloadPath;
 		readonly initialRecipientOwnerId?: OwnerId;
 	}): Promise<CliFlowOutcome>;
 
-	runEditFlow(input: {
+	runFileEditFlow(input: {
 		readonly initialPath?: PayloadPath;
 	}): Promise<CliFlowOutcome>;
 
+	runFilePayloadTargetResolutionFlow(input: {
+		readonly initialPath?: PayloadPath;
+	}): Promise<
+		CliFlowOutcome | { readonly kind: "resolved"; readonly path: PayloadPath }
+	>;
+
+	runIdentityReferenceResolutionFlow(input: {
+		readonly initialReference?: IdentityReferenceInput;
+		readonly scope: "grant" | "revoke" | "forget";
+	}): Promise<
+		CliFlowOutcome
+		| { readonly kind: "resolved"; readonly reference: IdentityReferenceInput }
+	>;
+
+	runIdentityStringResolutionFlow(input: {
+		readonly initialIdentityString?: IdentityString;
+	}): Promise<
+		CliFlowOutcome
+		| { readonly kind: "resolved"; readonly identityString: IdentityString }
+	>;
+
+	runPassphraseRetryFlow(input: {
+		readonly scope: "inspect" | "view";
+	}): Promise<
+		CliFlowOutcome
+		| { readonly kind: "retry" }
+	>;
+
+	runPassphrasePairConfirmationFlow(input: {
+		readonly scope: "setup" | "identity-passphrase";
+	}): Promise<
+		CliFlowOutcome
+		| { readonly kind: "resolved"; readonly passphrase: Passphrase }
+	>;
+
+	runEditorResolutionFlow(): Promise<
+		CliFlowOutcome
+		| { readonly kind: "resolved"; readonly editorCommand: string }
+	>;
+
+	runSetupGateFlow(): Promise<
+		CliFlowOutcome
+		| { readonly kind: "proceed" }
+	>;
+
+	runFileUpdateGateFlow(input: {
+		readonly command: "edit" | "grant" | "revoke";
+		readonly path: PayloadPath;
+		readonly reasons: ReadonlyArray<PayloadUpdateReason>;
+	}): Promise<
+		CliFlowOutcome
+		| { readonly kind: "update-now" }
+	>;
+
 	runInteractiveSession(): Promise<CliFlowOutcome>;
 }
+
+export interface BetterAgeCliCommandAliases {
+	readonly root: {
+		readonly setup: readonly [];
+		readonly interactive: readonly ["i"];
+		readonly create: readonly [];
+		readonly edit: readonly [];
+		readonly grant: readonly [];
+		readonly revoke: readonly [];
+		readonly inspect: readonly [];
+		readonly view: readonly [];
+		readonly load: readonly [];
+		readonly update: readonly [];
+	};
+	readonly identity: {
+		readonly export: readonly [];
+		readonly list: readonly [];
+		readonly import: readonly [];
+		readonly forget: readonly [];
+		readonly rotate: readonly [];
+		readonly passphrase: readonly ["pw", "pass"];
+	};
+}
+
+export interface BetterAgeCliCommandToCoreMapping {
+	readonly root: {
+		readonly setup: "commands.createUserIdentity";
+		readonly interactive:
+			"commands+shared-flows over file and identity command surfaces";
+	};
+	readonly file: {
+		readonly create: "commands.createPayload";
+		readonly edit: "commands.editPayload";
+		readonly grant: "commands.grantPayloadRecipient";
+		readonly revoke: "commands.revokePayloadRecipient";
+		readonly inspect: "queries.inspectPayload";
+		readonly view: "queries.readPayload";
+		readonly load: "queries.readPayload";
+		readonly update: "commands.updatePayload";
+	};
+	readonly identity: {
+		readonly export: "queries.exportOwnIdentityString";
+		readonly list: "queries.getSelfIdentity+queries.listKnownIdentities+queries.listRetiredKeys";
+		readonly import: "commands.importIdentityString";
+		readonly forget: "commands.forgetKnownIdentity";
+		readonly rotate: "commands.rotateUserIdentity";
+		readonly passphrase: "commands.changePassphrase";
+	};
+	readonly interactive: {
+		readonly session:
+			"commands+shared-flows over file and identity command surfaces";
+	};
+}
+
+export const CLI_COMMAND_TO_CORE_MAPPING: BetterAgeCliCommandToCoreMapping = {
+	root: {
+		setup: "commands.createUserIdentity",
+		interactive: "commands+shared-flows over file and identity command surfaces",
+	},
+	file: {
+		create: "commands.createPayload",
+		edit: "commands.editPayload",
+		grant: "commands.grantPayloadRecipient",
+		revoke: "commands.revokePayloadRecipient",
+		inspect: "queries.inspectPayload",
+		view: "queries.readPayload",
+		load: "queries.readPayload",
+		update: "commands.updatePayload",
+	},
+	identity: {
+		export: "queries.exportOwnIdentityString",
+		list: "queries.getSelfIdentity+queries.listKnownIdentities+queries.listRetiredKeys",
+		import: "commands.importIdentityString",
+		forget: "commands.forgetKnownIdentity",
+		rotate: "commands.rotateUserIdentity",
+		passphrase: "commands.changePassphrase",
+	},
+};
+
+export const CLI_COMMAND_ALIASES: BetterAgeCliCommandAliases = {
+	root: {
+		setup: [],
+		interactive: ["i"],
+		create: [],
+		edit: [],
+		grant: [],
+		revoke: [],
+		inspect: [],
+		view: [],
+		load: [],
+		update: [],
+	},
+	identity: {
+		export: [],
+		list: [],
+		import: [],
+		forget: [],
+		rotate: [],
+		passphrase: ["pw", "pass"],
+	},
+};
 
 // ===========================================================================
 // @better-age/varlock :: plugin/runtime

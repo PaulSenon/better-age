@@ -547,3 +547,54 @@ Confirmed preference after review:
 ### Assistant
 Persisted this command language into `UBIQUITOUS_LANGUAGE.md` as canonical terminology.
 This is now the preferred CLI vocabulary for the boundary spec phase.
+
+### User
+Confirmed another naming/boundary preference:
+- internal code may use resource-prefixed command names even if user-facing CLI stays short
+- example accepted: `runFileCreateCommand`
+- asked to persist this and the command-to-core mapping in specs
+
+### Assistant
+Persisted in `1-BOUNDARY_API_SPEC.ts`:
+- internal CLI command interfaces now use resource prefixes:
+  - `runFile*Command`
+  - `runIdentity*Command`
+  - `runInteractiveCommand`
+- shared CLI flows now use resource-prefixed names where command-scoped
+- added explicit CLI-command-to-core mapping table
+- kept user-facing CLI vocabulary separate from internal interface naming
+
+### User
+Accepted lower reusable shell flows as first-class shared-flow interfaces.
+Also changed command language in one last pass:
+- `setup` should stay root-level, not under `identity`
+- wanted aliases persisted:
+  - `interactive` => `i`
+  - `identity passphrase` => `pw` and `pass`
+
+### Assistant
+Persisted in specs:
+- `UBIQUITOUS_LANGUAGE.md`
+  - root `setup`
+  - `interactive` alias `i`
+  - `identity passphrase` aliases `pw` / `pass`
+- `1-BOUNDARY_API_SPEC.ts`
+  - `runSetupCommand()` moved to root command surface
+  - added `CLI_COMMAND_ALIASES`
+  - expanded `BetterAgeCliSharedFlows` with lower reusable shell flows:
+    - file payload target resolution
+    - identity reference resolution
+    - identity string resolution
+    - passphrase retry
+    - setup gate
+    - file update gate
+
+### User
+Confirmed 2 more reusable shell flows should be first-class too:
+- passphrase pair confirmation
+- editor resolution
+
+### Assistant
+Persisted in `1-BOUNDARY_API_SPEC.ts` by extending `BetterAgeCliSharedFlows` with:
+- `runPassphrasePairConfirmationFlow`
+- `runEditorResolutionFlow`
