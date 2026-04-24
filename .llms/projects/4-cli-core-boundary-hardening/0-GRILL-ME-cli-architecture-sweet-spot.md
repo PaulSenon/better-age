@@ -612,3 +612,20 @@ Persisted grouped shared-flow taxonomy in `1-BOUNDARY_API_SPEC.ts`:
 - aggregate `BetterAgeCliSharedFlows`
 
 Each now has explicit semantic definition comments to prevent drift.
+
+### User
+Agreed that generic `{ kind: "done" | "back" | "cancel" }` was weird.
+Clarified the deeper concern:
+- `back` / `cancel` belong to CLI-only navigation and menu/router control
+- they are not core semantic results and should not be confused with them
+- wanted naming that makes this explicit and avoids future confusion
+
+### Assistant
+Locked CLI-only flow-control protocol naming:
+- introduced `CliFlow*` signal types in `1-BOUNDARY_API_SPEC.ts`
+- added explicit comment that they are shell-internal navigation/orchestration protocol values
+- not core results, not user-facing messages, not product outcomes
+- settled on:
+  - shared generic signals: `CliFlowBack`, `CliFlowCancel`
+  - specialized signals: `CliFlowResolved<T>`, `CliFlowProceed`, `CliFlowRetry`, `CliFlowUpdateNow`, `CliFlowCompleted`
+- replaced old generic `CliFlowOutcome` usage with these more explicit signal types

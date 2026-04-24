@@ -932,10 +932,35 @@ export interface CliPresenter {
 // @better-age/cli :: program + commands + shared flows
 // ===========================================================================
 
-export type CliFlowOutcome =
-	| { readonly kind: "done" }
-	| { readonly kind: "back" }
-	| { readonly kind: "cancel" };
+/**
+ * CLI Flow Signals
+ *
+ * These are shell-internal navigation and orchestration protocol values.
+ *
+ * They are:
+ * - not core `success | failure` results
+ * - not user-facing messages
+ * - not semantic product outcomes
+ *
+ * They exist only so CLI flows can coordinate local navigation, retries,
+ * branching, and step-to-step control without leaking shell concerns into core.
+ */
+export type CliFlowBack = { readonly kind: "back" };
+
+export type CliFlowCancel = { readonly kind: "cancel" };
+
+export type CliFlowResolved<T> = {
+	readonly kind: "resolved";
+	readonly value: T;
+};
+
+export type CliFlowProceed = { readonly kind: "proceed" };
+
+export type CliFlowRetry = { readonly kind: "retry" };
+
+export type CliFlowUpdateNow = { readonly kind: "update-now" };
+
+export type CliFlowCompleted = { readonly kind: "completed" };
 
 export type CliProgramExitCode = 0 | 1;
 
@@ -946,60 +971,60 @@ export interface BetterAgeCliProgram {
 }
 
 export interface BetterAgeCliCommands {
-	runSetupCommand(): Promise<CliFlowOutcome>;
+	runSetupCommand(): Promise<CliFlowCompleted | CliFlowCancel>;
 
 	runFileCreateCommand(input: {
 		readonly initialPath?: PayloadPath;
-	}): Promise<CliFlowOutcome>;
+	}): Promise<CliFlowCompleted | CliFlowCancel>;
 
 	runFileEditCommand(input: {
 		readonly initialPath?: PayloadPath;
-	}): Promise<CliFlowOutcome>;
+	}): Promise<CliFlowCompleted | CliFlowCancel>;
 
 	runFileGrantCommand(input: {
 		readonly initialPath?: PayloadPath;
 		readonly initialRecipientReference?: IdentityReferenceInput;
-	}): Promise<CliFlowOutcome>;
+	}): Promise<CliFlowCompleted | CliFlowCancel>;
 
 	runFileRevokeCommand(input: {
 		readonly initialPath?: PayloadPath;
 		readonly initialRecipientOwnerId?: OwnerId;
-	}): Promise<CliFlowOutcome>;
+	}): Promise<CliFlowCompleted | CliFlowCancel>;
 
 	runFileInspectCommand(input: {
 		readonly initialPath?: PayloadPath;
-	}): Promise<CliFlowOutcome>;
+	}): Promise<CliFlowCompleted | CliFlowCancel>;
 
 	runFileViewCommand(input: {
 		readonly initialPath?: PayloadPath;
-	}): Promise<CliFlowOutcome>;
+	}): Promise<CliFlowCompleted | CliFlowCancel>;
 
 	runFileLoadCommand(input: {
 		readonly path: PayloadPath;
 		readonly protocolVersion?: ProtocolVersion;
-	}): Promise<CliFlowOutcome>;
+	}): Promise<CliFlowCompleted | CliFlowCancel>;
 
 	runFileUpdateCommand(input: {
 		readonly initialPath?: PayloadPath;
-	}): Promise<CliFlowOutcome>;
+	}): Promise<CliFlowCompleted | CliFlowCancel>;
 
-	runIdentityExportCommand(): Promise<CliFlowOutcome>;
+	runIdentityExportCommand(): Promise<CliFlowCompleted | CliFlowCancel>;
 
-	runIdentityListCommand(): Promise<CliFlowOutcome>;
+	runIdentityListCommand(): Promise<CliFlowCompleted | CliFlowCancel>;
 
 	runIdentityImportCommand(input: {
 		readonly initialIdentityString?: IdentityString;
-	}): Promise<CliFlowOutcome>;
+	}): Promise<CliFlowCompleted | CliFlowCancel>;
 
 	runIdentityForgetCommand(input: {
 		readonly initialIdentityReference?: IdentityReferenceInput;
-	}): Promise<CliFlowOutcome>;
+	}): Promise<CliFlowCompleted | CliFlowCancel>;
 
-	runIdentityRotateCommand(): Promise<CliFlowOutcome>;
+	runIdentityRotateCommand(): Promise<CliFlowCompleted | CliFlowCancel>;
 
-	runIdentityPassphraseCommand(): Promise<CliFlowOutcome>;
+	runIdentityPassphraseCommand(): Promise<CliFlowCompleted | CliFlowCancel>;
 
-	runInteractiveCommand(): Promise<CliFlowOutcome>;
+	runInteractiveCommand(): Promise<CliFlowCompleted | CliFlowCancel>;
 }
 
 /**
@@ -1017,41 +1042,30 @@ export interface BetterAgeCliResolverFlows {
 	runFilePayloadTargetResolutionFlow(input: {
 		readonly initialPath?: PayloadPath;
 	}): Promise<
-		CliFlowOutcome | { readonly kind: "resolved"; readonly path: PayloadPath }
+		CliFlowResolved<PayloadPath> | CliFlowBack | CliFlowCancel
 	>;
 
 	runIdentityReferenceResolutionFlow(input: {
 		readonly initialReference?: IdentityReferenceInput;
 		readonly scope: "grant" | "revoke" | "forget";
 	}): Promise<
-		CliFlowOutcome
-		| { readonly kind: "resolved"; readonly reference: IdentityReferenceInput }
+		CliFlowResolved<IdentityReferenceInput> | CliFlowBack | CliFlowCancel
 	>;
 
 	runIdentityStringResolutionFlow(input: {
 		readonly initialIdentityString?: IdentityString;
 	}): Promise<
-		CliFlowOutcome
-		| { readonly kind: "resolved"; readonly identityString: IdentityString }
-	>;
-
-	runPassphraseRetryFlow(input: {
-		readonly scope: "inspect" | "view";
-	}): Promise<
-		CliFlowOutcome
-		| { readonly kind: "retry" }
+		CliFlowResolved<IdentityString> | CliFlowBack | CliFlowCancel
 	>;
 
 	runPassphrasePairConfirmationFlow(input: {
 		readonly scope: "setup" | "identity-passphrase";
 	}): Promise<
-		CliFlowOutcome
-		| { readonly kind: "resolved"; readonly passphrase: Passphrase }
+		CliFlowResolved<Passphrase> | CliFlowBack | CliFlowCancel
 	>;
 
 	runEditorResolutionFlow(): Promise<
-		CliFlowOutcome
-		| { readonly kind: "resolved"; readonly editorCommand: string }
+		CliFlowResolved<string> | CliFlowBack | CliFlowCancel
 	>;
 }
 
@@ -1068,9 +1082,14 @@ export interface BetterAgeCliResolverFlows {
  *   `update-now`, `back`, or `cancel`
  */
 export interface BetterAgeCliGateFlows {
+	runPassphraseRetryFlow(input: {
+		readonly scope: "inspect" | "view";
+	}): Promise<
+		CliFlowRetry | CliFlowBack | CliFlowCancel
+	>;
+
 	runSetupGateFlow(): Promise<
-		CliFlowOutcome
-		| { readonly kind: "proceed" }
+		CliFlowProceed | CliFlowBack | CliFlowCancel
 	>;
 
 	runFileUpdateGateFlow(input: {
@@ -1078,8 +1097,7 @@ export interface BetterAgeCliGateFlows {
 		readonly path: PayloadPath;
 		readonly reasons: ReadonlyArray<PayloadUpdateReason>;
 	}): Promise<
-		CliFlowOutcome
-		| { readonly kind: "update-now" }
+		CliFlowUpdateNow | CliFlowBack | CliFlowCancel
 	>;
 }
 
@@ -1099,16 +1117,16 @@ export interface BetterAgeCliCompositeFlows {
 	runFileGrantFlow(input: {
 		readonly initialPath?: PayloadPath;
 		readonly initialRecipientReference?: IdentityReferenceInput;
-	}): Promise<CliFlowOutcome>;
+	}): Promise<CliFlowCompleted | CliFlowCancel>;
 
 	runFileRevokeFlow(input: {
 		readonly initialPath?: PayloadPath;
 		readonly initialRecipientOwnerId?: OwnerId;
-	}): Promise<CliFlowOutcome>;
+	}): Promise<CliFlowCompleted | CliFlowCancel>;
 
 	runFileEditFlow(input: {
 		readonly initialPath?: PayloadPath;
-	}): Promise<CliFlowOutcome>;
+	}): Promise<CliFlowCompleted | CliFlowCancel>;
 }
 
 /**
@@ -1124,7 +1142,7 @@ export interface BetterAgeCliCompositeFlows {
  * - own session-level back/cancel/menu semantics
  */
 export interface BetterAgeCliSessionFlows {
-	runInteractiveSession(): Promise<CliFlowOutcome>;
+	runInteractiveSession(): Promise<CliFlowCompleted | CliFlowCancel>;
 }
 
 export interface BetterAgeCliSharedFlows
