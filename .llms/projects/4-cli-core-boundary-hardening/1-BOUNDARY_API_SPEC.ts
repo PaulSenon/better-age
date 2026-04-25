@@ -41,6 +41,10 @@
  * - editor/viewer UI
  * - ANSI rendering
  * - CLI command parsing
+ *
+ * Naming:
+ * - core names should describe semantic/internal operations
+ * - example: `decryptPayload`
  */
 
 /**
@@ -54,7 +58,7 @@
  * - presentation
  *   human message ids, formatting, styling
  * - ports
- *   prompt / editor / secure-viewer / cwd-discovery / terminal capability
+ *   prompt / editor / secure-viewer / cwd-discovery / terminal mode
  * - infra/*
  *   node TTY, prompt, editor, secure viewer, style renderer
  *
@@ -62,8 +66,12 @@
  * - missing-arg resolution
  * - passphrase prompt timing and retry policy
  * - back / cancel / session loops
- * - choosing between readPayload -> view vs readPayload -> load
+ * - choosing how to project decrypted payload data into view / inspect / load
  * - human stderr/stdout rendering
+ *
+ * Naming:
+ * - CLI names should describe outside/user intent and command-local flows
+ * - example: `runOpenPayloadContextFlow`
  */
 
 /**
@@ -76,11 +84,13 @@
  * Varlock owns:
  * - plugin init/runtime contract
  * - process spawning of `bage load`
+ * - preserving inherited stdin/stderr for CLI prompts and human messages
  *
  * Varlock does not own:
  * - domain logic
  * - payload crypto
  * - artifact migration policy
+ * - passphrase collection
  */
 
 // ===========================================================================
@@ -96,12 +106,397 @@ export type DisplayName = string;
 export type Handle = string;
 export type LocalAlias = string;
 export type KeyFingerprint = string;
+export type EncryptedPrivateKeyRef = string;
 export type Passphrase = string;
 export type EnvText = string;
 export type ProtocolVersion = string;
 export type IsoUtcTimestamp = string;
 
-export type TerminalCapability = "interactive-terminal" | "headless-terminal";
+export type CliInvocationMode = "exact" | "guided";
+
+export type CliTerminalMode = "interactive" | "headless";
+
+export interface CliExecutionContext {
+	readonly invocationMode: CliInvocationMode;
+	readonly terminalMode: CliTerminalMode;
+}
+
+export interface CliCommandRunContext {
+	readonly execution: CliExecutionContext;
+}
+
+/**
+ * Invocation exactness is about mandatory non-secret operands only.
+ *
+ * Examples:
+ * - `bage grant <payload-path> <identity-ref>` is exact.
+ * - `bage grant <payload-path>` is guided because `identity-ref` is missing.
+ * - `bage grant` is guided because both mandatory operands are missing.
+ *
+ * Passphrase acquisition is not an operand-completeness signal.
+ */
+export type CliMandatoryOperandCompleteness = "complete" | "incomplete";
+
+export type CliOperandClass = "promptable" | "protocol" | "secret";
+
+export interface CliCommandContract {
+	readonly command: BetterAgeTargetCliCommand;
+	readonly promptableOperands: ReadonlyArray<string>;
+	readonly protocolOperands: ReadonlyArray<string>;
+	readonly secretPrompts: ReadonlyArray<string>;
+	readonly stdoutContract:
+		| "none"
+		| "human-output"
+		| "identity-string-only"
+		| "raw-envText-only";
+	readonly headlessBehavior:
+		| "allowed"
+		| "fail-missing-operand"
+		| "fail-passphrase-unavailable"
+		| "fail-interactive-unavailable";
+}
+
+export type CliCredentialAcquisition =
+	| "prompt-if-interactive"
+	| "fail-if-headless"
+	| "not-required";
+
+export interface CliPassphraseRetryPolicy {
+	readonly maxAttempts: 3;
+	readonly retryUi: "inline-prompt-loop";
+	readonly exhaustedBehavior: "fail-with-passphrase-error";
+}
+
+export interface GuidedPayloadPathRecoveryPolicy {
+	readonly appliesTo: "guided-payload-path-resolution";
+	readonly readFailureBehavior: "return-to-path-picker";
+	readonly preserveSuggestions: true;
+	readonly allowCustomPathRetry: true;
+	readonly exactInvocationBehavior: "exit-failure";
+}
+
+export type GrantRecipientPickerEntry =
+	| {
+			readonly kind: "self";
+			readonly identity: PublicIdentitySnapshot;
+			readonly localAlias: LocalAlias | null;
+			readonly selectable: false;
+			readonly marker: "you";
+	  }
+	| {
+			readonly kind: "already-granted";
+			readonly identity: PublicIdentitySnapshot;
+			readonly localAlias: LocalAlias | null;
+			readonly selectable: false;
+			readonly marker: "granted";
+	  }
+	| {
+			readonly kind: "grantable-known-identity";
+			readonly identity: PublicIdentitySnapshot;
+			readonly ownerId: OwnerId;
+			readonly localAlias: LocalAlias | null;
+			readonly selectable: true;
+			readonly value: PublicIdentitySnapshot;
+	  }
+	| {
+			readonly kind: "custom-identity-string";
+			readonly selectable: true;
+			readonly value: "parse-custom-identity-string";
+	  };
+
+export interface GrantRecipientPickerPolicy {
+	readonly source: "self+known-identities+payload-recipients";
+	readonly mergeKey: "ownerId";
+	readonly localAliasBehavior: "render-overlay-only";
+	readonly alreadyGrantedBehavior: "visible-disabled";
+	readonly selfBehavior: "visible-disabled";
+	readonly customIdentityStringBehavior: "selectable";
+}
+
+export interface PayloadRecipientDiscoveryPolicy {
+	readonly knownIdentityBehavior: "silently-update-when-payload-snapshot-newer";
+	readonly unknownIdentityBehavior: "transient-only-do-not-auto-import";
+	readonly aliasPromptBehavior: "not-in-payload-command-flow";
+	readonly futureImportFlowRequired: true;
+}
+
+export interface GrantRecipientIdempotencePolicy {
+	readonly alreadyGrantedSameOrOlderBehavior: "success-unchanged";
+	readonly newerSnapshotBehavior: "replace-recipient-snapshot-and-success-updated";
+	readonly missingRecipientBehavior: "add-recipient-and-success-added";
+}
+
+export interface GrantSelfPolicy {
+	readonly exactBehavior: "fail-CANNOT_GRANT_SELF";
+	readonly guidedBehavior: "visible-disabled-you-marker";
+}
+
+export type RevokeRecipientPickerEntry =
+	| {
+			readonly kind: "self-recipient";
+			readonly ownerId: OwnerId;
+			readonly identity: PublicIdentitySnapshot;
+			readonly localAlias: LocalAlias | null;
+			readonly selectable: false;
+			readonly marker: "you";
+	  }
+	| {
+			readonly kind: "revokable-recipient";
+			readonly ownerId: OwnerId;
+			readonly identity: PublicIdentitySnapshot;
+			readonly localAlias: LocalAlias | null;
+			readonly selectable: true;
+	  };
+
+export interface RevokeRecipientPickerPolicy {
+	readonly source: "payload-recipients-only";
+	readonly localAliasBehavior: "render-overlay-only";
+	readonly selfBehavior: "visible-disabled";
+}
+
+export interface RevokeRecipientPolicy {
+	readonly selfBehavior: "fail-CANNOT_REVOKE_SELF";
+	readonly notGrantedBehavior: "success-unchanged";
+	readonly grantedBehavior: "remove-recipient-and-success-removed";
+}
+
+export interface UpdatePayloadPolicy {
+	readonly allowedReasons: ReadonlyArray<PayloadUpdateReason>;
+	readonly noReasonsBehavior: "success-unchanged";
+	readonly reasonsBehavior: "rewrite-current-schema-and-self-recipient";
+	readonly broaderRepairBehavior: "out-of-scope";
+	readonly futurePrePersistVerifyRequired: true;
+}
+
+export interface OutdatedPayloadWriteGatePolicy {
+	readonly appliesTo: readonly ["edit", "grant", "revoke"];
+	readonly exactInteractiveBehavior: "fail-with-run-update-remediation";
+	readonly guidedInteractiveBehavior: "gate-update-now-back-cancel";
+	readonly headlessBehavior: "fail-fast-with-run-update-remediation";
+	readonly updateNowBehavior: "run-update-and-resume-original-command";
+}
+
+export interface EditPayloadFlowPolicy {
+	readonly editorCancelBehavior: "cancel-command";
+	readonly identicalTextBehavior: "success-unchanged";
+	readonly invalidEnvBehavior: "show-error-and-reopen-editor-with-edited-text";
+	readonly validChangedTextBehavior: "rewrite-payload-and-success-edited";
+}
+
+export interface PayloadReadOutputPolicy {
+	readonly viewBehavior: "secure-viewer-no-stdout-plaintext";
+	readonly inspectBehavior: "metadata-env-key-names-recipients-no-values";
+	readonly loadBehavior: "raw-envText-stdout-warnings-stderr";
+	readonly readableOutdatedBehavior: "success-with-in-memory-migration-and-update-warning";
+	readonly readPersistenceBehavior: "never-persist";
+}
+
+export interface CoreMutationStatelessnessPolicy {
+	readonly openedPayloadUsage: "cli-ux-convenience-only";
+	readonly mutationInputShape: "path-passphrase-and-command-specific-input";
+	readonly openedPayloadAsMutationInput: "forbidden";
+	readonly mutationBehavior: "reopen-and-revalidate";
+	readonly doubleDecryptTradeoff: "accepted-for-simplicity-and-safety";
+}
+
+export interface IdentityImportFlowPolicy {
+	readonly aliasPromptBehavior: "prompt-optional-alias-when-interactive";
+	readonly aliasFlagBehavior: "optional-hard-fail-invalid-or-duplicate";
+	readonly emptyAliasOnNewIdentityBehavior: "no-alias";
+	readonly emptyAliasOnExistingIdentityBehavior: "keep-existing-alias";
+	readonly invalidAliasPromptBehavior: "show-error-and-retry";
+	readonly duplicateAliasPromptBehavior: "show-error-and-retry";
+	readonly selfBehavior: "fail-CANNOT_IMPORT_SELF";
+	readonly unknownBehavior: "add-known-identity";
+	readonly knownNewerBehavior: "update-known-identity";
+	readonly knownSameOrOlderBehavior: "success-unchanged-or-alias-updated";
+	readonly payloadMutationBehavior: "never";
+}
+
+export interface IdentityForgetFlowPolicy {
+	readonly exactNotFoundBehavior: "fail-IDENTITY_REFERENCE_NOT_FOUND";
+	readonly guidedPickerSource: "known-identities-only";
+	readonly payloadMutationBehavior: "never";
+	readonly aliasBehavior: "remove-local-alias-with-known-identity";
+}
+
+export interface IdentityListOutputPolicy {
+	readonly sections: readonly ["self", "known-identities", "retired-keys"];
+	readonly coreQueryComposition: "getSelfIdentity+listKnownIdentities+listRetiredKeys";
+	readonly aggregateQueryBehavior: "optional-convenience-over-primitives";
+	readonly privateKeyMaterialBehavior: "never-render";
+	readonly passphraseBehavior: "not-required";
+	readonly payloadAccessBehavior: "never";
+	readonly headlessBehavior: "allowed";
+	readonly missingSetupBehavior: "fail-HOME_STATE_NOT_FOUND-with-setup-remediation";
+}
+
+export interface IdentityExportOutputPolicy {
+	readonly stdoutBehavior: "identity-string-only-unstyled";
+	readonly stderrBehavior: "warnings-notices-only";
+	readonly headlessBehavior: "allowed";
+	readonly passphraseBehavior: "not-required";
+	readonly missingSetupBehavior: "fail-HOME_STATE_NOT_FOUND-with-setup-remediation";
+	readonly exportedIdentity: "current-public-identity-only";
+	readonly retiredKeysBehavior: "never-export";
+}
+
+export interface IdentityRotateFlowPolicy {
+	readonly ownerIdBehavior: "preserve";
+	readonly oldKeyBehavior: "move-to-retired-keys";
+	readonly selfPublicIdentityBehavior: "replace-current-key-snapshot";
+	readonly payloadMutationBehavior: "never";
+	readonly passphraseBehavior: "required-with-standard-retry";
+	readonly headlessBehavior: "fail-passphrase-unavailable";
+	readonly remediationBehavior: "tell-user-to-run-update-for-stale-self-recipient-payloads";
+}
+
+export interface IdentityPassphraseFlowPolicy {
+	readonly credentialCheck: "decrypt-current-private-key";
+	readonly currentPassphraseRetry: "standard-3-attempt-inline-retry";
+	readonly newPassphraseConfirmationBehavior: "retry-pair-on-mismatch";
+	readonly reencryptScope: "current-and-retired-private-keys";
+	readonly persistedResult: "all-local-private-key-material-uses-new-passphrase";
+	readonly headlessBehavior: "fail-passphrase-unavailable";
+}
+
+export interface SetupFlowPolicy {
+	readonly displayNameInput: "name-option-or-guided-prompt";
+	readonly positionalDisplayNameBehavior: "not-supported";
+	readonly exactRequirement: "require-name-option";
+	readonly headlessRequirement: "require-name-option-then-fail-passphrase-unavailable";
+	readonly alreadyConfiguredBehavior: "fail-SETUP_ALREADY_CONFIGURED";
+	readonly passphraseConfirmationBehavior: "retry-pair-on-mismatch";
+	readonly persistedResult: "create-self-identity-and-encrypted-current-private-key";
+}
+
+export type PayloadContentCommand =
+	| "inspect"
+	| "view"
+	| "edit"
+	| "grant"
+	| "revoke"
+	| "update"
+	| "load";
+
+export type PayloadCreationCommand = "create";
+
+export type PayloadCommandOpenPolicy =
+	| {
+			readonly command: PayloadContentCommand;
+			readonly existingPayloadRead: "open-and-decrypt-early";
+			readonly credentialAcquisition: "prompt-if-interactive" | "fail-if-headless";
+	  }
+	| {
+			readonly command: PayloadCreationCommand;
+			readonly existingPayloadRead: "never";
+			readonly credentialAcquisition: "prompt-if-interactive" | "fail-if-headless";
+	  };
+
+export type LoadExecutionRequirement = {
+	readonly outputContract: "machine-stdout";
+	readonly credentialRequirement: "interactive-passphrase-required";
+	readonly headlessBehavior: "fail-fast-with-passphrase-unavailable";
+};
+
+export interface CliMandatoryOperandTable {
+	readonly setup: readonly ["--name for exact/headless"];
+	readonly create: readonly ["path"];
+	readonly edit: readonly ["path"];
+	readonly grant: readonly ["path", "identity-ref"];
+	readonly inspect: readonly ["path"];
+	readonly load: readonly ["path", "--protocol-version"];
+	readonly revoke: readonly ["path", "identity-ref"];
+	readonly update: readonly ["path"];
+	readonly view: readonly ["path"];
+	readonly identityExport: readonly [];
+	readonly identityImport: readonly ["identity-string"];
+	readonly identityForget: readonly ["identity-ref"];
+	readonly identityList: readonly [];
+	readonly identityPassphrase: readonly [];
+	readonly identityRotate: readonly [];
+	readonly interactive: readonly [];
+}
+
+export interface HeadlessCredentialPolicy {
+	readonly credentialRequiredCommands: readonly [
+		"setup",
+		"create",
+		"edit",
+		"grant",
+		"inspect",
+		"load",
+		"revoke",
+		"update",
+		"view",
+		"identity passphrase",
+		"identity rotate",
+	];
+	readonly allowedHeadlessCommands: readonly [
+		"identity export",
+		"identity import",
+		"identity forget",
+		"identity list",
+	];
+	readonly validationOrder: "missing-operands-before-passphrase-unavailable";
+	readonly noPromptBehavior: true;
+	readonly noDecryptBehavior: true;
+	readonly noMutationBehavior: true;
+}
+
+export interface InteractiveSessionPolicy {
+	readonly aliases: readonly ["i"];
+	readonly headlessBehavior: "fail-INTERACTIVE_UNAVAILABLE";
+	readonly ownership: "cli-only";
+	readonly routing: "same-command-flows-as-direct-commands";
+	readonly backBehavior: "previous-menu";
+	readonly cancelBehavior: "exit-session";
+}
+
+/**
+ * CLI execution policy is exactly two-axis.
+ *
+ * Do not add core concerns here.
+ * This policy controls shell behavior only: prompts, chooser flows, fail-fast
+ * behavior, and back/cancel availability.
+ */
+export type CliExecutionPolicy =
+	| {
+			readonly invocationMode: "exact";
+			readonly terminalMode: "interactive";
+			readonly missingOperandBehavior: "not-applicable";
+			readonly chooserBehavior: "forbidden-for-explicit-operands";
+			readonly passphrasePromptBehavior: "allowed";
+			readonly credentialAcquisition: "prompt-if-interactive";
+			readonly backCancelBehavior: "local-only-where-flow-has-parent";
+	  }
+	| {
+			readonly invocationMode: "exact";
+			readonly terminalMode: "headless";
+			readonly missingOperandBehavior: "not-applicable";
+			readonly chooserBehavior: "forbidden";
+			readonly passphrasePromptBehavior: "forbidden";
+			readonly credentialAcquisition: "fail-if-headless";
+			readonly backCancelBehavior: "unavailable";
+	  }
+	| {
+			readonly invocationMode: "guided";
+			readonly terminalMode: "interactive";
+			readonly missingOperandBehavior: "resolve-through-cli-flow";
+			readonly chooserBehavior: "allowed";
+			readonly passphrasePromptBehavior: "allowed";
+			readonly credentialAcquisition: "prompt-if-interactive";
+			readonly backCancelBehavior: "available";
+	  }
+	| {
+			readonly invocationMode: "guided";
+			readonly terminalMode: "headless";
+			readonly missingOperandBehavior: "fail-fast";
+			readonly chooserBehavior: "forbidden";
+			readonly passphrasePromptBehavior: "forbidden";
+			readonly credentialAcquisition: "fail-if-headless";
+			readonly backCancelBehavior: "unavailable";
+	  };
 
 export type RotationTtl = "1w" | "1m" | "3m" | "6m" | "9m" | "1y";
 
@@ -170,23 +565,117 @@ export interface PayloadRecipientSummary {
 	readonly isStaleSelf: boolean;
 }
 
-export interface PayloadReadModel {
-	readonly path: PayloadPath;
-	readonly payloadId: PayloadId;
-	readonly envText: EnvText;
-	readonly compatibility: PayloadCompatibilityState;
-}
-
-export interface PayloadInspection {
+export interface DecryptedPayload {
 	readonly path: PayloadPath;
 	readonly payloadId: PayloadId;
 	readonly createdAt: IsoUtcTimestamp;
 	readonly lastRewrittenAt: IsoUtcTimestamp;
 	readonly schemaVersion: number;
 	readonly compatibility: PayloadCompatibilityState;
-	readonly envKeyNames: ReadonlyArray<string>;
+	readonly envText: EnvText;
+	readonly envKeys: ReadonlyArray<string>;
 	readonly recipients: ReadonlyArray<PayloadRecipientSummary>;
 }
+
+// ===========================================================================
+// Persistence document shapes
+// ===========================================================================
+
+export type BetterAgeArtifactKind =
+	| "better-age/home-state"
+	| "better-age/private-key"
+	| "better-age/payload"
+	| "better-age/public-identity";
+
+export type ArtifactVersion = 1;
+
+export interface HomeStateDocumentV1 {
+	readonly kind: "better-age/home-state";
+	readonly version: 1;
+	readonly ownerId: OwnerId;
+	readonly displayName: DisplayName;
+	readonly identityUpdatedAt: IsoUtcTimestamp;
+	readonly currentKey: {
+		readonly publicKey: string;
+		readonly fingerprint: KeyFingerprint;
+		readonly encryptedPrivateKeyRef: EncryptedPrivateKeyRef;
+		readonly createdAt: IsoUtcTimestamp;
+	};
+	readonly retiredKeys: ReadonlyArray<{
+		readonly publicKey: string;
+		readonly fingerprint: KeyFingerprint;
+		readonly encryptedPrivateKeyRef: EncryptedPrivateKeyRef;
+		readonly createdAt: IsoUtcTimestamp;
+		readonly retiredAt: IsoUtcTimestamp;
+	}>;
+	readonly knownIdentities: ReadonlyArray<{
+		readonly ownerId: OwnerId;
+		readonly publicKey: string;
+		readonly displayName: DisplayName;
+		readonly identityUpdatedAt: IsoUtcTimestamp;
+		readonly localAlias: LocalAlias | null;
+	}>;
+	readonly preferences: {
+		readonly rotationTtl: RotationTtl;
+	};
+}
+
+export type HomeStateDocument = HomeStateDocumentV1;
+
+export interface PrivateKeyPlaintextV1 {
+	readonly kind: "better-age/private-key";
+	readonly version: 1;
+	readonly ownerId: OwnerId;
+	readonly publicKey: string;
+	readonly privateKey: string;
+	readonly fingerprint: KeyFingerprint;
+	readonly createdAt: IsoUtcTimestamp;
+}
+
+export type PrivateKeyPlaintext = PrivateKeyPlaintextV1;
+
+export interface PayloadPlaintextV1 {
+	readonly kind: "better-age/payload";
+	readonly version: 1;
+	readonly payloadId: PayloadId;
+	readonly createdAt: IsoUtcTimestamp;
+	readonly lastRewrittenAt: IsoUtcTimestamp;
+	readonly envText: EnvText;
+	readonly recipients: ReadonlyArray<PublicIdentitySnapshot>;
+}
+
+export type PayloadPlaintext = PayloadPlaintextV1;
+
+export interface PayloadDocumentV1 {
+	readonly kind: "better-age/payload";
+	readonly version: 1;
+	readonly encryptedPayload: string;
+}
+
+export type PayloadDocument = PayloadDocumentV1;
+
+export interface PublicIdentityStringV1 {
+	readonly kind: "better-age/public-identity";
+	readonly version: 1;
+	readonly ownerId: OwnerId;
+	readonly displayName: DisplayName;
+	readonly publicKey: string;
+	readonly identityUpdatedAt: IsoUtcTimestamp;
+}
+
+export type PublicIdentityDocument = PublicIdentityStringV1;
+
+export type MigrationResult<TCurrent> =
+	| {
+			readonly kind: "already-current";
+			readonly document: TCurrent;
+	  }
+	| {
+			readonly kind: "migrated";
+			readonly document: TCurrent;
+			readonly fromVersion: number;
+			readonly toVersion: number;
+	  };
 
 // ===========================================================================
 // Core result / error / notice model
@@ -268,10 +757,31 @@ export type CoreMethodResult<
 // Shared error detail shapes
 // ===========================================================================
 
-export interface AmbiguousKnownIdentityDetails {
+export type IdentityReferenceResolutionScope =
+	| "known-identities"
+	| "payload-recipients"
+	| "known-and-payload-recipients";
+
+export interface AmbiguousIdentityReferenceDetails {
 	readonly reference: IdentityReferenceInput;
-	readonly candidates: ReadonlyArray<KnownIdentitySummary>;
+	readonly scope: IdentityReferenceResolutionScope;
+	readonly candidates: ReadonlyArray<IdentityReferenceCandidate>;
 }
+
+export interface IdentityReferenceNotFoundDetails {
+	readonly reference: IdentityReferenceInput;
+	readonly scope: IdentityReferenceResolutionScope;
+}
+
+export type IdentityReferenceCandidate =
+	| {
+			readonly kind: "known-identity";
+			readonly identity: KnownIdentitySummary;
+	  }
+	| {
+			readonly kind: "payload-recipient";
+			readonly recipient: PayloadRecipientSummary;
+	  };
 
 export interface KnownIdentityConflictDetails {
 	readonly ownerId: OwnerId;
@@ -292,8 +802,15 @@ export interface VersionCompatibilityDetails {
 // ===========================================================================
 
 export type HomeReadErrorCode =
+	| "HOME_STATE_NOT_FOUND"
 	| "HOME_STATE_READ_FAILED"
-	| "HOME_STATE_INVALID";
+	| "HOME_STATE_INVALID"
+	| HomeCompatibilityErrorCode;
+
+export type HomeSetupProbeErrorCode = Exclude<
+	HomeReadErrorCode,
+	"HOME_STATE_NOT_FOUND"
+>;
 
 export type HomeWriteErrorCode = "HOME_STATE_WRITE_FAILED";
 
@@ -308,6 +825,19 @@ export type PayloadRepositoryErrorCode =
 	| "PAYLOAD_WRITE_FAILED"
 	| "PAYLOAD_ALREADY_EXISTS";
 
+export type PayloadReadRepositoryErrorCode =
+	| "PAYLOAD_NOT_FOUND"
+	| "PAYLOAD_READ_FAILED";
+
+export type PayloadCreateRepositoryErrorCode =
+	| "PAYLOAD_ALREADY_EXISTS"
+	| "PAYLOAD_WRITE_FAILED";
+
+export type PayloadMutationRepositoryErrorCode =
+	| "PAYLOAD_NOT_FOUND"
+	| "PAYLOAD_READ_FAILED"
+	| "PAYLOAD_WRITE_FAILED";
+
 export type PayloadContentErrorCode =
 	| "PAYLOAD_INVALID"
 	| "PAYLOAD_ENV_INVALID";
@@ -319,14 +849,15 @@ export type PayloadCompatibilityErrorCode =
 
 export type PayloadSecretErrorCode =
 	| "PASSPHRASE_INCORRECT"
+	| "PRIVATE_KEY_DECRYPT_FAILED"
 	| "PAYLOAD_ACCESS_DENIED"
 	| "PAYLOAD_DECRYPT_FAILED";
 
 export type IdentityParseErrorCode = "IDENTITY_STRING_INVALID";
 
-export type KnownIdentityResolutionErrorCode =
-	| "KNOWN_IDENTITY_NOT_FOUND"
-	| "KNOWN_IDENTITY_AMBIGUOUS";
+export type IdentityReferenceResolutionErrorCode =
+	| "IDENTITY_REFERENCE_NOT_FOUND"
+	| "IDENTITY_REFERENCE_AMBIGUOUS";
 
 // ===========================================================================
 // @better-age/core :: app/ports
@@ -340,9 +871,12 @@ export type KnownIdentityResolutionErrorCode =
 
 export interface HomeRepositoryPort {
 	loadHomeStateDocument(): Promise<unknown | null>;
-	saveCurrentHomeStateDocument(document: unknown): Promise<void>;
-	readEncryptedPrivateKey(path: string): Promise<string>;
-	writeEncryptedPrivateKey(path: string, encryptedKey: string): Promise<void>;
+	saveCurrentHomeStateDocument(document: HomeStateDocument): Promise<void>;
+	readEncryptedPrivateKey(ref: EncryptedPrivateKeyRef): Promise<string>;
+	writeEncryptedPrivateKey(input: {
+		readonly ref: EncryptedPrivateKeyRef;
+		readonly encryptedKey: string;
+	}): Promise<void>;
 	getLocation(): Promise<{
 		readonly homeDir: string;
 		readonly stateFile: string;
@@ -357,15 +891,31 @@ export interface PayloadRepositoryPort {
 
 export interface PayloadCryptoPort {
 	encryptPayload(input: {
-		readonly envelope: unknown;
+		readonly plaintext: PayloadPlaintext;
 		readonly recipients: ReadonlyArray<string>;
 	}): Promise<string>;
 
 	decryptPayload(input: {
 		readonly armoredPayload: string;
-		readonly encryptedPrivateKeys: ReadonlyArray<string>;
-		readonly passphrase: Passphrase;
+		readonly privateKeys: ReadonlyArray<PrivateKeyPlaintext>;
 	}): Promise<unknown>;
+}
+
+export interface IdentityCryptoPort {
+	generatePrivateKey(input: {
+		readonly ownerId: OwnerId;
+		readonly createdAt: IsoUtcTimestamp;
+	}): Promise<PrivateKeyPlaintext>;
+
+	protectPrivateKey(input: {
+		readonly privateKey: PrivateKeyPlaintext;
+		readonly passphrase: Passphrase;
+	}): Promise<string>;
+
+	decryptPrivateKey(input: {
+		readonly encryptedKey: string;
+		readonly passphrase: Passphrase;
+	}): Promise<PrivateKeyPlaintext>;
 }
 
 export interface ClockPort {
@@ -383,8 +933,7 @@ export interface RandomIdsPort {
 
 export type RunHomeStatePreflightErrorCode =
 	| HomeReadErrorCode
-	| HomeWriteErrorCode
-	| HomeCompatibilityErrorCode;
+	| HomeWriteErrorCode;
 
 export interface BetterAgeCoreLifecycle {
 	runHomeStatePreflight(): CoreMethodResult<
@@ -404,31 +953,34 @@ export interface BetterAgeCoreLifecycle {
 // @better-age/core :: app/queries
 // ===========================================================================
 
-export type GetSelfIdentityErrorCode = HomeReadErrorCode | "SELF_IDENTITY_NOT_FOUND";
+export type GetSelfIdentityErrorCode = HomeReadErrorCode;
 
 export type ListKnownIdentitiesErrorCode = HomeReadErrorCode;
 
 export type ListRetiredKeysErrorCode = HomeReadErrorCode;
 
-export type ExportOwnIdentityStringErrorCode =
-	| HomeReadErrorCode
-	| "SELF_IDENTITY_NOT_FOUND";
+export type ExportSelfIdentityStringErrorCode = HomeReadErrorCode;
 
 export type ParseIdentityStringErrorCode = IdentityParseErrorCode;
 
 export type ResolveKnownIdentityErrorCode =
 	| HomeReadErrorCode
-	| KnownIdentityResolutionErrorCode;
+	| IdentityReferenceResolutionErrorCode;
 
-export type ReadPayloadErrorCode =
-	| PayloadRepositoryErrorCode
+export type ResolvePayloadRecipientErrorCode = IdentityReferenceResolutionErrorCode;
+
+export type ResolveGrantRecipientErrorCode =
+	| HomeReadErrorCode
+	| IdentityParseErrorCode
+	| IdentityReferenceResolutionErrorCode;
+
+export type DecryptPayloadErrorCode =
+	| PayloadReadRepositoryErrorCode
 	| PayloadContentErrorCode
 	| PayloadCompatibilityErrorCode
 	| PayloadSecretErrorCode
 	| HomeReadErrorCode
 	| HomeWriteErrorCode;
-
-export type InspectPayloadErrorCode = ReadPayloadErrorCode;
 
 export interface BetterAgeCoreQueries {
 	getSelfIdentity(): CoreMethodResult<
@@ -458,15 +1010,15 @@ export interface BetterAgeCoreQueries {
 		BetterAgeCoreNotice
 	>;
 
-	exportOwnIdentityString(): CoreMethodResult<
+	exportSelfIdentityString(): CoreMethodResult<
 		CoreResult<
-			"OWN_IDENTITY_STRING_EXPORTED",
+			"SELF_IDENTITY_STRING_EXPORTED",
 			{
 				readonly identityString: IdentityString;
 				readonly publicIdentity: PublicIdentitySnapshot;
 				readonly handle: Handle;
 			},
-			ExportOwnIdentityStringErrorCode
+			ExportSelfIdentityStringErrorCode
 		>,
 		BetterAgeCoreNotice
 	>;
@@ -488,27 +1040,50 @@ export interface BetterAgeCoreQueries {
 			"KNOWN_IDENTITY_RESOLVED",
 			KnownIdentitySummary,
 			ResolveKnownIdentityErrorCode,
-			AmbiguousKnownIdentityDetails | undefined
+			| IdentityReferenceNotFoundDetails
+			| AmbiguousIdentityReferenceDetails
+			| undefined
 		>,
 		BetterAgeCoreNotice
 	>;
 
-	readPayload(input: {
-		readonly path: PayloadPath;
-		readonly passphrase: Passphrase;
+	resolvePayloadRecipient(input: {
+		readonly reference: IdentityReferenceInput;
+		readonly recipients: ReadonlyArray<PayloadRecipientSummary>;
 	}): CoreMethodResult<
-		CoreResult<"PAYLOAD_READ", PayloadReadModel, ReadPayloadErrorCode>,
+		CoreResult<
+			"PAYLOAD_RECIPIENT_RESOLVED",
+			PayloadRecipientSummary,
+			ResolvePayloadRecipientErrorCode,
+			| IdentityReferenceNotFoundDetails
+			| AmbiguousIdentityReferenceDetails
+			| undefined
+		>
+	>;
+
+	resolveGrantRecipient(input: {
+		readonly reference: IdentityReferenceInput;
+		readonly payloadRecipients: ReadonlyArray<PayloadRecipientSummary>;
+	}): CoreMethodResult<
+		CoreResult<
+			"GRANT_RECIPIENT_RESOLVED",
+			PublicIdentitySnapshot,
+			ResolveGrantRecipientErrorCode,
+			| IdentityReferenceNotFoundDetails
+			| AmbiguousIdentityReferenceDetails
+			| undefined
+		>,
 		BetterAgeCoreNotice
 	>;
 
-	inspectPayload(input: {
+	decryptPayload(input: {
 		readonly path: PayloadPath;
 		readonly passphrase: Passphrase;
 	}): CoreMethodResult<
 		CoreResult<
-			"PAYLOAD_INSPECTED",
-			PayloadInspection,
-			InspectPayloadErrorCode
+			"PAYLOAD_DECRYPTED",
+			DecryptedPayload,
+			DecryptPayloadErrorCode
 		>,
 		BetterAgeCoreNotice
 	>;
@@ -518,50 +1093,54 @@ export interface BetterAgeCoreQueries {
 // @better-age/core :: app/commands
 // ===========================================================================
 
-export type CreateUserIdentityErrorCode =
-	| HomeReadErrorCode
+export type CreateSelfIdentityErrorCode =
+	| HomeSetupProbeErrorCode
 	| HomeWriteErrorCode
-	| "DISPLAY_NAME_INVALID"
-	| "SELF_IDENTITY_ALREADY_EXISTS"
+	| "SETUP_NAME_INVALID"
+	| "SETUP_ALREADY_CONFIGURED"
 	| "KEY_GENERATION_FAILED"
 	| "PRIVATE_KEY_PROTECTION_FAILED";
 
-export type ImportIdentityStringErrorCode =
+export type ImportKnownIdentityErrorCode =
 	| HomeReadErrorCode
 	| HomeWriteErrorCode
 	| IdentityParseErrorCode
 	| "CANNOT_IMPORT_SELF_IDENTITY"
-	| "KNOWN_IDENTITY_CONFLICT";
+	| "KNOWN_IDENTITY_CONFLICT"
+	| "LOCAL_ALIAS_INVALID"
+	| "LOCAL_ALIAS_DUPLICATE";
 
 export type ForgetKnownIdentityErrorCode =
 	| HomeReadErrorCode
 	| HomeWriteErrorCode
-	| "KNOWN_IDENTITY_NOT_FOUND"
+	| "IDENTITY_REFERENCE_NOT_FOUND"
 	| "CANNOT_FORGET_SELF_IDENTITY";
 
 export type ChangePassphraseErrorCode =
 	| HomeReadErrorCode
 	| HomeWriteErrorCode
-	| "SELF_IDENTITY_NOT_FOUND"
 	| "PASSPHRASE_INCORRECT"
+	| "PRIVATE_KEY_DECRYPT_FAILED"
+	| "PRIVATE_KEY_REENCRYPT_FAILED"
 	| "PRIVATE_KEY_PROTECTION_FAILED";
 
-export type RotateUserIdentityErrorCode =
+export type RotateSelfIdentityErrorCode =
 	| HomeReadErrorCode
 	| HomeWriteErrorCode
-	| "SELF_IDENTITY_NOT_FOUND"
 	| "PASSPHRASE_INCORRECT"
+	| "PRIVATE_KEY_DECRYPT_FAILED"
 	| "KEY_GENERATION_FAILED"
 	| "PRIVATE_KEY_PROTECTION_FAILED";
 
 export type CreatePayloadErrorCode =
 	| HomeReadErrorCode
-	| PayloadRepositoryErrorCode
-	| "SELF_IDENTITY_NOT_FOUND"
+	| PayloadCreateRepositoryErrorCode
+	| "PASSPHRASE_INCORRECT"
+	| "PRIVATE_KEY_DECRYPT_FAILED"
 	| "PAYLOAD_ENCRYPT_FAILED";
 
 export type EditPayloadErrorCode =
-	| PayloadRepositoryErrorCode
+	| PayloadMutationRepositoryErrorCode
 	| PayloadContentErrorCode
 	| PayloadCompatibilityErrorCode
 	| PayloadSecretErrorCode
@@ -570,83 +1149,75 @@ export type EditPayloadErrorCode =
 	| "PAYLOAD_UPDATE_REQUIRED";
 
 export type GrantPayloadRecipientErrorCode =
-	| PayloadRepositoryErrorCode
+	| PayloadMutationRepositoryErrorCode
 	| PayloadContentErrorCode
 	| PayloadCompatibilityErrorCode
 	| PayloadSecretErrorCode
 	| HomeReadErrorCode
 	| HomeWriteErrorCode
 	| "PAYLOAD_UPDATE_REQUIRED"
-	| "KNOWN_IDENTITY_NOT_FOUND"
 	| "CANNOT_GRANT_SELF"
 	| "PAYLOAD_ENCRYPT_FAILED";
 
 export type RevokePayloadRecipientErrorCode =
-	| PayloadRepositoryErrorCode
+	| PayloadMutationRepositoryErrorCode
 	| PayloadContentErrorCode
 	| PayloadCompatibilityErrorCode
 	| PayloadSecretErrorCode
 	| HomeReadErrorCode
 	| HomeWriteErrorCode
 	| "PAYLOAD_UPDATE_REQUIRED"
-	| "RECIPIENT_NOT_GRANTED"
 	| "CANNOT_REVOKE_SELF"
 	| "PAYLOAD_ENCRYPT_FAILED";
 
 export type UpdatePayloadErrorCode =
-	| PayloadRepositoryErrorCode
+	| PayloadMutationRepositoryErrorCode
 	| PayloadContentErrorCode
 	| PayloadCompatibilityErrorCode
 	| PayloadSecretErrorCode
 	| HomeReadErrorCode
 	| HomeWriteErrorCode
-	| "SELF_IDENTITY_NOT_FOUND"
 	| "PAYLOAD_ENCRYPT_FAILED";
 
 /**
- * Command-side identity targets stay strict.
+ * Command-side identity targets stay exact.
  *
  * Flexible references never cross this boundary.
- * The CLI must call query-side resolution/parsing first.
+ * The CLI must call query-side resolution/parsing first, then pass the exact
+ * public identity snapshot to the payload mutation.
  */
-export type GrantRecipientTarget =
-	| {
-			readonly kind: "known-identity";
-			readonly ownerId: OwnerId;
-	  }
-	| {
-			readonly kind: "public-identity";
-			readonly identity: PublicIdentitySnapshot;
-	  };
-
 export interface BetterAgeCoreCommands {
-	createUserIdentity(input: {
+	createSelfIdentity(input: {
 		readonly displayName: DisplayName;
 		readonly passphrase: Passphrase;
 	}): CoreMethodResult<
 		CoreResult<
-			"USER_IDENTITY_CREATED",
+			"SELF_IDENTITY_CREATED",
 			{
 				readonly ownerId: OwnerId;
 				readonly handle: Handle;
 			},
-			CreateUserIdentityErrorCode
+			CreateSelfIdentityErrorCode
 		>,
 		BetterAgeCoreNotice
 	>;
 
-	importIdentityString(input: {
+	importKnownIdentity(input: {
 		readonly identityString: IdentityString;
 		readonly localAlias?: LocalAlias | null;
 	}): CoreMethodResult<
 		CoreResult<
-			"IDENTITY_IMPORTED",
+			"KNOWN_IDENTITY_IMPORTED",
 			{
 				readonly ownerId: OwnerId;
 				readonly handle: Handle;
-				readonly outcome: "added" | "updated" | "unchanged";
+				readonly outcome:
+					| "added"
+					| "updated"
+					| "unchanged"
+					| "alias-updated";
 			},
-			ImportIdentityStringErrorCode,
+			ImportKnownIdentityErrorCode,
 			KnownIdentityConflictDetails | undefined
 		>,
 		BetterAgeCoreNotice
@@ -659,14 +1230,14 @@ export interface BetterAgeCoreCommands {
 			"KNOWN_IDENTITY_FORGOTTEN",
 			{
 				readonly ownerId: OwnerId;
-				readonly outcome: "removed" | "unchanged";
+				readonly outcome: "removed";
 			},
 			ForgetKnownIdentityErrorCode
 		>,
 		BetterAgeCoreNotice
 	>;
 
-	changePassphrase(input: {
+	changeIdentityPassphrase(input: {
 		readonly currentPassphrase: Passphrase;
 		readonly nextPassphrase: Passphrase;
 	}): CoreMethodResult<
@@ -680,22 +1251,23 @@ export interface BetterAgeCoreCommands {
 		BetterAgeCoreNotice
 	>;
 
-	rotateUserIdentity(input: {
+	rotateSelfIdentity(input: {
 		readonly passphrase: Passphrase;
 	}): CoreMethodResult<
 		CoreResult<
-			"USER_IDENTITY_ROTATED",
+			"SELF_IDENTITY_ROTATED",
 			{
 				readonly ownerId: OwnerId;
 				readonly nextFingerprint: KeyFingerprint;
 			},
-			RotateUserIdentityErrorCode
+			RotateSelfIdentityErrorCode
 		>,
 		BetterAgeCoreNotice
 	>;
 
 	createPayload(input: {
 		readonly path: PayloadPath;
+		readonly passphrase: Passphrase;
 	}): CoreMethodResult<
 		CoreResult<
 			"PAYLOAD_CREATED",
@@ -718,7 +1290,7 @@ export interface BetterAgeCoreCommands {
 			{
 				readonly path: PayloadPath;
 				readonly payloadId: PayloadId;
-				readonly outcome: "rewritten" | "unchanged";
+				readonly outcome: "edited" | "unchanged";
 			},
 			EditPayloadErrorCode,
 			PayloadMutationBlockedDetails | undefined
@@ -729,7 +1301,7 @@ export interface BetterAgeCoreCommands {
 	grantPayloadRecipient(input: {
 		readonly path: PayloadPath;
 		readonly passphrase: Passphrase;
-		readonly recipient: GrantRecipientTarget;
+		readonly recipient: PublicIdentitySnapshot;
 	}): CoreMethodResult<
 		CoreResult<
 			"PAYLOAD_RECIPIENT_GRANTED",
@@ -806,8 +1378,8 @@ export interface CwdPayloadDiscoveryPort {
 	>;
 }
 
-export interface TerminalCapabilityPort {
-	getTerminalCapability(): Promise<TerminalCapability>;
+export interface CliTerminalModePort {
+	getTerminalMode(): Promise<CliTerminalMode>;
 }
 
 export interface PromptPort {
@@ -858,52 +1430,81 @@ export type CliHumanMessageKind =
 	| "hint";
 
 export type CliErrorMessageId =
+	| "ERR.SETUP.NAME_MISSING"
+	| "ERR.SETUP.NAME_INVALID"
 	| "ERR.SETUP.REQUIRED"
 	| "ERR.SETUP.ALREADY_CONFIGURED"
-	| "ERR.HOME_STATE.CLI_TOO_OLD"
-	| "ERR.HOME_STATE.MIGRATION_PATH_MISSING"
-	| "ERR.HOME_STATE.INVALID"
-	| "ERR.IDENTITY_STRING.INVALID"
+	| "ERR.HOME.READ_FAILED"
+	| "ERR.HOME.WRITE_FAILED"
+	| "ERR.HOME.PRIVATE_KEY_DECRYPT_FAILED"
+	| "ERR.HOME.PRIVATE_KEY_PROTECTION_FAILED"
+	| "ERR.HOME.PRIVATE_KEY_REENCRYPT_FAILED"
+	| "ERR.HOME.CLI_TOO_OLD"
+	| "ERR.HOME.MIGRATION_PATH_MISSING"
+	| "ERR.HOME.MIGRATION_HARD_BROKEN"
+	| "ERR.HOME.STATE_INVALID"
+	| "ERR.IDENTITY.STRING_MISSING"
+	| "ERR.IDENTITY.STRING_INVALID"
+	| "ERR.IDENTITY.REFERENCE_MISSING"
 	| "ERR.IDENTITY.NOT_FOUND"
 	| "ERR.IDENTITY.AMBIGUOUS"
+	| "ERR.IDENTITY.ALIAS_INVALID"
+	| "ERR.IDENTITY.ALIAS_DUPLICATE"
 	| "ERR.IDENTITY.CANNOT_IMPORT_SELF"
 	| "ERR.IDENTITY.CONFLICT"
 	| "ERR.IDENTITY.CANNOT_FORGET_SELF"
+	| "ERR.IDENTITY.KEY_GENERATION_FAILED"
 	| "ERR.PASSPHRASE.INCORRECT"
 	| "ERR.PASSPHRASE.UNAVAILABLE"
+	| "ERR.PASSPHRASE.CONFIRMATION_MISMATCH"
+	| "ERR.PAYLOAD.PATH_MISSING"
 	| "ERR.PAYLOAD.NOT_FOUND"
+	| "ERR.PAYLOAD.ALREADY_EXISTS"
+	| "ERR.PAYLOAD.READ_FAILED"
+	| "ERR.PAYLOAD.WRITE_FAILED"
 	| "ERR.PAYLOAD.INVALID"
+	| "ERR.PAYLOAD.ENV_INVALID"
+	| "ERR.PAYLOAD.ENCRYPT_FAILED"
+	| "ERR.PAYLOAD.DECRYPT_FAILED"
 	| "ERR.PAYLOAD.ACCESS_DENIED"
 	| "ERR.PAYLOAD.CLI_TOO_OLD"
 	| "ERR.PAYLOAD.MIGRATION_PATH_MISSING"
 	| "ERR.PAYLOAD.MIGRATION_HARD_BROKEN"
 	| "ERR.PAYLOAD.UPDATE_REQUIRED"
-	| "ERR.PAYLOAD.CANNOT_GRANT_SELF"
-	| "ERR.PAYLOAD.CANNOT_REVOKE_SELF"
+	| "ERR.GRANT.CANNOT_GRANT_SELF"
+	| "ERR.REVOKE.CANNOT_REVOKE_SELF"
 	| "ERR.LOAD.PROTOCOL_REQUIRED"
 	| "ERR.LOAD.PROTOCOL_UNSUPPORTED"
 	| "ERR.PROMPT.UNAVAILABLE"
-	| "ERR.SECURE_VIEWER.UNAVAILABLE";
+	| "ERR.INTERACTIVE.UNAVAILABLE"
+	| "ERR.EDITOR.UNAVAILABLE"
+	| "ERR.EDITOR.LAUNCH_FAILED"
+	| "ERR.EDITOR.EXIT_NON_ZERO"
+	| "ERR.EDITOR.TEMP_FILE_CREATE_FAILED"
+	| "ERR.EDITOR.TEMP_FILE_READ_FAILED"
+	| "ERR.VIEWER.UNAVAILABLE"
+	| "ERR.VIEWER.RENDER_FAILED"
+	| "ERR.INTERNAL.DEFECT";
 
 export type CliWarningMessageId =
-	| "WARN.PAYLOAD.UPDATE_RECOMMENDED";
+	| "WARN.PAYLOAD.UPDATE_RECOMMENDED"
+	| "WARN.IDENTITY.SELF_RECIPIENT_STALE_AFTER_ROTATE";
 
 export type CliInfoMessageId =
-	| "INFO.HOME_STATE.MIGRATED"
-	| "INFO.PAYLOAD.READ_USED_IN_MEMORY_MIGRATION"
-	| "INFO.USING_DISCOVERED_PATH";
+	| "INFO.HOME.STATE_MIGRATED"
+	| "INFO.PAYLOAD.READ_USED_IN_MEMORY_MIGRATION";
 
 export type CliSuccessMessageId =
-	| "SUCCESS.SETUP.COMPLETED"
-	| "SUCCESS.IDENTITY.IMPORTED"
-	| "SUCCESS.IDENTITY.FORGOTTEN"
-	| "SUCCESS.PASSPHRASE.CHANGED"
-	| "SUCCESS.IDENTITY.ROTATED"
-	| "SUCCESS.PAYLOAD.CREATED"
-	| "SUCCESS.PAYLOAD.EDITED"
-	| "SUCCESS.PAYLOAD.GRANTED"
-	| "SUCCESS.PAYLOAD.REVOKED"
-	| "SUCCESS.PAYLOAD.UPDATED";
+	| "SUCCESS.SETUP.COMPLETE"
+	| "SUCCESS.IDENTITY.IMPORT"
+	| "SUCCESS.IDENTITY.FORGET"
+	| "SUCCESS.IDENTITY.PASSPHRASE"
+	| "SUCCESS.IDENTITY.ROTATE"
+	| "SUCCESS.PAYLOAD.CREATE"
+	| "SUCCESS.PAYLOAD.EDIT"
+	| "SUCCESS.PAYLOAD.GRANT"
+	| "SUCCESS.PAYLOAD.REVOKE"
+	| "SUCCESS.PAYLOAD.UPDATE";
 
 export type CliHintMessageId =
 	| "HINT.RUN_SETUP"
@@ -927,6 +1528,13 @@ export interface CliPresenter {
 	render(message: CliHumanMessage): string;
 	renderMany(messages: ReadonlyArray<CliHumanMessage>): string;
 }
+
+export type VarlockAdapterErrorMessageId =
+	| "ERR.VARLOCK.STDOUT_PIPE_UNAVAILABLE"
+	| "ERR.VARLOCK.CLI_START_FAILED"
+	| "ERR.VARLOCK.LOAD_EXIT_NON_ZERO"
+	| "ERR.VARLOCK.NOT_INITIALIZED"
+	| "ERR.VARLOCK.MULTIPLE_INIT_UNSUPPORTED";
 
 // ===========================================================================
 // @better-age/cli :: program + commands + shared flows
@@ -956,13 +1564,22 @@ export type CliFlowResolved<T> = {
 
 export type CliFlowProceed = { readonly kind: "proceed" };
 
-export type CliFlowRetry = { readonly kind: "retry" };
-
 export type CliFlowUpdateNow = { readonly kind: "update-now" };
 
 export type CliFlowCompleted = { readonly kind: "completed" };
 
-export type CliProgramExitCode = 0 | 1;
+export type CliProgramExitCode = 0 | 1 | 130;
+
+export interface CliExitMappingPolicy {
+	readonly success: 0;
+	readonly unchangedSuccess: 0;
+	readonly ctrlCAbort: 130;
+	readonly userCancel: 1;
+	readonly standaloneBack: 1;
+	readonly domainOrUserError: 1;
+	readonly internalDefect: 1;
+	readonly cancelMessageStyle: "quiet-non-scary";
+}
 
 export interface BetterAgeCliProgram {
 	runCli(argv: ReadonlyArray<string>): Promise<{
@@ -970,61 +1587,123 @@ export interface BetterAgeCliProgram {
 	}>;
 }
 
+export type BetterAgeTargetCliCommand =
+	| "setup"
+	| "interactive"
+	| "create"
+	| "edit"
+	| "grant"
+	| "inspect"
+	| "load"
+	| "revoke"
+	| "update"
+	| "view"
+	| "identity export"
+	| "identity forget"
+	| "identity import"
+	| "identity list"
+	| "identity passphrase"
+	| "identity rotate";
+
+export const TARGET_CLI_COMMAND_SURFACE: ReadonlyArray<BetterAgeTargetCliCommand> =
+	[
+		"setup",
+		"interactive",
+		"create",
+		"edit",
+		"grant",
+		"inspect",
+		"load",
+		"revoke",
+		"update",
+		"view",
+		"identity export",
+		"identity forget",
+		"identity import",
+		"identity list",
+		"identity passphrase",
+		"identity rotate",
+	];
+
 export interface BetterAgeCliCommands {
-	runSetupCommand(): Promise<CliFlowCompleted | CliFlowCancel>;
+	runSetupCommand(input: {
+		readonly context: CliCommandRunContext;
+		readonly name?: DisplayName;
+	}): Promise<CliFlowCompleted | CliFlowCancel>;
 
 	runFileCreateCommand(input: {
+		readonly context: CliCommandRunContext;
 		readonly initialPath?: PayloadPath;
 	}): Promise<CliFlowCompleted | CliFlowCancel>;
 
 	runFileEditCommand(input: {
+		readonly context: CliCommandRunContext;
 		readonly initialPath?: PayloadPath;
 	}): Promise<CliFlowCompleted | CliFlowCancel>;
 
 	runFileGrantCommand(input: {
+		readonly context: CliCommandRunContext;
 		readonly initialPath?: PayloadPath;
 		readonly initialRecipientReference?: IdentityReferenceInput;
 	}): Promise<CliFlowCompleted | CliFlowCancel>;
 
 	runFileRevokeCommand(input: {
+		readonly context: CliCommandRunContext;
 		readonly initialPath?: PayloadPath;
-		readonly initialRecipientOwnerId?: OwnerId;
+		readonly initialRecipientReference?: IdentityReferenceInput;
 	}): Promise<CliFlowCompleted | CliFlowCancel>;
 
 	runFileInspectCommand(input: {
+		readonly context: CliCommandRunContext;
 		readonly initialPath?: PayloadPath;
 	}): Promise<CliFlowCompleted | CliFlowCancel>;
 
 	runFileViewCommand(input: {
+		readonly context: CliCommandRunContext;
 		readonly initialPath?: PayloadPath;
 	}): Promise<CliFlowCompleted | CliFlowCancel>;
 
 	runFileLoadCommand(input: {
-		readonly path: PayloadPath;
+		readonly context: CliCommandRunContext;
+		readonly initialPath?: PayloadPath;
 		readonly protocolVersion?: ProtocolVersion;
 	}): Promise<CliFlowCompleted | CliFlowCancel>;
 
 	runFileUpdateCommand(input: {
+		readonly context: CliCommandRunContext;
 		readonly initialPath?: PayloadPath;
 	}): Promise<CliFlowCompleted | CliFlowCancel>;
 
-	runIdentityExportCommand(): Promise<CliFlowCompleted | CliFlowCancel>;
+	runIdentityExportCommand(input: {
+		readonly context: CliCommandRunContext;
+	}): Promise<CliFlowCompleted | CliFlowCancel>;
 
-	runIdentityListCommand(): Promise<CliFlowCompleted | CliFlowCancel>;
+	runIdentityListCommand(input: {
+		readonly context: CliCommandRunContext;
+	}): Promise<CliFlowCompleted | CliFlowCancel>;
 
 	runIdentityImportCommand(input: {
+		readonly context: CliCommandRunContext;
 		readonly initialIdentityString?: IdentityString;
+		readonly alias?: LocalAlias;
 	}): Promise<CliFlowCompleted | CliFlowCancel>;
 
 	runIdentityForgetCommand(input: {
+		readonly context: CliCommandRunContext;
 		readonly initialIdentityReference?: IdentityReferenceInput;
 	}): Promise<CliFlowCompleted | CliFlowCancel>;
 
-	runIdentityRotateCommand(): Promise<CliFlowCompleted | CliFlowCancel>;
+	runIdentityRotateCommand(input: {
+		readonly context: CliCommandRunContext;
+	}): Promise<CliFlowCompleted | CliFlowCancel>;
 
-	runIdentityPassphraseCommand(): Promise<CliFlowCompleted | CliFlowCancel>;
+	runIdentityPassphraseCommand(input: {
+		readonly context: CliCommandRunContext;
+	}): Promise<CliFlowCompleted | CliFlowCancel>;
 
-	runInteractiveCommand(): Promise<CliFlowCompleted | CliFlowCancel>;
+	runInteractiveCommand(input: {
+		readonly context: CliCommandRunContext;
+	}): Promise<CliFlowCompleted | CliFlowCancel>;
 }
 
 /**
@@ -1064,8 +1743,68 @@ export interface BetterAgeCliResolverFlows {
 		CliFlowResolved<Passphrase> | CliFlowBack | CliFlowCancel
 	>;
 
+	runPassphraseAcquisitionFlow(input: {
+		readonly scope:
+			| "setup"
+			| "create"
+			| "inspect"
+			| "view"
+			| "edit"
+			| "grant"
+			| "revoke"
+			| "update"
+			| "load"
+			| "identity-passphrase"
+			| "identity-rotate";
+		readonly credentialAcquisition: CliCredentialAcquisition;
+	}): Promise<
+		CliFlowResolved<Passphrase> | CliFlowBack | CliFlowCancel
+	>;
+
 	runEditorResolutionFlow(): Promise<
 		CliFlowResolved<string> | CliFlowBack | CliFlowCancel
+	>;
+}
+
+/**
+ * Payload Context Flows
+ *
+ * Purpose:
+ * - open/decrypt one exact payload early for every payload-content command
+ * - keep the passphrase in memory only for the current command execution
+ * - expose read models needed to build better guided choices
+ *
+ * Applies to:
+ * - inspect
+ * - view
+ * - edit
+ * - grant
+ * - revoke
+ * - update
+ * - load
+ *
+ * Does not apply to:
+ * - create, because no existing payload exists yet
+ *
+ * Example:
+ * - guided grant resolves payload path
+ * - prompts passphrase
+ * - opens payload in memory
+ * - shows known identities plus already-granted recipient context
+ * - calls strict core mutation with the same in-memory credential context
+ */
+export interface BetterAgeCliPayloadContextFlows {
+	runOpenPayloadContextFlow(input: {
+		readonly path: PayloadPath;
+		readonly command: PayloadContentCommand;
+		readonly credentialAcquisition: CliCredentialAcquisition;
+	}): Promise<
+		CliFlowResolved<{
+			readonly path: PayloadPath;
+			readonly passphrase: Passphrase;
+			readonly payload: DecryptedPayload;
+			readonly notices: ReadonlyArray<BetterAgeCoreNotice>;
+		}> | CliFlowBack | CliFlowCancel
 	>;
 }
 
@@ -1078,16 +1817,10 @@ export interface BetterAgeCliResolverFlows {
  * Rules:
  * - no domain mutation by themselves
  * - decide branching, not value resolution
- * - return semantic branch outcomes such as `proceed`, `retry`,
- *   `update-now`, `back`, or `cancel`
+ * - return semantic branch outcomes such as `proceed`, `update-now`, `back`,
+ *   or `cancel`
  */
 export interface BetterAgeCliGateFlows {
-	runPassphraseRetryFlow(input: {
-		readonly scope: "inspect" | "view";
-	}): Promise<
-		CliFlowRetry | CliFlowBack | CliFlowCancel
-	>;
-
 	runSetupGateFlow(): Promise<
 		CliFlowProceed | CliFlowBack | CliFlowCancel
 	>;
@@ -1121,7 +1854,7 @@ export interface BetterAgeCliCompositeFlows {
 
 	runFileRevokeFlow(input: {
 		readonly initialPath?: PayloadPath;
-		readonly initialRecipientOwnerId?: OwnerId;
+		readonly initialRecipientReference?: IdentityReferenceInput;
 	}): Promise<CliFlowCompleted | CliFlowCancel>;
 
 	runFileEditFlow(input: {
@@ -1147,6 +1880,7 @@ export interface BetterAgeCliSessionFlows {
 
 export interface BetterAgeCliSharedFlows
 	extends BetterAgeCliResolverFlows,
+		BetterAgeCliPayloadContextFlows,
 		BetterAgeCliGateFlows,
 		BetterAgeCliCompositeFlows,
 		BetterAgeCliSessionFlows {}
@@ -1176,27 +1910,27 @@ export interface BetterAgeCliCommandAliases {
 
 export interface BetterAgeCliCommandToCoreMapping {
 	readonly root: {
-		readonly setup: "commands.createUserIdentity";
+		readonly setup: "commands.createSelfIdentity";
 		readonly interactive:
 			"commands+shared-flows over file and identity command surfaces";
 	};
 	readonly file: {
 		readonly create: "commands.createPayload";
-		readonly edit: "commands.editPayload";
-		readonly grant: "commands.grantPayloadRecipient";
-		readonly revoke: "commands.revokePayloadRecipient";
-		readonly inspect: "queries.inspectPayload";
-		readonly view: "queries.readPayload";
-		readonly load: "queries.readPayload";
-		readonly update: "commands.updatePayload";
+		readonly edit: "queries.decryptPayload+commands.editPayload";
+		readonly grant: "queries.decryptPayload+queries.resolveGrantRecipient+commands.grantPayloadRecipient";
+		readonly revoke: "queries.decryptPayload+queries.resolvePayloadRecipient+commands.revokePayloadRecipient";
+		readonly inspect: "queries.decryptPayload";
+		readonly view: "queries.decryptPayload";
+		readonly load: "queries.decryptPayload";
+		readonly update: "queries.decryptPayload+commands.updatePayload";
 	};
 	readonly identity: {
-		readonly export: "queries.exportOwnIdentityString";
+		readonly export: "queries.exportSelfIdentityString";
 		readonly list: "queries.getSelfIdentity+queries.listKnownIdentities+queries.listRetiredKeys";
-		readonly import: "commands.importIdentityString";
-		readonly forget: "commands.forgetKnownIdentity";
-		readonly rotate: "commands.rotateUserIdentity";
-		readonly passphrase: "commands.changePassphrase";
+		readonly import: "commands.importKnownIdentity";
+		readonly forget: "queries.resolveKnownIdentity+commands.forgetKnownIdentity";
+		readonly rotate: "commands.rotateSelfIdentity";
+		readonly passphrase: "commands.changeIdentityPassphrase";
 	};
 	readonly interactive: {
 		readonly session:
@@ -1206,28 +1940,163 @@ export interface BetterAgeCliCommandToCoreMapping {
 
 export const CLI_COMMAND_TO_CORE_MAPPING: BetterAgeCliCommandToCoreMapping = {
 	root: {
-		setup: "commands.createUserIdentity",
+		setup: "commands.createSelfIdentity",
 		interactive: "commands+shared-flows over file and identity command surfaces",
 	},
 	file: {
 		create: "commands.createPayload",
-		edit: "commands.editPayload",
-		grant: "commands.grantPayloadRecipient",
-		revoke: "commands.revokePayloadRecipient",
-		inspect: "queries.inspectPayload",
-		view: "queries.readPayload",
-		load: "queries.readPayload",
-		update: "commands.updatePayload",
+		edit: "queries.decryptPayload+commands.editPayload",
+		grant: "queries.decryptPayload+queries.resolveGrantRecipient+commands.grantPayloadRecipient",
+		revoke:
+			"queries.decryptPayload+queries.resolvePayloadRecipient+commands.revokePayloadRecipient",
+		inspect: "queries.decryptPayload",
+		view: "queries.decryptPayload",
+		load: "queries.decryptPayload",
+		update: "queries.decryptPayload+commands.updatePayload",
 	},
 	identity: {
-		export: "queries.exportOwnIdentityString",
+		export: "queries.exportSelfIdentityString",
 		list: "queries.getSelfIdentity+queries.listKnownIdentities+queries.listRetiredKeys",
-		import: "commands.importIdentityString",
-		forget: "commands.forgetKnownIdentity",
-		rotate: "commands.rotateUserIdentity",
-		passphrase: "commands.changePassphrase",
+		import: "commands.importKnownIdentity",
+		forget: "queries.resolveKnownIdentity+commands.forgetKnownIdentity",
+		rotate: "commands.rotateSelfIdentity",
+		passphrase: "commands.changeIdentityPassphrase",
+	},
+	interactive: {
+		session: "commands+shared-flows over file and identity command surfaces",
 	},
 };
+
+export const CLI_COMMAND_CONTRACTS: ReadonlyArray<CliCommandContract> = [
+	{
+		command: "setup",
+		promptableOperands: ["--name"],
+		protocolOperands: [],
+		secretPrompts: ["new-passphrase", "confirm-new-passphrase"],
+		stdoutContract: "none",
+		headlessBehavior: "fail-passphrase-unavailable",
+	},
+	{
+		command: "create",
+		promptableOperands: ["path"],
+		protocolOperands: [],
+		secretPrompts: ["passphrase"],
+		stdoutContract: "none",
+		headlessBehavior: "fail-passphrase-unavailable",
+	},
+	{
+		command: "edit",
+		promptableOperands: ["path"],
+		protocolOperands: [],
+		secretPrompts: ["passphrase"],
+		stdoutContract: "none",
+		headlessBehavior: "fail-passphrase-unavailable",
+	},
+	{
+		command: "grant",
+		promptableOperands: ["path", "identity-ref"],
+		protocolOperands: [],
+		secretPrompts: ["passphrase"],
+		stdoutContract: "none",
+		headlessBehavior: "fail-passphrase-unavailable",
+	},
+	{
+		command: "inspect",
+		promptableOperands: ["path"],
+		protocolOperands: [],
+		secretPrompts: ["passphrase"],
+		stdoutContract: "human-output",
+		headlessBehavior: "fail-passphrase-unavailable",
+	},
+	{
+		command: "load",
+		promptableOperands: ["path"],
+		protocolOperands: ["--protocol-version"],
+		secretPrompts: ["passphrase"],
+		stdoutContract: "raw-envText-only",
+		headlessBehavior: "fail-passphrase-unavailable",
+	},
+	{
+		command: "revoke",
+		promptableOperands: ["path", "identity-ref"],
+		protocolOperands: [],
+		secretPrompts: ["passphrase"],
+		stdoutContract: "none",
+		headlessBehavior: "fail-passphrase-unavailable",
+	},
+	{
+		command: "update",
+		promptableOperands: ["path"],
+		protocolOperands: [],
+		secretPrompts: ["passphrase"],
+		stdoutContract: "none",
+		headlessBehavior: "fail-passphrase-unavailable",
+	},
+	{
+		command: "view",
+		promptableOperands: ["path"],
+		protocolOperands: [],
+		secretPrompts: ["passphrase"],
+		stdoutContract: "none",
+		headlessBehavior: "fail-passphrase-unavailable",
+	},
+	{
+		command: "identity export",
+		promptableOperands: [],
+		protocolOperands: [],
+		secretPrompts: [],
+		stdoutContract: "identity-string-only",
+		headlessBehavior: "allowed",
+	},
+	{
+		command: "identity forget",
+		promptableOperands: ["identity-ref"],
+		protocolOperands: [],
+		secretPrompts: [],
+		stdoutContract: "none",
+		headlessBehavior: "allowed",
+	},
+	{
+		command: "identity import",
+		promptableOperands: ["identity-string"],
+		protocolOperands: [],
+		secretPrompts: [],
+		stdoutContract: "none",
+		headlessBehavior: "allowed",
+	},
+	{
+		command: "identity list",
+		promptableOperands: [],
+		protocolOperands: [],
+		secretPrompts: [],
+		stdoutContract: "human-output",
+		headlessBehavior: "allowed",
+	},
+	{
+		command: "identity passphrase",
+		promptableOperands: [],
+		protocolOperands: [],
+		secretPrompts: ["current-passphrase", "new-passphrase", "confirm-new-passphrase"],
+		stdoutContract: "none",
+		headlessBehavior: "fail-passphrase-unavailable",
+	},
+	{
+		command: "identity rotate",
+		promptableOperands: [],
+		protocolOperands: [],
+		secretPrompts: ["passphrase"],
+		stdoutContract: "none",
+		headlessBehavior: "fail-passphrase-unavailable",
+	},
+	{
+		command: "interactive",
+		promptableOperands: [],
+		protocolOperands: [],
+		secretPrompts: ["command-dependent"],
+		stdoutContract: "none",
+		headlessBehavior: "fail-interactive-unavailable",
+	},
+];
 
 export const CLI_COMMAND_ALIASES: BetterAgeCliCommandAliases = {
 	root: {
@@ -1259,7 +2128,25 @@ export const CLI_COMMAND_ALIASES: BetterAgeCliCommandAliases = {
 export interface LoadProtocolRequest {
 	readonly protocolVersion: ProtocolVersion;
 	readonly path: PayloadPath;
-	readonly passphrase: Passphrase;
+}
+
+/**
+ * Current varlock integration keeps `load` interactive-capable by spawning the
+ * CLI with stdin/stderr inherited and stdout piped.
+ *
+ * Consequence:
+ * - env text is captured from stdout
+ * - passphrase prompt renders on stderr
+ * - passphrase input is read from inherited stdin
+ * - varlock does not receive, store, or forward the passphrase
+ */
+export interface LoadProtocolProcessContract {
+	readonly stdin: "inherit";
+	readonly stdout: "pipe-env-text";
+	readonly stderr: "inherit-human-messages-and-prompts";
+	readonly credentialAcquisition:
+		| "prompt-through-inherited-tty"
+		| "fail-if-inherited-stdio-is-not-interactive";
 }
 
 export interface LoadProtocolSuccess {
@@ -1278,10 +2165,32 @@ export type LoadProtocolResponse =
 	| LoadProtocolSuccess
 	| LoadProtocolFailure;
 
+export type VarlockAdapterErrorCode =
+	| "LOAD_STDOUT_PIPE_UNAVAILABLE"
+	| "VARLOCK_CLI_START_FAILED"
+	| "VARLOCK_LOAD_EXIT_NON_ZERO"
+	| "VARLOCK_NOT_INITIALIZED"
+	| "VARLOCK_MULTIPLE_INIT_UNSUPPORTED";
+
+export interface VarlockAdapterFailure {
+	readonly kind: "adapter-failure";
+	readonly code: VarlockAdapterErrorCode;
+	readonly messageId: VarlockAdapterErrorMessageId;
+	readonly details?: {
+		readonly launcher?: string;
+		readonly payloadPath?: PayloadPath;
+		readonly exitCode?: number;
+	};
+}
+
+export type VarlockLoadResult =
+	| LoadProtocolResponse
+	| VarlockAdapterFailure;
+
 /**
  * The varlock package does not call core directly in v1.
  * It depends on the CLI load protocol.
  */
 export interface BetterAgeMachineAdapter {
-	load(input: LoadProtocolRequest): Promise<LoadProtocolResponse>;
+	load(input: LoadProtocolRequest): Promise<VarlockLoadResult>;
 }

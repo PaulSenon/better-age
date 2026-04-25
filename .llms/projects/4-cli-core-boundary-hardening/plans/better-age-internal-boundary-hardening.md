@@ -1,120 +1,146 @@
-# Plan: better-age Internal Boundary Hardening
+# Spec Worklist: CLI/Core Boundary Redesign
 
-> Source PRD: [PRD_INTERNAL_BOUNDARY_HARDENING.md](../0-PRD_INTERNAL_BOUNDARY_HARDENING.md)
+Status: active spec session. No implementation tasks here.
 
-## Architectural decisions
+## Current Locked Decisions
 
-Durable decisions that apply across all phases:
+- Do not restart from scratch before specs are stable.
+- Target contracts are written across `core`, `cli`, and `varlock` concerns.
+- Core is exact and semantic.
+- CLI owns shell policy, prompts, guided completion, back/cancel, presentation, and exit behavior.
+- Core API is not a mirror of CLI commands.
+- `view`, `inspect`, and `load` share core `decryptPayload`.
+- Keep explicit core payload mutations, no generic public `writePayload`.
+- Keep typed semantic notices small; do not replace with logs.
+- Payload discovery from cwd is CLI-only.
+- Payload file IO after exact path is core-owned behind ports.
+- Identity parsing/resolution belongs in core queries.
+- Mutations receive strict inputs.
+- `grantPayloadRecipient` accepts an exact recipient identity snapshot.
+- `revokePayloadRecipient` accepts `OwnerId`.
+- Passphrase retry policy belongs to CLI; core is one-shot.
+- CLI flow-control signals are shell-internal, not core results.
 
-- **Packaging**: keep one `better-age` package; no public SDK, no multi-package split.
-- **Boundary direction**: app layer owns semantic use-cases and typed outcomes; CLI layer owns prompts, guided navigation, retries, back/cancel semantics, final rendering, and exit mapping.
-- **Failure model**: use one generic command-failure model carrying structured metadata such as command name and failure reason.
-- **User-facing copy**: final stderr/stdout copy is renderer-owned and driven by stable issue identifiers; low-level adapter text is not default UX.
-- **Guided control model**: shared guided flows must distinguish `done`, `back`, and `cancel`.
-- **Mutation orchestration**: `edit`, `grant`, and `revoke` should share one orchestration shape through deep CLI flow modules rather than duplicating orchestration in each command handler.
-- **Interactive ownership**: the interactive session runner belongs to CLI, not app.
-- **Load contract**: `load` keeps current machine-facing contract, including warning on update-needed with successful output.
-- **Runtime wiring**: keep Effect Layer-based composition, but group layers into coarse bundles to reduce assembly sprawl.
-- **Type discipline**: remove cast escape hatches where a stronger typed adapter boundary can express the same contract cleanly.
+## Canonical Target Commands
 
----
+```txt
+bage create
+bage edit
+bage grant
+bage inspect
+bage load --protocol-version=1
+bage revoke
+bage update
+bage view
 
-## Phase 1: Docs + Contract Sync
+bage identity export
+bage identity forget
+bage identity import
+bage identity list
+bage identity passphrase # aliases: pass, pw
+bage identity rotate
 
-**User stories**: 17, 18, 19
+bage setup
+bage interactive # alias: i
+```
 
-### What to build
+## Done
 
-Bring package docs and drift-tracking documents back in sync with actual behavior and the approved internal-boundary direction. This slice should correct stale statements first, so later implementation work starts from an accurate written contract.
+- Recovered durable decisions from append-only grill log.
+- Updated PRD from stale refactor/completed-phase framing to target spec charter.
+- Preserved current command target in ubiquitous language.
+- Boundary API spec already covers most core query/command contracts.
+- Boundary API spec already separates CLI commands from shared CLI flows.
+- Added reusable plaintext execution flow chunks for payload-content commands and create.
+- Error taxonomy cleanup pass completed in `3-ERROR_KIND_SPEC.md`.
+- Error/message mapping cleanup pass completed in `4-ERROR_MESSAGE_MAPPING_SPEC.md`.
+- Varlock adapter failures now have a typed boundary surface.
+- Added command-by-command CLI contract spec in `5-CLI_COMMAND_CONTRACT_SPEC.md`.
+- Reflected command contracts into `CLI_COMMAND_CONTRACTS` in `1-BOUNDARY_API_SPEC.ts`.
+- Added notice/success outcome spec in `6-NOTICE_SUCCESS_SPEC.md`.
+- Added global home preflight and shared failure ordering to execution specs.
+- Added persistence schema/migration spec in `7-PERSISTENCE_SCHEMA_SPEC.md`.
+- Added macro implementation architecture in `9-MACRO_IMPLEMENTATION_ARCHITECTURE.md`.
 
-### Acceptance criteria
+## Next Spec Slices
 
-- [x] Package docs describe `load` as warning-and-success when payload update is recommended.
-- [x] Drift/spec docs stop reporting already-fixed behavior as still broken.
-- [x] Internal-boundary target is described consistently across maintained package docs.
-- [x] No product behavior changes are required to complete this slice.
+1. Review execution-context model after full flow pass.
+   - exact vs guided captured
+   - interactive vs headless captured
+   - direct command vs interactive session captured without third axis
 
----
+2. Review CLI command contracts after full flow pass.
+   - exact/guided inputs captured per command
+   - prompt/viewer/editor/passphrase needs captured
+   - stdout/stderr/menu/viewer sinks captured
 
-## Phase 2: Shared Command Failure + Renderer Boundary
+3. Finish core API contracts.
+   - command/query inputs
+   - result values
+   - typed failure details
+   - semantic notices
 
-**User stories**: 6, 7, 8, 9, 16, 23
+4. Review error catalog after full command-flow pass.
+   - active taxonomy has no open questions after cleanup
+   - revisit only if later flow/API work exposes missing cases
 
-### What to build
+5. Review flow descriptions after final API pass.
+   - setup
+   - payload command-specific continuations after shared payload flow
+   - identity export/import/list/forget/rotate/passphrase
+   - interactive session routing
+   - varlock load protocol path
 
-Introduce a single CLI command-failure model and a clearer renderer-owned user-facing issue contract. The slice should reduce top-level exit-handling repetition and stop normal user-facing branches from depending directly on low-level error text.
+6. Implementation rollout framing.
+   - park current CLI as `cli-legacy`
+   - remove legacy command bin
+   - mark legacy package private
+   - create new core package first with full MVP test coverage
+   - create new CLI from scratch on top of new core
+   - package/bin compatibility is not required during unreleased MVP reimplementation
 
-### Acceptance criteria
+7. Core persistence/test-fixture strategy.
+   - define new `HomeStateDocument v1`
+   - define new `PayloadDocument v1`
+   - define new `PublicIdentityString v1`
+   - no compatibility with previous prototype schemas
+   - migration mechanism still exists and is tested from day one
+   - artifact envelopes use explicit `kind` and `version`
+   - encrypted private keys live in `keys/<fingerprint>.age`
+   - home state stores key metadata and encrypted-key refs only
+   - private key blobs use age-native encrypted file format; no custom outer crypto container
 
-- [x] Top-level CLI exit mapping uses one generic command-failure model instead of many per-command failure classes.
-- [x] User-facing warnings/errors are rendered through a central issue-driven renderer contract.
-- [x] Normal command stderr output no longer depends on raw adapter/app `message` text in targeted migrated branches.
-- [x] Existing machine-facing output behavior remains intact.
+8. Test strategy.
+   - deterministic core unit tests with fake ports
+   - focused core integration tests with real filesystem + real age adapter
+   - migration fixture tests from day one
+   - CLI contract tests for stdout/stderr/exit/prompt behavior
+   - varlock process/stdio integration tests
 
----
+9. Macro implementation architecture.
+   - package rollout
+   - dependency direction
+   - tech choices: `effect`, `@effect/cli`, internal presenter
+   - core deep modules
+   - CLI macro modules
+   - varlock module
+   - build order
+   - first tracer bullet candidate
 
-## Phase 3: Real Update Gate Semantics
+## Known Stale/Current-V1 Terms
 
-**User stories**: 10, 11, 12, 13, 14
+These names can appear in shipped docs/code, but are not target CLI language:
 
-### What to build
+- `me` -> `identity export` or part of `identity list`
+- `identities` -> `identity list`
+- `add-identity` -> `identity import`
+- `forget-identity` -> `identity forget`
+- `rotate` -> `identity rotate`
+- `change-passphrase` -> `identity passphrase`
 
-Implement real semantic handling for update-gated guided flows. The update gate must stop pretending that `Back` exists while actually aborting. This slice should make the gate reusable and make each command honor `Back` and `Cancel` distinctly.
+## Reviewer Summary
 
-### Acceptance criteria
-
-- [x] Guided update-gated mutation flows distinguish `Update now`, `Back`, and `Cancel`.
-- [x] `Back` returns to the previous local step rather than aborting the entire command.
-- [x] `Cancel` exits the command cleanly without pretending it was a local back-navigation event.
-- [x] Exact-mode mutation behavior stays explicit and does not silently convert into guided recovery.
-
----
-
-## Phase 4: Mutation Flow Deep Modules
-
-**User stories**: 2, 4, 5, 13, 15, 24
-
-### What to build
-
-Extract deep CLI flow modules that own the repeated orchestration shape for `edit`, `grant`, and `revoke`. Each command should become a thin end-to-end adapter over shared guided orchestration rather than a large bespoke control-flow implementation.
-
-### Acceptance criteria
-
-- [x] `edit`, `grant`, and `revoke` are driven by shared deep flow modules for the repeated orchestration shape.
-- [x] Command handlers are substantially thinner and read primarily as command adapters.
-- [x] Shared mutation flow modules are testable at the flow boundary without depending on command-file implementation details.
-- [x] User-facing behavior remains consistent with pre-existing semantics except where Phase 3 intentionally changed control behavior.
-
----
-
-## Phase 5: Interactive Ownership Move
-
-**User stories**: 1, 3
-
-### What to build
-
-Move the interactive session runner fully into CLI ownership. The slice should remove upward imports from app into CLI and clarify that interactive navigation is a CLI surface over shared command semantics, not an app-layer service.
-
-### Acceptance criteria
-
-- [x] Interactive session runner no longer lives in or depends upward from app layer.
-- [x] App layer does not import CLI command modules or CLI shared-flow modules.
-- [x] Interactive navigation still exposes the same product surface after relocation.
-- [x] The new ownership boundary is obvious from code organization and tests.
-
----
-
-## Phase 6: Infra Type Boundary Cleanup + Layer Grouping
-
-**User stories**: 20, 21, 22
-
-### What to build
-
-Tighten adapter typing and simplify runtime composition. Remove practical cast escape hatches, then group runtime layers into coarse bundles so composition remains understandable without changing overall runtime behavior.
-
-### Acceptance criteria
-
-- [x] Targeted infrastructure adapters no longer rely on the current cast escape hatches where a typed boundary can replace them cleanly.
-- [x] Runtime layer composition is grouped into coarse bundles with clearer responsibilities.
-- [x] Behavior remains unchanged apart from clearer typing and cleaner assembly.
-- [x] The package remains single-package and ready for future segmentation without introducing a premature package split.
+Done: stale plan reframed; specs complete enough for PRD; macro implementation architecture captured.
+Left: PRD synthesis, then tracer-bullet plan.
+Questions: none active.
+Blocking: none.

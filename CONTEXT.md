@@ -214,7 +214,7 @@ _Avoid_: Canonical display name, embedded identity field
 > **Domain expert:** "Prefer no. They should reuse one canonical **Identity Snapshot** and add container-specific fields only where needed."
 >
 > **Dev:** "Can a payload recipient become a known identity automatically when first seen?"
-> **Domain expert:** "Yes. That is why payload recipients, identity strings, and known identities must share the same **Public Identity Snapshot**."
+> **Domain expert:** "Not in MVP. If the payload recipient matches an existing **Known Identity** and carries a newer snapshot, update that known identity silently. Unknown payload recipients stay transient for the current command until a future import-from-payload flow exists."
 >
 > **Dev:** "Then where does the user-scoped alias live?"
 > **Domain expert:** "In a separate **Local Alias Map** under home state, not inside the shared public identity shape."
@@ -298,6 +298,7 @@ _Avoid_: Canonical display name, embedded identity field
 - "read operations should not trigger updates" was ambiguous across payload and home state. Resolution: this restriction applies to **User-Managed Resource** payload rewrites, not to **Managed State** home migration.
 - "identity string" was used to mean both one import/export encoding and the broader reusable identity representation. Resolution: use **Identity Snapshot** for the canonical versioned entity shape and **Identity String** for one serialized encoding of it.
 - "payload recipient as projection" conflicted with lossless promotion into known identities. Resolution: payload recipients, identity strings, and known identities share one **Public Identity Snapshot**; only local alias remains separate in **Local Alias Map**.
+- "payload recipients become known automatically" was too broad. Resolution: existing known identities may silently refresh from newer payload recipient snapshots; unknown payload recipients remain transient in MVP and need a future import-from-payload flow.
 
 ## Current Target
 

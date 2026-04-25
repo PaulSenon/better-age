@@ -46,7 +46,7 @@
 | **Revoke** | The operation that removes one **Recipient** from future rewritten versions of a **Payload**. | Delete, unshare, ban |
 | **Inspect** | The operation that reads non-secret **Payload** metadata and env key names. | Show recipients, ls, show |
 | **View** | The human plaintext-reading operation that opens one **Payload** inside the secure in-process viewer. | Read, cat, open |
-| **Load** | The machine-only operation that decrypts one **Payload** and writes raw `.env` text to `stdout` for another process to consume. | Read, view, export, decrypt |
+| **Load** | The machine-output operation that decrypts one **Payload** and writes raw `.env` text to `stdout` for another process to consume. For MVP, it still requires interactive passphrase acquisition. | Read, view, export, decrypt |
 | **Update** | The explicit maintenance operation that rewrites a **Payload** only for schema migration or refreshing a stale **Self Recipient**. | Repair, migrate, refresh |
 | **Self Recipient** | The **Recipient Entry** in a payload whose `ownerId` matches the current local self identity. | Owner row, local recipient, self key row |
 
@@ -68,10 +68,13 @@
 
 | Term | Definition | Aliases to avoid |
 | --- | --- | --- |
-| **Exact Invocation** | A command call that supplies every required operand up front and does not rely on guided completion. | Full command mode, non-interactive mode |
-| **Guided Invocation** | A command call that omits one or more operands and lets the CLI complete intent through prompts, pickers, or viewers. | Wizard mode, convenience mode |
+| **Exact Invocation** | A command call that supplies every required non-secret operand up front. Passphrase acquisition is a separate credential step, not an operand-completeness signal. | Full command mode, non-interactive mode |
+| **Guided Invocation** | A command call that omits one or more non-secret operands and lets the CLI complete intent through prompts, pickers, or viewers when an **Interactive Terminal** is available. | Wizard mode, convenience mode |
 | **Interactive Terminal** | A runtime where prompts, menus, and the secure viewer can open safely. | TTY mode |
 | **Headless Terminal** | A runtime where guided human surfaces are unavailable even if a command still runs. | Non-interactive mode |
+| **Payload Context** | The command-local in-memory result of opening/decrypting one existing **Payload** early so later flow steps can fail fast and build contextual prompts. | Payload session, decrypted cache |
+| **Passphrase Retry** | The inline retry loop after a wrong passphrase during interactive credential acquisition. Target policy: 3 total attempts, then fail. | Retry menu, unlock flow |
+| **Grant Recipient Picker** | The guided `grant` picker that merges self identity, local known identities, and current payload recipients into one rendered list plus a custom identity-string entry. | Share picker, identity chooser |
 | **Flow Outcome** | The semantic result of one guided step: `OK`, `BACK`, `CANCEL`, or `ERROR`. | Return code, result state |
 | **Back Transition** | A local navigation return from a nested step without committing new mutation. | Cancel, quit |
 | **Cancel Outcome** | An intentional stop of the current command flow by the user. | Error, back |
@@ -95,6 +98,7 @@
 - A **Local Alias** points to exactly one **Known Identity**.
 - A **Forget Identity** removes one **Known Identity** from **Home State** only.
 - An **Identity Command Group** contains **Identity Export**, **Identity List**, **Identity Import**, **Identity Forget**, **Identity Rotate**, and **Identity Passphrase**.
+- **Identity Import** is the MVP command that can set or change **Local Alias**.
 - The **Setup Command** is root-level even though it creates local identity state.
 - A **Passphrase** is required for local private-key protection.
 - A **Key Mode** belongs to one concrete local identity record.
@@ -105,6 +109,9 @@
 - A **Revoke** removes one **Recipient Entry** from future rewritten versions of a **Payload**.
 - A **View** opens one **Payload** in the **Secure Viewer** for human reading.
 - A **Load** reads exactly one **Payload** path per invocation.
+- **Load** is machine-output, not headless by default.
+- **Load** requires an **Interactive Terminal** for passphrase acquisition in MVP.
+- **Load** fails immediately with explicit remediation when passphrase acquisition is unavailable.
 - An **Update** may rewrite a **Payload** without changing non-self access intent.
 - The **Root Payload Commands** are the canonical short CLI surface for payload work.
 - A **Self Recipient** may become stale after **Key Rotation**.
@@ -116,7 +123,14 @@
 - An **Interactive Session** routes human workflows through keyboard-select navigation.
 - A **Secure Viewer** belongs to the human UX path and is distinct from **Load**.
 - An **Exact Invocation** must not rely on an **Interactive Terminal** to complete missing operands.
+- An **Exact Invocation** may still require an interactive passphrase prompt unless a later headless credential channel is explicitly specified.
 - A **Guided Invocation** may require an **Interactive Terminal**.
+- Payload-content commands create a **Payload Context** early after path and passphrase are available.
+- Payload-content commands are `inspect`, `view`, `edit`, `grant`, `revoke`, `update`, and `load`.
+- **Create** requires passphrase acquisition but never creates a **Payload Context** because no existing payload is read.
+- **Passphrase Retry** does not reopen operand choosers; it only repeats passphrase prompt.
+- **Grant Recipient Picker** merges identities by **Owner Id** and treats **Local Alias** as display overlay only.
+- Payload recipients discovered during a payload open may silently refresh an existing **Known Identity** when newer, but unknown recipients remain transient in MVP.
 - A **Back Transition** is one possible **Flow Outcome** of a guided subflow.
 - A **Cancel Outcome** stops the current command flow and is not the same as **Back Transition**.
 - A **Message Id** belongs to one semantic user-facing branch.

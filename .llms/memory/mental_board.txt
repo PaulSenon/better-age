@@ -1,0 +1,19 @@
+Current goal: spec-only CLI/core/varlock boundary hardening for better-age.
+
+Active state:
+- Command surface locked around create/edit/grant/inspect/load/revoke/update/view + identity subcommands.
+- Error taxonomy/mapping cleanup pass complete; no active error-spec questions.
+- Core stays exact/stateless; CLI owns exact/guided + interactive/headless flow.
+- CLI command contract pass now captured in `5-CLI_COMMAND_CONTRACT_SPEC.md`.
+- Notice/success spec captured in `6-NOTICE_SUCCESS_SPEC.md`.
+- Preflight/failure ordering captured in execution specs.
+- Rollout: rename current CLI package/folder to `cli-legacy`, remove bin, mark private. No compatibility needed before release.
+- Persistence: new Home/Payload/IdentityString formats start at v1 with explicit kind/version; no prototype compatibility; migration mechanism required/tested.
+- Encrypted private keys live as `keys/<fingerprint>.age`; home stores metadata/refs; no custom outer crypto container.
+- Test strategy: core unit tests with fake ports; focused integration tests with real age/fs; migration fixtures day one; CLI contract tests; varlock stdio integration.
+- Macro implementation architecture captured in `9-MACRO_IMPLEMENTATION_ARCHITECTURE.md`; next step can be PRD synthesis.
+- Tech lock: core uses `effect`; CLI uses `effect + @effect/cli`; styling behind internal `CliPresenter` with emoji/color/bold allowed for human output; machine stdout unstyled.
+
+Next:
+- Synthesize PRD markdown, then tracer-bullet phase plan.
+- Avoid implementation changes.

@@ -1,0 +1,4 @@
+CLI/core boundary spec: design future flow for importing unknown identities discovered in a payload. Candidate: interactive-only flow after opening payload when new recipients exist, or dedicated command later. Should loop through unknown identities, allow import/skip, and optionally prompt local alias on display-name collision.
+Payload update hardening: before replacing a payload file, encrypt updated payload in memory, decrypt/reopen it in memory, and only persist if verification succeeds. Out of MVP.
+Future identity alias commands: `bage identity alias add [<identity-ref>] [<alias>]` to add/edit alias, and `bage identity alias remove [<identity-ref>]` with possible `rm` alias. Out of MVP.
+Consider CLI-only follow-up after interactive `create`: offer or automatically start `edit` for the newly created empty payload. Core create remains empty-payload only.
