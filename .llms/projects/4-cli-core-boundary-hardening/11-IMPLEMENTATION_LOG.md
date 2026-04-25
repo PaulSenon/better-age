@@ -324,3 +324,84 @@ Notes:
 
 - The new CLI runner is intentionally small and contract-first; there is no `bage` bin yet.
 - `@effect/cli` remains the chosen CLI dependency, but this phase did not yet replace the runner's tiny argv parser with an `@effect/cli` command tree. That should be handled before packaging/help/completions work, or in the next CLI infrastructure pass.
+
+## 2026-04-25 Phase 7 Start
+
+Track check:
+
+- Phase 6 is complete.
+- Phase 7 is the correct next slice from `plans/better-age-mvp-reimplementation.md`.
+- Scope is new CLI payload create/read/edit only.
+- Sharing and maintenance commands (`grant`, `revoke`, `update`) remain Phase 8.
+
+Goal:
+
+- Add `create`, `inspect`, `view`, `load`, and `edit` to the new CLI runner.
+- Preserve command contracts: machine-clean stdout for `load`, no plaintext stdout for `view`, readable inspect output, prompt-policy correctness, and editor/viewer boundaries.
+
+Actions completed:
+
+- Extended the new CLI core contract with payload primitives:
+  - `commands.createPayload`
+  - `commands.editPayload`
+  - `queries.decryptPayload`
+- Added optional `payloadPathExists` preflight hook to `runCli`.
+- Wired `createNodeCli` to pass the real payload repository existence check.
+- Added payload path resolution for exact and guided interactive modes.
+- Added shared payload context opening:
+  - validates payload path before passphrase when `payloadPathExists` is available.
+  - fails headless before decrypt.
+  - retries wrong passphrase inline without returning to path selection.
+  - routes payload update notices to stderr.
+- Added `create` flow:
+  - target existence checked before passphrase.
+  - headless fails without creating.
+  - success/error uses presenter.
+- Added `inspect` flow:
+  - renders payload metadata, env key names, and recipients.
+  - never prints env values.
+- Added `load --protocol-version=1` flow:
+  - validates protocol before prompt/decrypt.
+  - prints raw env text only to stdout.
+  - routes warnings to stderr.
+- Added `view` flow:
+  - opens plaintext only through `terminal.openViewer`.
+  - never prints plaintext to stdout.
+- Added `edit` flow:
+  - opens editor with current env text.
+  - cancel returns cancelled.
+  - unchanged returns success without mutation.
+  - invalid `.env` reports error and reopens editor with previous edited text.
+  - valid changed content calls core `editPayload`.
+- Tightened core `decryptPayload` success typing by preserving literal `kind: "success"` and `code: "PAYLOAD_DECRYPTED"` for package-boundary compatibility.
+
+TDD notes:
+
+- RED: `create` contract failed because command was unknown.
+- GREEN: added create flow and target-existence preflight hook.
+- RED: `inspect` contract failed because command was unknown.
+- GREEN: added payload context opening and inspect presenter.
+- RED: `load` protocol/clean stdout contract failed because command was unknown.
+- GREEN: added protocol gate and raw env stdout behavior.
+- RED: `view` contract failed because command was unknown.
+- GREEN: added viewer port and view command.
+- RED: `edit` contract failed because command was unknown.
+- GREEN: added editor port, invalid env retry loop, cancel/unchanged/changed handling.
+- RED: mode/passphrase test added for headless and guided retry.
+- GREEN: shared payload context covered mode policy.
+- REFACTOR: no broad refactor; kept runner contract-first and presenter-owned output.
+
+Verification:
+
+- `pnpm -F @better-age/cli test:unit` passed: 12 tests.
+- `pnpm -F @better-age/cli check` passed.
+- `pnpm -F @better-age/core check` passed.
+- `pnpm test` passed.
+- `pnpm check` passed.
+- `git diff --check` passed.
+
+Notes:
+
+- `@effect/cli` command-tree/parser integration is still pending; runner remains a small contract-first argv parser.
+- There is still no `bage` bin.
+- Real editor/viewer implementations are not introduced yet; Phase 7 defines the ports and tests CLI behavior through them.

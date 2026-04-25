@@ -150,14 +150,14 @@ Add payload create and read/edit commands to the new CLI. Implement shared paylo
 
 ### Acceptance Criteria
 
-- [ ] `bage create` validates target existence before passphrase prompt.
-- [ ] `bage inspect` renders metadata, keys, and recipients without plaintext values.
-- [ ] `bage view` opens plaintext through the secure viewer and never stdout.
-- [ ] `bage load --protocol-version=1` prints raw env text only to stdout.
-- [ ] `load` protocol errors are handled before prompts.
-- [ ] `bage edit` handles cancel, unchanged, invalid env retry, and changed save.
-- [ ] Payload read notices/warnings route to stderr where required.
-- [ ] Exact/guided/headless behavior matches the command contracts.
+- [x] `bage create` validates target existence before passphrase prompt.
+- [x] `bage inspect` renders metadata, keys, and recipients without plaintext values.
+- [x] `bage view` opens plaintext through the secure viewer and never stdout.
+- [x] `bage load --protocol-version=1` prints raw env text only to stdout.
+- [x] `load` protocol errors are handled before prompts.
+- [x] `bage edit` handles cancel, unchanged, invalid env retry, and changed save.
+- [x] Payload read notices/warnings route to stderr where required.
+- [x] Exact/guided/headless behavior matches the command contracts.
 
 ---
 

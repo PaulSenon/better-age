@@ -17,11 +17,12 @@ export type NodeCliOptions = {
 
 export const createNodeCli = (options: NodeCliOptions) => {
 	const homeDir = options.homeDir ?? join(homedir(), ".better-age");
+	const payloadRepository = createNodePayloadRepository();
 	const core = createBetterAgeCore({
 		clock: { now: async () => new Date().toISOString() },
 		homeRepository: createNodeHomeRepository({ homeDir }),
 		identityCrypto: createAgeIdentityCrypto(),
-		payloadRepository: createNodePayloadRepository(),
+		payloadRepository,
 		payloadCrypto: createAgePayloadCrypto(),
 		randomIds: {
 			nextOwnerId: async () => `owner_${randomUUID()}`,
@@ -31,6 +32,11 @@ export const createNodeCli = (options: NodeCliOptions) => {
 
 	return {
 		run: async (argv: ReadonlyArray<string>) =>
-			await runCli({ argv, core, terminal: options.terminal }),
+			await runCli({
+				argv,
+				core,
+				payloadPathExists: payloadRepository.payloadExists,
+				terminal: options.terminal,
+			}),
 	};
 };

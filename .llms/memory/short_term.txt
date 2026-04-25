@@ -7,3 +7,15 @@
 - No `bage` bin yet.
 - `@effect/cli` is installed/locked, but command tree/parser integration still pending before final packaging/help/completions.
 - Verification passed: `pnpm test`, `pnpm check`, `git diff --check`.
+
+2026-04-25 Phase 7 complete:
+- New CLI payload create/read/edit slice implemented in `packages/cli/src/cli/runCli.ts`.
+- Added contracts for `create`, `inspect`, `view`, `load --protocol-version=1`, and `edit`.
+- `createNodeCli` now passes real payload existence preflight.
+- `load` stdout is raw env text only; warnings go stderr.
+- `view` plaintext only goes through `terminal.openViewer`.
+- `edit` uses `terminal.openEditor`, covering cancel/unchanged/invalid retry/changed save.
+- Shared payload context handles path preflight, headless no-prompt failure, passphrase retry, and notices.
+- Core `decryptPayload` success result typing tightened to literal success/code.
+- Verification passed: `pnpm test`, `pnpm check`, `git diff --check`.
+- Next phase: Phase 8 sharing/maintenance (`grant`, `revoke`, `update`).

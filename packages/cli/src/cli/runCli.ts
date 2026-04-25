@@ -2,7 +2,9 @@ import {
 	presentFailure,
 	presentIdentityList,
 	presentIdentityString,
+	presentPayloadInspect,
 	presentSuccess,
+	presentWarning,
 } from "./presenter.js";
 
 export type CliTerminalMode = "interactive" | "headless";
@@ -21,7 +23,12 @@ type CoreFailure = {
 
 type CoreResponse<TValue> = {
 	readonly result: CoreSuccess<TValue> | CoreFailure;
-	readonly notices: ReadonlyArray<unknown>;
+	readonly notices: ReadonlyArray<CoreNotice>;
+};
+
+type CoreNotice = {
+	readonly level: "warning";
+	readonly code: string;
 };
 
 type KnownIdentity = {
@@ -50,12 +57,54 @@ type RetiredKey = {
 	readonly retiredAt: string;
 };
 
+type PayloadRecipient = {
+	readonly ownerId: string;
+	readonly displayName: string;
+	readonly handle: string;
+	readonly fingerprint: string;
+	readonly localAlias: string | null;
+	readonly isSelf: boolean;
+	readonly isStaleSelf: boolean;
+};
+
+type DecryptedPayload = {
+	readonly path: string;
+	readonly payloadId: string;
+	readonly createdAt: string;
+	readonly lastRewrittenAt: string;
+	readonly schemaVersion: number;
+	readonly compatibility: "up-to-date" | "readable-but-outdated";
+	readonly envText: string;
+	readonly envKeys: ReadonlyArray<string>;
+	readonly recipients: ReadonlyArray<PayloadRecipient>;
+};
+
 export type CliCore = {
 	readonly commands: {
 		readonly createSelfIdentity: (input: {
 			readonly displayName: string;
 			readonly passphrase: string;
 		}) => Promise<CoreResponse<{ readonly handle: string }>>;
+		readonly createPayload: (input: {
+			readonly path: string;
+			readonly passphrase: string;
+		}) => Promise<
+			CoreResponse<{
+				readonly path: string;
+				readonly payloadId: string;
+			}>
+		>;
+		readonly editPayload: (input: {
+			readonly path: string;
+			readonly passphrase: string;
+			readonly editedEnvText: string;
+		}) => Promise<
+			CoreResponse<{
+				readonly path: string;
+				readonly payloadId: string;
+				readonly outcome: string;
+			}>
+		>;
 		readonly importKnownIdentity: (input: {
 			readonly identityString: string;
 			readonly localAlias?: string | null;
@@ -74,6 +123,10 @@ export type CliCore = {
 		readonly exportSelfIdentityString: () => Promise<
 			CoreResponse<{ readonly identityString: string }>
 		>;
+		readonly decryptPayload: (input: {
+			readonly path: string;
+			readonly passphrase: string;
+		}) => Promise<CoreResponse<DecryptedPayload>>;
 		readonly getSelfIdentity: () => Promise<CoreResponse<SelfIdentity>>;
 		readonly listKnownIdentities: () => Promise<
 			CoreResponse<ReadonlyArray<KnownIdentity>>
@@ -86,6 +139,13 @@ export type CliCore = {
 
 export type CliTerminal = {
 	readonly mode: CliTerminalMode;
+	readonly openEditor?: (
+		initialText: string,
+	) => Promise<
+		| { readonly kind: "cancel" }
+		| { readonly kind: "saved"; readonly text: string }
+	>;
+	readonly openViewer?: (envText: string) => Promise<void>;
 	readonly promptText?: (label: string) => Promise<string>;
 	readonly promptSecret?: (label: string) => Promise<string>;
 };
@@ -93,6 +153,7 @@ export type CliTerminal = {
 export type RunCliInput = {
 	readonly argv: ReadonlyArray<string>;
 	readonly core: CliCore;
+	readonly payloadPathExists?: (path: string) => Promise<boolean>;
 	readonly terminal: CliTerminal;
 };
 
@@ -154,6 +215,40 @@ const requirePromptSecret = (
 	terminal: CliTerminal,
 ): ((label: string) => Promise<string>) | null =>
 	terminal.mode === "headless" ? null : (terminal.promptSecret ?? null);
+
+const acquirePassphrase = async (
+	terminal: CliTerminal,
+): Promise<
+	{ readonly passphrase: string } | { readonly failure: RunCliResult }
+> => {
+	const promptSecret = requirePromptSecret(terminal);
+
+	if (promptSecret === null) {
+		return { failure: presentFailure("PASSPHRASE_UNAVAILABLE") };
+	}
+
+	return { passphrase: await promptSecret("Passphrase") };
+};
+
+const renderNotices = (notices: ReadonlyArray<CoreNotice>): string =>
+	notices
+		.map((notice) =>
+			notice.code === "PAYLOAD_UPDATE_RECOMMENDED"
+				? presentWarning("Payload update recommended: run bage update")
+				: presentWarning(notice.code),
+		)
+		.join("");
+
+const isValidEnvText = (envText: string): boolean =>
+	envText
+		.split(/\r?\n/)
+		.map((line) => line.trim())
+		.every(
+			(line) =>
+				line.length === 0 ||
+				line.startsWith("#") ||
+				/^[A-Za-z_][A-Za-z0-9_]*=.*/.test(line),
+		);
 
 const acquireNewPassphrase = async (
 	terminal: CliTerminal,
@@ -221,6 +316,246 @@ const runSetup = async (
 	}
 
 	return presentSuccess(`Identity created: ${response.result.value.handle}`);
+};
+
+const resolvePayloadPath = async (
+	args: ParsedArgs,
+	input: RunCliInput,
+): Promise<string | null> =>
+	args.positionals[1] ??
+	(input.terminal.mode === "interactive"
+		? await ensurePromptText(input.terminal)("Payload path")
+		: null);
+
+const runCreatePayload = async (
+	args: ParsedArgs,
+	input: RunCliInput,
+): Promise<RunCliResult> => {
+	const path = await resolvePayloadPath(args, input);
+
+	if (path === null || path.length === 0) {
+		return presentFailure("PAYLOAD_PATH_MISSING", 2);
+	}
+
+	if ((await input.payloadPathExists?.(path)) === true) {
+		return presentFailure("PAYLOAD_ALREADY_EXISTS");
+	}
+
+	const passphrase = await acquirePassphrase(input.terminal);
+
+	if ("failure" in passphrase) {
+		return passphrase.failure;
+	}
+
+	const response = await input.core.commands.createPayload({
+		path,
+		passphrase: passphrase.passphrase,
+	});
+
+	if (response.result.kind === "failure") {
+		return presentFailure(response.result.code);
+	}
+
+	return presentSuccess(`Payload created: ${response.result.value.path}`);
+};
+
+const openPayloadContext = async (
+	args: ParsedArgs,
+	input: RunCliInput,
+): Promise<
+	| {
+			readonly payload: DecryptedPayload;
+			readonly passphrase: string;
+			readonly stderr: string;
+	  }
+	| { readonly failure: RunCliResult }
+> => {
+	const path = await resolvePayloadPath(args, input);
+
+	if (path === null || path.length === 0) {
+		return { failure: presentFailure("PAYLOAD_PATH_MISSING", 2) };
+	}
+
+	if ((await input.payloadPathExists?.(path)) === false) {
+		return { failure: presentFailure("PAYLOAD_NOT_FOUND") };
+	}
+
+	if (input.terminal.mode === "headless") {
+		return { failure: presentFailure("PASSPHRASE_UNAVAILABLE") };
+	}
+
+	let stderr = "";
+
+	for (let attempt = 0; attempt < 3; attempt++) {
+		const passphrase = await acquirePassphrase(input.terminal);
+
+		if ("failure" in passphrase) {
+			return passphrase;
+		}
+
+		const response = await input.core.queries.decryptPayload({
+			path,
+			passphrase: passphrase.passphrase,
+		});
+
+		if (response.result.kind === "success") {
+			return {
+				payload: response.result.value,
+				passphrase: passphrase.passphrase,
+				stderr: `${stderr}${renderNotices(response.notices)}`,
+			};
+		}
+
+		if (response.result.code !== "PASSPHRASE_INCORRECT") {
+			return {
+				failure: {
+					...presentFailure(response.result.code),
+					stderr: `${stderr}${presentFailure(response.result.code).stderr}`,
+				},
+			};
+		}
+
+		if (attempt < 2) {
+			stderr += "[ERROR] PASSPHRASE_INCORRECT: invalid passphrase, try again\n";
+		}
+	}
+
+	return {
+		failure: {
+			...presentFailure("PASSPHRASE_INCORRECT"),
+			stderr: `${stderr}${presentFailure("PASSPHRASE_INCORRECT").stderr}`,
+		},
+	};
+};
+
+const runInspectPayload = async (
+	args: ParsedArgs,
+	input: RunCliInput,
+): Promise<RunCliResult> => {
+	const opened = await openPayloadContext(args, input);
+
+	if ("failure" in opened) {
+		return opened.failure;
+	}
+
+	const result = presentPayloadInspect(opened.payload);
+
+	return { ...result, stderr: `${opened.stderr}${result.stderr}` };
+};
+
+const runLoadPayload = async (
+	args: ParsedArgs,
+	input: RunCliInput,
+): Promise<RunCliResult> => {
+	const protocolVersion = args.options["protocol-version"];
+
+	if (protocolVersion === undefined) {
+		return presentFailure("LOAD_PROTOCOL_REQUIRED", 2);
+	}
+
+	if (protocolVersion !== "1") {
+		return presentFailure("LOAD_PROTOCOL_UNSUPPORTED", 2);
+	}
+
+	const opened = await openPayloadContext(args, input);
+
+	if ("failure" in opened) {
+		return opened.failure;
+	}
+
+	return {
+		exitCode: 0,
+		stdout: opened.payload.envText,
+		stderr: opened.stderr,
+	};
+};
+
+const runViewPayload = async (
+	args: ParsedArgs,
+	input: RunCliInput,
+): Promise<RunCliResult> => {
+	const opened = await openPayloadContext(args, input);
+
+	if ("failure" in opened) {
+		return opened.failure;
+	}
+
+	if (input.terminal.openViewer === undefined) {
+		return presentFailure("VIEWER_UNAVAILABLE");
+	}
+
+	await input.terminal.openViewer(opened.payload.envText);
+
+	return {
+		...presentSuccess("Viewer closed"),
+		stderr: `${opened.stderr}${presentSuccess("Viewer closed").stderr}`,
+	};
+};
+
+const runEditPayload = async (
+	args: ParsedArgs,
+	input: RunCliInput,
+): Promise<RunCliResult> => {
+	const opened = await openPayloadContext(args, input);
+
+	if ("failure" in opened) {
+		return opened.failure;
+	}
+
+	if (input.terminal.openEditor === undefined) {
+		return presentFailure("EDITOR_UNAVAILABLE");
+	}
+
+	let stderr = opened.stderr;
+	let editorText = opened.payload.envText;
+
+	for (let attempt = 0; attempt < 5; attempt++) {
+		const edited = await input.terminal.openEditor(editorText);
+
+		if (edited.kind === "cancel") {
+			return {
+				...presentFailure("CANCELLED", 130),
+				stderr: `${stderr}${presentFailure("CANCELLED", 130).stderr}`,
+			};
+		}
+
+		editorText = edited.text;
+
+		if (editorText === opened.payload.envText) {
+			return {
+				...presentSuccess(`Payload unchanged: ${opened.payload.path}`),
+				stderr: `${stderr}${presentSuccess(`Payload unchanged: ${opened.payload.path}`).stderr}`,
+			};
+		}
+
+		if (!isValidEnvText(editorText)) {
+			stderr += presentFailure("PAYLOAD_ENV_INVALID").stderr;
+			continue;
+		}
+
+		const response = await input.core.commands.editPayload({
+			path: opened.payload.path,
+			passphrase: opened.passphrase,
+			editedEnvText: editorText,
+		});
+
+		if (response.result.kind === "failure") {
+			return {
+				...presentFailure(response.result.code),
+				stderr: `${stderr}${presentFailure(response.result.code).stderr}`,
+			};
+		}
+
+		const outcome =
+			response.result.value.outcome === "unchanged" ? "unchanged" : "edited";
+
+		return {
+			...presentSuccess(`Payload ${outcome}: ${response.result.value.path}`),
+			stderr: `${stderr}${presentSuccess(`Payload ${outcome}: ${response.result.value.path}`).stderr}`,
+		};
+	}
+
+	return presentFailure("PAYLOAD_ENV_INVALID");
 };
 
 const runIdentityExport = async (core: CliCore): Promise<RunCliResult> => {
@@ -362,6 +697,26 @@ export const runCli = async (input: RunCliInput): Promise<RunCliResult> => {
 
 	if (command === "setup") {
 		return runSetup(args, input);
+	}
+
+	if (command === "create") {
+		return runCreatePayload(args, input);
+	}
+
+	if (command === "inspect") {
+		return runInspectPayload(args, input);
+	}
+
+	if (command === "load") {
+		return runLoadPayload(args, input);
+	}
+
+	if (command === "view") {
+		return runViewPayload(args, input);
+	}
+
+	if (command === "edit") {
+		return runEditPayload(args, input);
 	}
 
 	if (command === "identity" && subcommand === "export") {

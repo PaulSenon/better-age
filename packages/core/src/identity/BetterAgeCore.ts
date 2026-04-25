@@ -560,8 +560,8 @@ export const createBetterAgeCore = (ports: BetterAgeCorePorts) => {
 
 		return response(
 			{
-				kind: "success",
-				code: "PAYLOAD_DECRYPTED",
+				kind: "success" as const,
+				code: "PAYLOAD_DECRYPTED" as const,
 				value: {
 					path: input.path,
 					payloadId: plaintext.payloadId,
