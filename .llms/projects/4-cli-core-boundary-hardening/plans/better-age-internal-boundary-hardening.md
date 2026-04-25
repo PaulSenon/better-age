@@ -61,6 +61,8 @@ bage interactive # alias: i
 - Added global home preflight and shared failure ordering to execution specs.
 - Added persistence schema/migration spec in `7-PERSISTENCE_SCHEMA_SPEC.md`.
 - Added macro implementation architecture in `9-MACRO_IMPLEMENTATION_ARCHITECTURE.md`.
+- Added implementation PRD in `10-PRD_MVP_REIMPLEMENTATION.md`.
+- Added tracer-bullet implementation plan in `plans/better-age-mvp-reimplementation.md`.
 
 ## Next Spec Slices
 
@@ -140,7 +142,7 @@ These names can appear in shipped docs/code, but are not target CLI language:
 
 ## Reviewer Summary
 
-Done: stale plan reframed; specs complete enough for PRD; macro implementation architecture captured.
-Left: PRD synthesis, then tracer-bullet plan.
+Done: stale plan reframed; specs complete enough for PRD; macro implementation architecture captured; PRD synthesized; tracer-bullet plan written.
+Left: implementation.
 Questions: none active.
 Blocking: none.

@@ -152,6 +152,7 @@ Policy direction:
 - persistence schemas and migration strategy: `7-PERSISTENCE_SCHEMA_SPEC.md`
 - test strategy: `8-TEST_STRATEGY_SPEC.md`
 - macro implementation architecture: `9-MACRO_IMPLEMENTATION_ARCHITECTURE.md`
+- implementation PRD: `10-PRD_MVP_REIMPLEMENTATION.md`
 - spec worklist: `plans/better-age-internal-boundary-hardening.md`
 - project language: `../../UBIQUITOUS_LANGUAGE.md`
 - compatibility language: `../../CONTEXT.md`

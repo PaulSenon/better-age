@@ -13,7 +13,9 @@ Active state:
 - Test strategy: core unit tests with fake ports; focused integration tests with real age/fs; migration fixtures day one; CLI contract tests; varlock stdio integration.
 - Macro implementation architecture captured in `9-MACRO_IMPLEMENTATION_ARCHITECTURE.md`; next step can be PRD synthesis.
 - Tech lock: core uses `effect`; CLI uses `effect + @effect/cli`; styling behind internal `CliPresenter` with emoji/color/bold allowed for human output; machine stdout unstyled.
+- PRD created at `10-PRD_MVP_REIMPLEMENTATION.md`.
+- Plan created at `plans/better-age-mvp-reimplementation.md`.
 
 Next:
-- Synthesize PRD markdown, then tracer-bullet phase plan.
+- Begin implementation from Phase 1 when requested.
 - Avoid implementation changes.

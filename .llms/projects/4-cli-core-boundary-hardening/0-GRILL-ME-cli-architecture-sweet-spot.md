@@ -2584,3 +2584,36 @@ Persisted technology choice:
 - `effect + @effect/cli` for CLI.
 - internal presenter boundary owns emoji/color/bold/minimal ANSI rendering.
 - machine stdout remains unstyled.
+
+### Assistant
+Created PRD markdown using `to-prd` workflow:
+- `10-PRD_MVP_REIMPLEMENTATION.md`
+- one umbrella PRD, not multiple PRDs.
+- covers problem, solution, user stories, implementation decisions, testing decisions, out of scope, notes.
+
+### User
+Asked to write the implementation plan using `prd-to-plan`.
+
+### Assistant
+Prepared proposed tracer-bullet phase breakdown for approval before writing final plan file.
+
+Proposed phases:
+- legacy parking and workspace skeleton
+- artifact/migration/test harness foundation
+- core identity/key lifecycle
+- core payload lifecycle
+- real adapters integration
+- new CLI shell/presenter + identity commands
+- new CLI payload create/read/edit/load commands
+- new CLI grant/revoke/update guided flows
+- varlock load protocol integration
+- final contract hardening
+
+### User
+Approved proposed tracer-bullet breakdown.
+
+### Assistant
+Created final plan:
+- `plans/better-age-mvp-reimplementation.md`
+- 11 phases.
+- each phase includes user stories, what to build, and acceptance criteria.
