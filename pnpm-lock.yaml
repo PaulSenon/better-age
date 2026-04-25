@@ -27,7 +27,33 @@ importers:
         specifier: 'catalog:'
         version: 5.9.3
 
-  packages/cli: {}
+  packages/cli:
+    dependencies:
+      '@effect/cli':
+        specifier: ^0.75.1
+        version: 0.75.1(@effect/platform@0.96.0(effect@3.21.2))(@effect/printer-ansi@0.49.0(@effect/typeclass@0.40.0(effect@3.21.2))(effect@3.21.2))(@effect/printer@0.49.0(@effect/typeclass@0.40.0(effect@3.21.2))(effect@3.21.2))(effect@3.21.2)
+      effect:
+        specifier: ^3.21.2
+        version: 3.21.2
+    devDependencies:
+      '@biomejs/biome':
+        specifier: 2.4.10
+        version: 2.4.10
+      '@effect/language-service':
+        specifier: ^0.85.1
+        version: 0.85.1
+      '@effect/vitest':
+        specifier: ^0.29.0
+        version: 0.29.0(effect@3.21.2)(vitest@3.2.4(@types/debug@4.1.12)(@types/node@25.6.0)(jiti@2.6.1)(lightningcss@1.32.0)(yaml@2.8.3))
+      '@types/node':
+        specifier: ^25.6.0
+        version: 25.6.0
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.12)(@types/node@25.6.0)(jiti@2.6.1)(lightningcss@1.32.0)(yaml@2.8.3)
 
   packages/cli-legacy:
     dependencies:
@@ -84,7 +110,30 @@ importers:
         specifier: ^3.2.4
         version: 3.2.4(@types/debug@4.1.12)(@types/node@25.6.0)(jiti@2.6.1)(lightningcss@1.32.0)(yaml@2.8.3)
 
-  packages/core: {}
+  packages/core:
+    dependencies:
+      effect:
+        specifier: ^3.21.1
+        version: 3.21.1
+    devDependencies:
+      '@biomejs/biome':
+        specifier: 2.4.10
+        version: 2.4.10
+      '@effect/language-service':
+        specifier: ^0.85.1
+        version: 0.85.1
+      '@effect/vitest':
+        specifier: ^0.29.0
+        version: 0.29.0(effect@3.21.1)(vitest@3.2.4(@types/debug@4.1.12)(@types/node@25.6.0)(jiti@2.6.1)(lightningcss@1.32.0)(yaml@2.8.3))
+      '@types/node':
+        specifier: ^25.6.0
+        version: 25.6.0
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.12)(@types/node@25.6.0)(jiti@2.6.1)(lightningcss@1.32.0)(yaml@2.8.3)
 
   packages/varlock:
     dependencies:
@@ -1244,6 +1293,9 @@ packages:
   effect@3.21.1:
     resolution: {integrity: sha512-bA3TsBd0mByThuCnE6FQqS+L3DLazk4UbE9jp0CqVfIjQl5DKi8sAe93O/ZKeF7clL65fJxcsVGiAKYXdnHByA==}
 
+  effect@3.21.2:
+    resolution: {integrity: sha512-rXd2FGDM8KdjSIrc+mqEELo7ScW7xTVxEf1iInmPSpIde9/nyGuFM710cjTo7/EreGXiUX2MOonPpprbz2XHCg==}
+
   elliptic@6.6.1:
     resolution: {integrity: sha512-RaddvvMatK2LJHqFJ+YA4WysVN5Ita9E35botqIYspQ4TkRAlCicdzKOjlyv/1Za5RyTNn7di//eEV0uTAfe3g==}
 
@@ -2203,6 +2255,16 @@ snapshots:
       toml: 3.0.0
       yaml: 2.8.3
 
+  '@effect/cli@0.75.1(@effect/platform@0.96.0(effect@3.21.2))(@effect/printer-ansi@0.49.0(@effect/typeclass@0.40.0(effect@3.21.2))(effect@3.21.2))(@effect/printer@0.49.0(@effect/typeclass@0.40.0(effect@3.21.2))(effect@3.21.2))(effect@3.21.2)':
+    dependencies:
+      '@effect/platform': 0.96.0(effect@3.21.2)
+      '@effect/printer': 0.49.0(@effect/typeclass@0.40.0(effect@3.21.2))(effect@3.21.2)
+      '@effect/printer-ansi': 0.49.0(@effect/typeclass@0.40.0(effect@3.21.2))(effect@3.21.2)
+      effect: 3.21.2
+      ini: 4.1.3
+      toml: 3.0.0
+      yaml: 2.8.3
+
   '@effect/cluster@0.58.1(@effect/platform@0.96.0(effect@3.21.1))(@effect/rpc@0.75.0(@effect/platform@0.96.0(effect@3.21.1))(effect@3.21.1))(@effect/sql@0.51.0(@effect/experimental@0.60.0(@effect/platform@0.96.0(effect@3.21.1))(effect@3.21.1))(@effect/platform@0.96.0(effect@3.21.1))(effect@3.21.1))(@effect/workflow@0.18.0(@effect/experimental@0.60.0(@effect/platform@0.96.0(effect@3.21.1))(effect@3.21.1))(@effect/platform@0.96.0(effect@3.21.1))(@effect/rpc@0.75.0(@effect/platform@0.96.0(effect@3.21.1))(effect@3.21.1))(effect@3.21.1))(effect@3.21.1)':
     dependencies:
       '@effect/platform': 0.96.0(effect@3.21.1)
@@ -2256,16 +2318,34 @@ snapshots:
       msgpackr: 1.11.10
       multipasta: 0.2.7
 
+  '@effect/platform@0.96.0(effect@3.21.2)':
+    dependencies:
+      effect: 3.21.2
+      find-my-way-ts: 0.1.6
+      msgpackr: 1.11.10
+      multipasta: 0.2.7
+
   '@effect/printer-ansi@0.49.0(@effect/typeclass@0.40.0(effect@3.21.1))(effect@3.21.1)':
     dependencies:
       '@effect/printer': 0.49.0(@effect/typeclass@0.40.0(effect@3.21.1))(effect@3.21.1)
       '@effect/typeclass': 0.40.0(effect@3.21.1)
       effect: 3.21.1
 
+  '@effect/printer-ansi@0.49.0(@effect/typeclass@0.40.0(effect@3.21.2))(effect@3.21.2)':
+    dependencies:
+      '@effect/printer': 0.49.0(@effect/typeclass@0.40.0(effect@3.21.2))(effect@3.21.2)
+      '@effect/typeclass': 0.40.0(effect@3.21.2)
+      effect: 3.21.2
+
   '@effect/printer@0.49.0(@effect/typeclass@0.40.0(effect@3.21.1))(effect@3.21.1)':
     dependencies:
       '@effect/typeclass': 0.40.0(effect@3.21.1)
       effect: 3.21.1
+
+  '@effect/printer@0.49.0(@effect/typeclass@0.40.0(effect@3.21.2))(effect@3.21.2)':
+    dependencies:
+      '@effect/typeclass': 0.40.0(effect@3.21.2)
+      effect: 3.21.2
 
   '@effect/rpc@0.75.0(@effect/platform@0.96.0(effect@3.21.1))(effect@3.21.1)':
     dependencies:
@@ -2284,9 +2364,18 @@ snapshots:
     dependencies:
       effect: 3.21.1
 
+  '@effect/typeclass@0.40.0(effect@3.21.2)':
+    dependencies:
+      effect: 3.21.2
+
   '@effect/vitest@0.29.0(effect@3.21.1)(vitest@3.2.4(@types/debug@4.1.12)(@types/node@25.6.0)(jiti@2.6.1)(lightningcss@1.32.0)(yaml@2.8.3))':
     dependencies:
       effect: 3.21.1
+      vitest: 3.2.4(@types/debug@4.1.12)(@types/node@25.6.0)(jiti@2.6.1)(lightningcss@1.32.0)(yaml@2.8.3)
+
+  '@effect/vitest@0.29.0(effect@3.21.2)(vitest@3.2.4(@types/debug@4.1.12)(@types/node@25.6.0)(jiti@2.6.1)(lightningcss@1.32.0)(yaml@2.8.3))':
+    dependencies:
+      effect: 3.21.2
       vitest: 3.2.4(@types/debug@4.1.12)(@types/node@25.6.0)(jiti@2.6.1)(lightningcss@1.32.0)(yaml@2.8.3)
 
   '@effect/workflow@0.18.0(@effect/experimental@0.60.0(@effect/platform@0.96.0(effect@3.21.1))(effect@3.21.1))(@effect/platform@0.96.0(effect@3.21.1))(@effect/rpc@0.75.0(@effect/platform@0.96.0(effect@3.21.1))(effect@3.21.1))(effect@3.21.1)':
@@ -3105,6 +3194,11 @@ snapshots:
       gopd: 1.2.0
 
   effect@3.21.1:
+    dependencies:
+      '@standard-schema/spec': 1.1.0
+      fast-check: 3.23.2
+
+  effect@3.21.2:
     dependencies:
       '@standard-schema/spec': 1.1.0
       fast-check: 3.23.2

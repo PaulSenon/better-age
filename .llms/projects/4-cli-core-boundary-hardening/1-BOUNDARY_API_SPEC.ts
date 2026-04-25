@@ -385,12 +385,16 @@ export type PayloadCommandOpenPolicy =
 	| {
 			readonly command: PayloadContentCommand;
 			readonly existingPayloadRead: "open-and-decrypt-early";
-			readonly credentialAcquisition: "prompt-if-interactive" | "fail-if-headless";
+			readonly credentialAcquisition:
+				| "prompt-if-interactive"
+				| "fail-if-headless";
 	  }
 	| {
 			readonly command: PayloadCreationCommand;
 			readonly existingPayloadRead: "never";
-			readonly credentialAcquisition: "prompt-if-interactive" | "fail-if-headless";
+			readonly credentialAcquisition:
+				| "prompt-if-interactive"
+				| "fail-if-headless";
 	  };
 
 export type LoadExecutionRequirement = {
@@ -698,9 +702,7 @@ export type CoreResult<
 	TValue,
 	TErrorCode extends string,
 	TErrorDetails = undefined,
-> =
-	| CoreSuccess<TSuccessCode, TValue>
-	| CoreFailure<TErrorCode, TErrorDetails>;
+> = CoreSuccess<TSuccessCode, TValue> | CoreFailure<TErrorCode, TErrorDetails>;
 
 export type CoreNoticeLevel = "info" | "warning";
 
@@ -838,9 +840,7 @@ export type PayloadMutationRepositoryErrorCode =
 	| "PAYLOAD_READ_FAILED"
 	| "PAYLOAD_WRITE_FAILED";
 
-export type PayloadContentErrorCode =
-	| "PAYLOAD_INVALID"
-	| "PAYLOAD_ENV_INVALID";
+export type PayloadContentErrorCode = "PAYLOAD_INVALID" | "PAYLOAD_ENV_INVALID";
 
 export type PayloadCompatibilityErrorCode =
 	| "PAYLOAD_CLI_TOO_OLD"
@@ -967,7 +967,8 @@ export type ResolveKnownIdentityErrorCode =
 	| HomeReadErrorCode
 	| IdentityReferenceResolutionErrorCode;
 
-export type ResolvePayloadRecipientErrorCode = IdentityReferenceResolutionErrorCode;
+export type ResolvePayloadRecipientErrorCode =
+	IdentityReferenceResolutionErrorCode;
 
 export type ResolveGrantRecipientErrorCode =
 	| HomeReadErrorCode
@@ -1080,11 +1081,7 @@ export interface BetterAgeCoreQueries {
 		readonly path: PayloadPath;
 		readonly passphrase: Passphrase;
 	}): CoreMethodResult<
-		CoreResult<
-			"PAYLOAD_DECRYPTED",
-			DecryptedPayload,
-			DecryptPayloadErrorCode
-		>,
+		CoreResult<"PAYLOAD_DECRYPTED", DecryptedPayload, DecryptPayloadErrorCode>,
 		BetterAgeCoreNotice
 	>;
 }
@@ -1211,11 +1208,7 @@ export interface BetterAgeCoreCommands {
 			{
 				readonly ownerId: OwnerId;
 				readonly handle: Handle;
-				readonly outcome:
-					| "added"
-					| "updated"
-					| "unchanged"
-					| "alias-updated";
+				readonly outcome: "added" | "updated" | "unchanged" | "alias-updated";
 			},
 			ImportKnownIdentityErrorCode,
 			KnownIdentityConflictDetails | undefined
@@ -1223,9 +1216,7 @@ export interface BetterAgeCoreCommands {
 		BetterAgeCoreNotice
 	>;
 
-	forgetKnownIdentity(input: {
-		readonly ownerId: OwnerId;
-	}): CoreMethodResult<
+	forgetKnownIdentity(input: { readonly ownerId: OwnerId }): CoreMethodResult<
 		CoreResult<
 			"KNOWN_IDENTITY_FORGOTTEN",
 			{
@@ -1388,9 +1379,7 @@ export interface PromptPort {
 		readonly defaultValue?: string;
 	}): Promise<string>;
 
-	inputSecret(input: {
-		readonly label: string;
-	}): Promise<Passphrase>;
+	inputSecret(input: { readonly label: string }): Promise<Passphrase>;
 
 	selectOne<T>(input: {
 		readonly label: string;
@@ -1403,9 +1392,7 @@ export interface PromptPort {
 }
 
 export interface EditorPort {
-	edit(input: {
-		readonly initialText: EnvText;
-	}): Promise<{
+	edit(input: { readonly initialText: EnvText }): Promise<{
 		readonly editedText: EnvText;
 		readonly outcome: "saved" | "cancelled";
 	}>;
@@ -1720,9 +1707,7 @@ export interface BetterAgeCliCommands {
 export interface BetterAgeCliResolverFlows {
 	runFilePayloadTargetResolutionFlow(input: {
 		readonly initialPath?: PayloadPath;
-	}): Promise<
-		CliFlowResolved<PayloadPath> | CliFlowBack | CliFlowCancel
-	>;
+	}): Promise<CliFlowResolved<PayloadPath> | CliFlowBack | CliFlowCancel>;
 
 	runIdentityReferenceResolutionFlow(input: {
 		readonly initialReference?: IdentityReferenceInput;
@@ -1733,15 +1718,11 @@ export interface BetterAgeCliResolverFlows {
 
 	runIdentityStringResolutionFlow(input: {
 		readonly initialIdentityString?: IdentityString;
-	}): Promise<
-		CliFlowResolved<IdentityString> | CliFlowBack | CliFlowCancel
-	>;
+	}): Promise<CliFlowResolved<IdentityString> | CliFlowBack | CliFlowCancel>;
 
 	runPassphrasePairConfirmationFlow(input: {
 		readonly scope: "setup" | "identity-passphrase";
-	}): Promise<
-		CliFlowResolved<Passphrase> | CliFlowBack | CliFlowCancel
-	>;
+	}): Promise<CliFlowResolved<Passphrase> | CliFlowBack | CliFlowCancel>;
 
 	runPassphraseAcquisitionFlow(input: {
 		readonly scope:
@@ -1757,9 +1738,7 @@ export interface BetterAgeCliResolverFlows {
 			| "identity-passphrase"
 			| "identity-rotate";
 		readonly credentialAcquisition: CliCredentialAcquisition;
-	}): Promise<
-		CliFlowResolved<Passphrase> | CliFlowBack | CliFlowCancel
-	>;
+	}): Promise<CliFlowResolved<Passphrase> | CliFlowBack | CliFlowCancel>;
 
 	runEditorResolutionFlow(): Promise<
 		CliFlowResolved<string> | CliFlowBack | CliFlowCancel
@@ -1799,12 +1778,14 @@ export interface BetterAgeCliPayloadContextFlows {
 		readonly command: PayloadContentCommand;
 		readonly credentialAcquisition: CliCredentialAcquisition;
 	}): Promise<
-		CliFlowResolved<{
-			readonly path: PayloadPath;
-			readonly passphrase: Passphrase;
-			readonly payload: DecryptedPayload;
-			readonly notices: ReadonlyArray<BetterAgeCoreNotice>;
-		}> | CliFlowBack | CliFlowCancel
+		| CliFlowResolved<{
+				readonly path: PayloadPath;
+				readonly passphrase: Passphrase;
+				readonly payload: DecryptedPayload;
+				readonly notices: ReadonlyArray<BetterAgeCoreNotice>;
+		  }>
+		| CliFlowBack
+		| CliFlowCancel
 	>;
 }
 
@@ -1821,17 +1802,13 @@ export interface BetterAgeCliPayloadContextFlows {
  *   or `cancel`
  */
 export interface BetterAgeCliGateFlows {
-	runSetupGateFlow(): Promise<
-		CliFlowProceed | CliFlowBack | CliFlowCancel
-	>;
+	runSetupGateFlow(): Promise<CliFlowProceed | CliFlowBack | CliFlowCancel>;
 
 	runFileUpdateGateFlow(input: {
 		readonly command: "edit" | "grant" | "revoke";
 		readonly path: PayloadPath;
 		readonly reasons: ReadonlyArray<PayloadUpdateReason>;
-	}): Promise<
-		CliFlowUpdateNow | CliFlowBack | CliFlowCancel
-	>;
+	}): Promise<CliFlowUpdateNow | CliFlowBack | CliFlowCancel>;
 }
 
 /**
@@ -1911,8 +1888,7 @@ export interface BetterAgeCliCommandAliases {
 export interface BetterAgeCliCommandToCoreMapping {
 	readonly root: {
 		readonly setup: "commands.createSelfIdentity";
-		readonly interactive:
-			"commands+shared-flows over file and identity command surfaces";
+		readonly interactive: "commands+shared-flows over file and identity command surfaces";
 	};
 	readonly file: {
 		readonly create: "commands.createPayload";
@@ -1933,20 +1909,21 @@ export interface BetterAgeCliCommandToCoreMapping {
 		readonly passphrase: "commands.changeIdentityPassphrase";
 	};
 	readonly interactive: {
-		readonly session:
-			"commands+shared-flows over file and identity command surfaces";
+		readonly session: "commands+shared-flows over file and identity command surfaces";
 	};
 }
 
 export const CLI_COMMAND_TO_CORE_MAPPING: BetterAgeCliCommandToCoreMapping = {
 	root: {
 		setup: "commands.createSelfIdentity",
-		interactive: "commands+shared-flows over file and identity command surfaces",
+		interactive:
+			"commands+shared-flows over file and identity command surfaces",
 	},
 	file: {
 		create: "commands.createPayload",
 		edit: "queries.decryptPayload+commands.editPayload",
-		grant: "queries.decryptPayload+queries.resolveGrantRecipient+commands.grantPayloadRecipient",
+		grant:
+			"queries.decryptPayload+queries.resolveGrantRecipient+commands.grantPayloadRecipient",
 		revoke:
 			"queries.decryptPayload+queries.resolvePayloadRecipient+commands.revokePayloadRecipient",
 		inspect: "queries.decryptPayload",
@@ -2076,7 +2053,11 @@ export const CLI_COMMAND_CONTRACTS: ReadonlyArray<CliCommandContract> = [
 		command: "identity passphrase",
 		promptableOperands: [],
 		protocolOperands: [],
-		secretPrompts: ["current-passphrase", "new-passphrase", "confirm-new-passphrase"],
+		secretPrompts: [
+			"current-passphrase",
+			"new-passphrase",
+			"confirm-new-passphrase",
+		],
 		stdoutContract: "none",
 		headlessBehavior: "fail-passphrase-unavailable",
 	},
@@ -2161,9 +2142,7 @@ export interface LoadProtocolFailure {
 	readonly exitCode: 1;
 }
 
-export type LoadProtocolResponse =
-	| LoadProtocolSuccess
-	| LoadProtocolFailure;
+export type LoadProtocolResponse = LoadProtocolSuccess | LoadProtocolFailure;
 
 export type VarlockAdapterErrorCode =
 	| "LOAD_STDOUT_PIPE_UNAVAILABLE"
@@ -2183,9 +2162,7 @@ export interface VarlockAdapterFailure {
 	};
 }
 
-export type VarlockLoadResult =
-	| LoadProtocolResponse
-	| VarlockAdapterFailure;
+export type VarlockLoadResult = LoadProtocolResponse | VarlockAdapterFailure;
 
 /**
  * The varlock package does not call core directly in v1.

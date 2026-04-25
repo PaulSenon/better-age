@@ -52,3 +52,48 @@ Verification:
 Known follow-up:
 
 - Decide in Phase 2 whether package-local `devDependencies` should be added or root workspace tooling is enough for new package scripts.
+
+## 2026-04-25 Phase 2 Start
+
+Goal:
+
+- Implement pure v1 artifact parse/encode/migration foundation.
+- Add deterministic unit tests before/with implementation.
+- Configure new packages with Effect language-service TypeScript checking.
+
+Actions completed:
+
+- Added `effect` runtime dependency to `@better-age/core`.
+- Added `effect` and `@effect/cli` runtime dependencies to `@better-age/cli`.
+- Added package-local test/typecheck/lint tooling deps to new core and CLI packages.
+- Mirrored legacy Effect language-service `tsconfig` plugin config into new core and CLI packages.
+- Added Vitest unit config for new core and CLI packages.
+- Added `packages/core/src/persistence/ArtifactDocument.ts`.
+- Added v1 schemas, parse functions, JSON encode functions, no-op migration functions, and public identity string encode/parse.
+- Added canonical v1 artifact fixtures under `packages/core/test/fixtures/artifacts`.
+- Added fixture layout documentation.
+
+TDD notes:
+
+- RED: home-state parser/migration test failed because module was absent.
+- GREEN: implemented initial home-state schema/parser/migration.
+- RED: all-artifact parser/migration test failed on missing functions.
+- GREEN: implemented private-key, payload plaintext, payload document, and public-identity documents.
+- RED: invalid/future/prototype cases failed on missing error classes/classification.
+- GREEN: added parser preflight and structured artifact errors.
+- RED: encode and identity-string round-trip test failed on missing functions.
+- GREEN: added JSON encoders and shareable identity string parser/encoder.
+
+Verification:
+
+- `pnpm -F @better-age/core test` passed: 7 unit tests.
+- `pnpm -F @better-age/core check` passed.
+- `pnpm -F @better-age/cli check` passed.
+- `pnpm check` initially exposed missing workspace links for `@better-age/varlock`; ran `pnpm install`.
+- `pnpm check` then passed for all workspace packages and root Biome.
+
+Notes:
+
+- Root Biome formatted `.llms/projects/4-cli-core-boundary-hardening/1-BOUNDARY_API_SPEC.ts`.
+- `packages/core/src/persistence/ArtifactDocument.ts` is intentionally pure: no filesystem, no crypto, no app services.
+- Encrypted private key blob crypto round-trips remain Phase 5 real-adapter work.

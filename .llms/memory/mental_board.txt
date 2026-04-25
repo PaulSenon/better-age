@@ -1,4 +1,4 @@
-Current goal: Better Age MVP reimplementation, Phase 1.
+Current goal: Better Age MVP reimplementation, Phase 2 complete.
 
 Active state:
 - Phase 1 skeleton edits done.
@@ -7,10 +7,14 @@ Active state:
 - New `packages/cli` skeleton exists; no `bage` bin yet.
 - `packages/varlock` unchanged.
 - Append-only implementation log: `.llms/projects/4-cli-core-boundary-hardening/11-IMPLEMENTATION_LOG.md`.
+- Phase 2 core artifact foundation started with TDD.
+- Core has v1 artifact schemas/parsers/encoders/no-op migrations for home, private-key plaintext, payload plaintext, payload document, public identity.
+- Public identity string round-trips as `better-age://identity/v1/<base64url-json>`.
+- Core test passed.
+- Root `pnpm check` passed.
 
 Next:
-- Run final read-only hygiene for Phase 1.
-- Then proceed to Phase 2: artifact + migration foundation.
+- Phase 3: core identity and key lifecycle over fake ports.
 
 Blockers:
-- No build/test/check run; user forbids dev commands unless explicitly requested.
+- None currently.
