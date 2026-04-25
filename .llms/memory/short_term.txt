@@ -19,3 +19,14 @@
 - Core `decryptPayload` success result typing tightened to literal success/code.
 - Verification passed: `pnpm test`, `pnpm check`, `git diff --check`.
 - Next phase: Phase 8 sharing/maintenance (`grant`, `revoke`, `update`).
+
+2026-04-25 Phase 8 complete:
+- New CLI sharing/maintenance slice implemented in `packages/cli/src/cli/runCli.ts`.
+- Added `grant`, `revoke`, and `update`.
+- Exact grant resolves known refs, payload recipient refs, and identity strings via injected parser.
+- Guided grant/revoke use `terminal.selectOne`; self/already-granted disabled states covered.
+- Outdated write gate applies to exact/guided mutation flows; guided update-now resumes.
+- Idempotent grant/revoke/update outcomes render as success.
+- Core `PayloadRecipientSummary` now includes `publicKey` and `identityUpdatedAt`.
+- Verification passed: `pnpm test`, `pnpm check`, `git diff --check`.
+- Next phase: Phase 9 identity security (`identity rotate`, `identity passphrase`).

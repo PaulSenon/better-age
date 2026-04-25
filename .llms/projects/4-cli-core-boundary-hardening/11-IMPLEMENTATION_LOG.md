@@ -405,3 +405,70 @@ Notes:
 - `@effect/cli` command-tree/parser integration is still pending; runner remains a small contract-first argv parser.
 - There is still no `bage` bin.
 - Real editor/viewer implementations are not introduced yet; Phase 7 defines the ports and tests CLI behavior through them.
+
+## 2026-04-25 Phase 8 Start
+
+Track check:
+
+- Phase 7 is complete.
+- Phase 8 is the correct next slice from `plans/better-age-mvp-reimplementation.md`.
+- Scope is new CLI sharing/maintenance: `grant`, `revoke`, and `update`.
+- Identity security commands remain Phase 9.
+
+Goal:
+
+- Add grant/revoke/update flows to the new CLI.
+- Cover exact identity resolution, guided pickers, self/already-granted disabled states, outdated write gates, update-now resume, and idempotent success output.
+
+Actions completed:
+
+- Extended CLI core contract with:
+  - `commands.grantPayloadRecipient`
+  - `commands.revokePayloadRecipient`
+  - `commands.updatePayload`
+- Added `parseIdentityString` dependency to `runCli` for exact/custom identity-string grant flows.
+- Added `terminal.selectOne` port for guided recipient pickers and update gate prompts.
+- Added exact `grant` flow resolving:
+  - known identity refs.
+  - payload recipient refs.
+  - identity strings through `parseIdentityString`.
+- Added guided `grant` picker:
+  - self visible and disabled `[you]`.
+  - already-granted recipients visible and disabled `[granted]`.
+  - known ungranted identities selectable.
+  - custom identity string selectable.
+- Added exact `revoke` flow resolving payload recipients only.
+- Added guided `revoke` picker:
+  - payload recipients only.
+  - self visible and disabled.
+- Added `update` flow rendering updated/unchanged outcomes as success.
+- Added outdated payload write gate:
+  - exact write commands fail with `PAYLOAD_UPDATE_REQUIRED`.
+  - guided write commands can select update-now, run `updatePayload`, then resume.
+  - covered guided edit and guided grant.
+- Added idempotent success rendering for grant/revoke/update unchanged outcomes.
+- Extended core `PayloadRecipientSummary` to expose `publicKey` and `identityUpdatedAt`, so CLI can pass exact payload-recipient public identity snapshots back to core without reconstructing incomplete identities.
+
+TDD notes:
+
+- RED: grant/revoke/update contracts failed as unknown commands.
+- GREEN: added command dispatch and minimal flows.
+- RED: guided picker assertions failed until picker choices matched spec labels/disabled states.
+- GREEN: grant and revoke pickers now render disabled self/already-granted rows.
+- RED: update gate/idempotent tests exposed missing guided edit gate and unchanged wording.
+- GREEN: guided edit runs the same update gate and idempotent outcomes render as success.
+- RED: core payload summary test drifted after adding public recipient fields.
+- GREEN: updated expected core decrypted recipient shape.
+
+Verification:
+
+- `pnpm -F @better-age/cli test:unit` passed: 17 tests.
+- `pnpm test` passed.
+- `pnpm check` passed.
+- `git diff --check` passed.
+
+Notes:
+
+- `@effect/cli` command-tree/parser integration is still pending.
+- There is still no `bage` bin.
+- Real prompt/editor/viewer implementations are still ports only; command behavior is contract-tested.

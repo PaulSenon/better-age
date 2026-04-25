@@ -24,6 +24,19 @@ const knownSarah = {
 	localAlias: "ops",
 };
 
+const knownNora = {
+	ownerId: "owner_nora",
+	publicIdentity: {
+		ownerId: "owner_nora",
+		displayName: "Nora",
+		publicKey: "age1nora",
+		identityUpdatedAt: "2026-04-25T12:00:00.000Z",
+	},
+	handle: "Nora#age1nora",
+	fingerprint: "age1nora",
+	localAlias: null,
+};
+
 const decryptedPayload = {
 	path: "secrets.env.enc",
 	payloadId: "payload_123",
@@ -37,6 +50,8 @@ const decryptedPayload = {
 		{
 			ownerId: "owner_self",
 			displayName: "Isaac",
+			publicKey: "age1self",
+			identityUpdatedAt: "2026-04-25T10:00:00.000Z",
 			handle: "Isaac#fp_self",
 			fingerprint: "fp_self",
 			localAlias: null,
@@ -46,6 +61,8 @@ const decryptedPayload = {
 		{
 			ownerId: "owner_sarah",
 			displayName: "Sarah",
+			publicKey: "age1sarah",
+			identityUpdatedAt: "2026-04-25T11:00:00.000Z",
 			handle: "ops#age1sarah",
 			fingerprint: "age1sarah",
 			localAlias: "ops",
@@ -86,6 +103,33 @@ const makeCore = (overrides: CoreOverrides = {}) => {
 					outcome: "edited",
 				});
 			},
+			grantPayloadRecipient: async (input) => {
+				calls.push({ name: "grantPayloadRecipient", input });
+				return success("PAYLOAD_RECIPIENT_GRANTED", {
+					path: input.path,
+					payloadId: "payload_123",
+					recipient: input.recipient,
+					outcome: "added",
+				});
+			},
+			revokePayloadRecipient: async (input) => {
+				calls.push({ name: "revokePayloadRecipient", input });
+				return success("PAYLOAD_RECIPIENT_REVOKED", {
+					path: input.path,
+					payloadId: "payload_123",
+					recipientOwnerId: input.recipientOwnerId,
+					outcome: "removed",
+				});
+			},
+			updatePayload: async (input) => {
+				calls.push({ name: "updatePayload", input });
+				return success("PAYLOAD_UPDATED", {
+					path: input.path,
+					payloadId: "payload_123",
+					outcome: "updated",
+					rewriteReasons: ["self-recipient-refresh"],
+				});
+			},
 			forgetKnownIdentity: async (input) => {
 				calls.push({ name: "forgetKnownIdentity", input });
 				return success("KNOWN_IDENTITY_FORGOTTEN", {
@@ -124,7 +168,7 @@ const makeCore = (overrides: CoreOverrides = {}) => {
 					rotationTtl: "3m",
 				}),
 			listKnownIdentities: async () =>
-				success("KNOWN_IDENTITIES_LISTED", [knownSarah]),
+				success("KNOWN_IDENTITIES_LISTED", [knownSarah, knownNora]),
 			listRetiredKeys: async () => success("RETIRED_KEYS_LISTED", []),
 			decryptPayload: async (input) => {
 				calls.push({ name: "decryptPayload", input });
@@ -313,7 +357,7 @@ describe("runCli command contracts", () => {
 		).resolves.toMatchObject({
 			exitCode: 0,
 			stdout:
-				"Self\n  Isaac owner_self fp_self\n\nKnown identities\n  ops owner_sarah age1sarah\n\nRetired keys\n  none\n",
+				"Self\n  Isaac owner_self fp_self\n\nKnown identities\n  ops owner_sarah age1sarah\n  Nora owner_nora age1nora\n\nRetired keys\n  none\n",
 			stderr: "",
 		});
 
@@ -616,6 +660,393 @@ describe("runCli command contracts", () => {
 				input: { path: "secrets.env.enc", passphrase: "correct horse" },
 			},
 		]);
+	});
+
+	it("grants exact recipients from known refs, payload refs, and identity strings", async () => {
+		const known = makeCore();
+		await expect(
+			runCli({
+				argv: ["grant", "secrets.env.enc", "Nora"],
+				core: known.core,
+				payloadPathExists: async () => true,
+				terminal: {
+					mode: "interactive",
+					promptSecret: async () => "correct horse",
+				},
+			}),
+		).resolves.toEqual({
+			exitCode: 0,
+			stdout: "",
+			stderr: "[OK] Recipient granted: Nora#age1nora\n",
+		});
+		expect(known.calls).toContainEqual({
+			name: "grantPayloadRecipient",
+			input: {
+				path: "secrets.env.enc",
+				passphrase: "correct horse",
+				recipient: knownNora.publicIdentity,
+			},
+		});
+
+		const payloadRecipient = makeCore();
+		await expect(
+			runCli({
+				argv: ["grant", "secrets.env.enc", "ops"],
+				core: payloadRecipient.core,
+				payloadPathExists: async () => true,
+				terminal: {
+					mode: "interactive",
+					promptSecret: async () => "correct horse",
+				},
+			}),
+		).resolves.toMatchObject({ exitCode: 0 });
+		expect(payloadRecipient.calls).toContainEqual({
+			name: "grantPayloadRecipient",
+			input: {
+				path: "secrets.env.enc",
+				passphrase: "correct horse",
+				recipient: {
+					ownerId: "owner_sarah",
+					displayName: "Sarah",
+					publicKey: "age1sarah",
+					identityUpdatedAt: "2026-04-25T11:00:00.000Z",
+				},
+			},
+		});
+
+		const parsed = makeCore();
+		await expect(
+			runCli({
+				argv: ["grant", "secrets.env.enc", "identity-string-nora"],
+				core: parsed.core,
+				parseIdentityString: async () => knownNora.publicIdentity,
+				payloadPathExists: async () => true,
+				terminal: {
+					mode: "interactive",
+					promptSecret: async () => "correct horse",
+				},
+			}),
+		).resolves.toMatchObject({ exitCode: 0 });
+		expect(parsed.calls).toContainEqual({
+			name: "grantPayloadRecipient",
+			input: {
+				path: "secrets.env.enc",
+				passphrase: "correct horse",
+				recipient: knownNora.publicIdentity,
+			},
+		});
+	});
+
+	it("renders guided grant picker with disabled self and already granted recipients", async () => {
+		const guided = makeCore();
+		let options: ReadonlyArray<{
+			readonly label: string;
+			readonly disabled: boolean;
+		}> = [];
+
+		await expect(
+			runCli({
+				argv: ["grant", "secrets.env.enc"],
+				core: guided.core,
+				payloadPathExists: async () => true,
+				terminal: {
+					mode: "interactive",
+					promptSecret: async () => "correct horse",
+					selectOne: async (_label, choices) => {
+						options = choices;
+						return "owner_nora";
+					},
+				},
+			}),
+		).resolves.toMatchObject({ exitCode: 0 });
+		expect(options).toEqual([
+			{
+				value: "owner_self",
+				label: "Isaac owner_self [you]",
+				disabled: true,
+			},
+			{
+				value: "owner_sarah",
+				label: "ops owner_sarah [granted]",
+				disabled: true,
+			},
+			{
+				value: "owner_nora",
+				label: "Nora owner_nora",
+				disabled: false,
+			},
+			{
+				value: "__custom_identity_string__",
+				label: "Enter identity string",
+				disabled: false,
+			},
+		]);
+	});
+
+	it("revokes exact and guided recipients while disabling self", async () => {
+		const exact = makeCore();
+		await expect(
+			runCli({
+				argv: ["revoke", "secrets.env.enc", "ops"],
+				core: exact.core,
+				payloadPathExists: async () => true,
+				terminal: {
+					mode: "interactive",
+					promptSecret: async () => "correct horse",
+				},
+			}),
+		).resolves.toEqual({
+			exitCode: 0,
+			stdout: "",
+			stderr: "[OK] Recipient revoked: owner_sarah\n",
+		});
+		expect(exact.calls).toContainEqual({
+			name: "revokePayloadRecipient",
+			input: {
+				path: "secrets.env.enc",
+				passphrase: "correct horse",
+				recipientOwnerId: "owner_sarah",
+			},
+		});
+
+		const guided = makeCore();
+		let options: ReadonlyArray<{
+			readonly label: string;
+			readonly disabled: boolean;
+		}> = [];
+		await expect(
+			runCli({
+				argv: ["revoke", "secrets.env.enc"],
+				core: guided.core,
+				payloadPathExists: async () => true,
+				terminal: {
+					mode: "interactive",
+					promptSecret: async () => "correct horse",
+					selectOne: async (_label, choices) => {
+						options = choices;
+						return "owner_sarah";
+					},
+				},
+			}),
+		).resolves.toMatchObject({ exitCode: 0 });
+		expect(options).toEqual([
+			{
+				value: "owner_self",
+				label: "Isaac owner_self [you]",
+				disabled: true,
+			},
+			{
+				value: "owner_sarah",
+				label: "ops owner_sarah",
+				disabled: false,
+			},
+		]);
+	});
+
+	it("updates payload and gates outdated exact and guided write commands", async () => {
+		const update = makeCore();
+		await expect(
+			runCli({
+				argv: ["update", "secrets.env.enc"],
+				core: update.core,
+				payloadPathExists: async () => true,
+				terminal: {
+					mode: "interactive",
+					promptSecret: async () => "correct horse",
+				},
+			}),
+		).resolves.toEqual({
+			exitCode: 0,
+			stdout: "",
+			stderr: "[OK] Payload updated: secrets.env.enc\n",
+		});
+
+		const outdatedPayload = {
+			...decryptedPayload,
+			compatibility: "readable-but-outdated" as const,
+		};
+		const exact = makeCore({
+			queries: {
+				decryptPayload: async (input) => {
+					exact.calls.push({ name: "decryptPayload", input });
+					return success("PAYLOAD_DECRYPTED", outdatedPayload);
+				},
+			},
+		});
+		await expect(
+			runCli({
+				argv: ["grant", "secrets.env.enc", "Nora"],
+				core: exact.core,
+				payloadPathExists: async () => true,
+				terminal: {
+					mode: "interactive",
+					promptSecret: async () => "correct horse",
+				},
+			}),
+		).resolves.toEqual({
+			exitCode: 1,
+			stdout: "",
+			stderr:
+				"[ERROR] PAYLOAD_UPDATE_REQUIRED: run bage update before mutating payload\n",
+		});
+
+		const guided = makeCore({
+			queries: {
+				decryptPayload: async (input) => {
+					guided.calls.push({ name: "decryptPayload", input });
+					return success("PAYLOAD_DECRYPTED", outdatedPayload);
+				},
+			},
+		});
+		await expect(
+			runCli({
+				argv: ["grant", "secrets.env.enc"],
+				core: guided.core,
+				payloadPathExists: async () => true,
+				terminal: {
+					mode: "interactive",
+					promptSecret: async () => "correct horse",
+					selectOne: async (label, choices) => {
+						const nora = choices.find(
+							(choice) => choice.value === "owner_nora",
+						);
+
+						return label === "Payload update required"
+							? "update-now"
+							: (nora?.value ?? "");
+					},
+				},
+			}),
+		).resolves.toMatchObject({
+			exitCode: 0,
+			stderr:
+				"[OK] Payload updated: secrets.env.enc\n[OK] Recipient granted: Nora#age1nora\n",
+		});
+		expect(guided.calls).toContainEqual({
+			name: "updatePayload",
+			input: { path: "secrets.env.enc", passphrase: "correct horse" },
+		});
+		expect(guided.calls).toContainEqual({
+			name: "grantPayloadRecipient",
+			input: {
+				path: "secrets.env.enc",
+				passphrase: "correct horse",
+				recipient: knownNora.publicIdentity,
+			},
+		});
+	});
+
+	it("applies guided update gate to edit and renders idempotent outcomes as success", async () => {
+		const outdatedPayload = {
+			...decryptedPayload,
+			compatibility: "readable-but-outdated" as const,
+		};
+		const edit = makeCore({
+			queries: {
+				decryptPayload: async (input) => {
+					edit.calls.push({ name: "decryptPayload", input });
+					return success("PAYLOAD_DECRYPTED", outdatedPayload);
+				},
+			},
+		});
+
+		await expect(
+			runCli({
+				argv: ["edit"],
+				core: edit.core,
+				payloadPathExists: async () => true,
+				terminal: {
+					mode: "interactive",
+					promptText: async () => "secrets.env.enc",
+					promptSecret: async () => "correct horse",
+					selectOne: async () => "update-now",
+					openEditor: async () => ({
+						kind: "saved",
+						text: decryptedPayload.envText,
+					}),
+				},
+			}),
+		).resolves.toEqual({
+			exitCode: 0,
+			stdout: "",
+			stderr:
+				"[OK] Payload updated: secrets.env.enc\n[OK] Payload unchanged: secrets.env.enc\n",
+		});
+
+		const idempotent = makeCore({
+			commands: {
+				grantPayloadRecipient: async (input) => {
+					idempotent.calls.push({ name: "grantPayloadRecipient", input });
+					return success("PAYLOAD_RECIPIENT_GRANTED", {
+						path: input.path,
+						payloadId: "payload_123",
+						recipient: input.recipient,
+						outcome: "unchanged",
+					});
+				},
+				revokePayloadRecipient: async (input) => {
+					idempotent.calls.push({ name: "revokePayloadRecipient", input });
+					return success("PAYLOAD_RECIPIENT_REVOKED", {
+						path: input.path,
+						payloadId: "payload_123",
+						recipientOwnerId: input.recipientOwnerId,
+						outcome: "unchanged",
+					});
+				},
+				updatePayload: async (input) => {
+					idempotent.calls.push({ name: "updatePayload", input });
+					return success("PAYLOAD_UPDATED", {
+						path: input.path,
+						payloadId: "payload_123",
+						outcome: "unchanged",
+						rewriteReasons: [],
+					});
+				},
+			},
+		});
+
+		await expect(
+			runCli({
+				argv: ["grant", "secrets.env.enc", "ops"],
+				core: idempotent.core,
+				payloadPathExists: async () => true,
+				terminal: {
+					mode: "interactive",
+					promptSecret: async () => "correct horse",
+				},
+			}),
+		).resolves.toMatchObject({
+			exitCode: 0,
+			stderr: "[OK] Recipient unchanged: Sarah#age1sarah\n",
+		});
+		await expect(
+			runCli({
+				argv: ["revoke", "secrets.env.enc", "ops"],
+				core: idempotent.core,
+				payloadPathExists: async () => true,
+				terminal: {
+					mode: "interactive",
+					promptSecret: async () => "correct horse",
+				},
+			}),
+		).resolves.toMatchObject({
+			exitCode: 0,
+			stderr: "[OK] Recipient unchanged: owner_sarah\n",
+		});
+		await expect(
+			runCli({
+				argv: ["update", "secrets.env.enc"],
+				core: idempotent.core,
+				payloadPathExists: async () => true,
+				terminal: {
+					mode: "interactive",
+					promptSecret: async () => "correct horse",
+				},
+			}),
+		).resolves.toMatchObject({
+			exitCode: 0,
+			stderr: "[OK] Payload unchanged: secrets.env.enc\n",
+		});
 	});
 });
 

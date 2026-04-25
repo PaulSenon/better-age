@@ -171,15 +171,15 @@ Add grant, revoke, and update command flows. Implement guided recipient pickers,
 
 ### Acceptance Criteria
 
-- [ ] `bage grant` exact flow resolves known identity, identity string, or payload recipient reference.
-- [ ] Guided grant picker merges self, known identities, and payload recipients correctly.
-- [ ] Already-granted and self identities are visible but disabled in guided grant.
-- [ ] `bage revoke` exact flow resolves against payload recipients.
-- [ ] Guided revoke picker shows payload recipients only and disables self.
-- [ ] `bage update` rewrites only for allowed update reasons.
-- [ ] Outdated payload write gate works for guided edit/grant/revoke.
-- [ ] Exact outdated write commands fail with update remediation.
-- [ ] Idempotent grant/revoke/update outcomes render as success.
+- [x] `bage grant` exact flow resolves known identity, identity string, or payload recipient reference.
+- [x] Guided grant picker merges self, known identities, and payload recipients correctly.
+- [x] Already-granted and self identities are visible but disabled in guided grant.
+- [x] `bage revoke` exact flow resolves against payload recipients.
+- [x] Guided revoke picker shows payload recipients only and disables self.
+- [x] `bage update` rewrites only for allowed update reasons.
+- [x] Outdated payload write gate works for guided edit/grant/revoke.
+- [x] Exact outdated write commands fail with update remediation.
+- [x] Idempotent grant/revoke/update outcomes render as success.
 
 ---
 

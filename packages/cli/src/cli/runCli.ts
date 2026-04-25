@@ -33,9 +33,7 @@ type CoreNotice = {
 
 type KnownIdentity = {
 	readonly ownerId: string;
-	readonly publicIdentity: {
-		readonly displayName: string;
-	};
+	readonly publicIdentity: PublicIdentity;
 	readonly handle: string;
 	readonly fingerprint: string;
 	readonly localAlias: string | null;
@@ -60,11 +58,20 @@ type RetiredKey = {
 type PayloadRecipient = {
 	readonly ownerId: string;
 	readonly displayName: string;
+	readonly publicKey: string;
+	readonly identityUpdatedAt: string;
 	readonly handle: string;
 	readonly fingerprint: string;
 	readonly localAlias: string | null;
 	readonly isSelf: boolean;
 	readonly isStaleSelf: boolean;
+};
+
+type PublicIdentity = {
+	readonly ownerId: string;
+	readonly displayName: string;
+	readonly publicKey: string;
+	readonly identityUpdatedAt: string;
 };
 
 type DecryptedPayload = {
@@ -105,6 +112,18 @@ export type CliCore = {
 				readonly outcome: string;
 			}>
 		>;
+		readonly grantPayloadRecipient: (input: {
+			readonly path: string;
+			readonly passphrase: string;
+			readonly recipient: PublicIdentity;
+		}) => Promise<
+			CoreResponse<{
+				readonly path: string;
+				readonly payloadId: string;
+				readonly recipient: PublicIdentity;
+				readonly outcome: string;
+			}>
+		>;
 		readonly importKnownIdentity: (input: {
 			readonly identityString: string;
 			readonly localAlias?: string | null;
@@ -118,6 +137,29 @@ export type CliCore = {
 		readonly forgetKnownIdentity: (input: {
 			readonly ownerId: string;
 		}) => Promise<CoreResponse<{ readonly ownerId: string }>>;
+		readonly revokePayloadRecipient: (input: {
+			readonly path: string;
+			readonly passphrase: string;
+			readonly recipientOwnerId: string;
+		}) => Promise<
+			CoreResponse<{
+				readonly path: string;
+				readonly payloadId: string;
+				readonly recipientOwnerId: string;
+				readonly outcome: string;
+			}>
+		>;
+		readonly updatePayload: (input: {
+			readonly path: string;
+			readonly passphrase: string;
+		}) => Promise<
+			CoreResponse<{
+				readonly path: string;
+				readonly payloadId: string;
+				readonly outcome: string;
+				readonly rewriteReasons: ReadonlyArray<string>;
+			}>
+		>;
 	};
 	readonly queries: {
 		readonly exportSelfIdentityString: () => Promise<
@@ -148,11 +190,22 @@ export type CliTerminal = {
 	readonly openViewer?: (envText: string) => Promise<void>;
 	readonly promptText?: (label: string) => Promise<string>;
 	readonly promptSecret?: (label: string) => Promise<string>;
+	readonly selectOne?: (
+		label: string,
+		choices: ReadonlyArray<{
+			readonly value: string;
+			readonly label: string;
+			readonly disabled: boolean;
+		}>,
+	) => Promise<string>;
 };
 
 export type RunCliInput = {
 	readonly argv: ReadonlyArray<string>;
 	readonly core: CliCore;
+	readonly parseIdentityString?: (
+		identityString: string,
+	) => Promise<PublicIdentity | null>;
 	readonly payloadPathExists?: (path: string) => Promise<boolean>;
 	readonly terminal: CliTerminal;
 };
@@ -284,6 +337,45 @@ const resolveKnownIdentity = (
 			identity.handle === reference ||
 			identity.publicIdentity.displayName === reference,
 	);
+
+const matchesRecipientReference = (
+	recipient: PayloadRecipient,
+	reference: string,
+) =>
+	recipient.ownerId === reference ||
+	recipient.localAlias === reference ||
+	recipient.handle === reference ||
+	recipient.displayName === reference;
+
+const recipientToPublicIdentity = (
+	recipient: PayloadRecipient,
+): PublicIdentity => ({
+	ownerId: recipient.ownerId,
+	displayName: recipient.displayName,
+	publicKey: recipient.publicKey,
+	identityUpdatedAt: recipient.identityUpdatedAt,
+});
+
+const exactCommandHasAllOperands = (args: ParsedArgs) =>
+	args.positionals[1] !== undefined && args.positionals[2] !== undefined;
+
+const promptSelectOne = async (
+	terminal: CliTerminal,
+	label: string,
+	choices: ReadonlyArray<{
+		readonly value: string;
+		readonly label: string;
+		readonly disabled: boolean;
+	}>,
+) => {
+	const selectOne = terminal.selectOne;
+
+	if (selectOne === undefined) {
+		return null;
+	}
+
+	return await selectOne(label, choices);
+};
 
 const runSetup = async (
 	args: ParsedArgs,
@@ -502,11 +594,28 @@ const runEditPayload = async (
 		return opened.failure;
 	}
 
+	if (
+		opened.payload.compatibility !== "up-to-date" &&
+		args.positionals[1] !== undefined
+	) {
+		return presentFailure("PAYLOAD_UPDATE_REQUIRED");
+	}
+
+	const gate = await runUpdateGateIfNeeded(
+		input,
+		opened,
+		args.positionals[1] !== undefined,
+	);
+
+	if ("failure" in gate) {
+		return gate.failure;
+	}
+
 	if (input.terminal.openEditor === undefined) {
 		return presentFailure("EDITOR_UNAVAILABLE");
 	}
 
-	let stderr = opened.stderr;
+	let stderr = gate.stderr;
 	let editorText = opened.payload.envText;
 
 	for (let attempt = 0; attempt < 5; attempt++) {
@@ -556,6 +665,301 @@ const runEditPayload = async (
 	}
 
 	return presentFailure("PAYLOAD_ENV_INVALID");
+};
+
+const resolveGrantRecipient = async (
+	input: RunCliInput,
+	payload: DecryptedPayload,
+	reference: string,
+): Promise<PublicIdentity | null> => {
+	const payloadRecipient = payload.recipients.find((recipient) =>
+		matchesRecipientReference(recipient, reference),
+	);
+
+	if (payloadRecipient !== undefined) {
+		return recipientToPublicIdentity(payloadRecipient);
+	}
+
+	const known = await input.core.queries.listKnownIdentities();
+
+	if (known.result.kind === "success") {
+		const knownIdentity = resolveKnownIdentity(known.result.value, reference);
+
+		if (knownIdentity !== undefined) {
+			return knownIdentity.publicIdentity as PublicIdentity;
+		}
+	}
+
+	return (await input.parseIdentityString?.(reference)) ?? null;
+};
+
+const grantPickerChoices = async (
+	input: RunCliInput,
+	payload: DecryptedPayload,
+) => {
+	const known = await input.core.queries.listKnownIdentities();
+	const knownIdentities =
+		known.result.kind === "success" ? known.result.value : [];
+	const payloadOwnerIds = new Set(
+		payload.recipients.map((recipient) => recipient.ownerId),
+	);
+	const choices = payload.recipients.map((recipient) => ({
+		value: recipient.ownerId,
+		label: `${recipient.localAlias ?? recipient.displayName} ${recipient.ownerId} ${
+			recipient.isSelf ? "[you]" : "[granted]"
+		}`,
+		disabled: true,
+	}));
+
+	for (const identity of knownIdentities) {
+		if (!payloadOwnerIds.has(identity.ownerId)) {
+			choices.push({
+				value: identity.ownerId,
+				label: `${identity.localAlias ?? identity.publicIdentity.displayName} ${identity.ownerId}`,
+				disabled: false,
+			});
+		}
+	}
+
+	choices.push({
+		value: "__custom_identity_string__",
+		label: "Enter identity string",
+		disabled: false,
+	});
+
+	return choices;
+};
+
+const runUpdateGateIfNeeded = async (
+	input: RunCliInput,
+	opened: {
+		readonly payload: DecryptedPayload;
+		readonly passphrase: string;
+		readonly stderr: string;
+	},
+	isExact: boolean,
+): Promise<
+	{ readonly stderr: string } | { readonly failure: RunCliResult }
+> => {
+	if (opened.payload.compatibility === "up-to-date") {
+		return { stderr: opened.stderr };
+	}
+
+	if (isExact) {
+		return { failure: presentFailure("PAYLOAD_UPDATE_REQUIRED") };
+	}
+
+	const selected = await promptSelectOne(
+		input.terminal,
+		"Payload update required",
+		[
+			{ value: "update-now", label: "Update now", disabled: false },
+			{ value: "back", label: "Back", disabled: false },
+			{ value: "cancel", label: "Cancel", disabled: false },
+		],
+	);
+
+	if (selected !== "update-now") {
+		return { failure: presentFailure("CANCELLED", 130) };
+	}
+
+	const response = await input.core.commands.updatePayload({
+		path: opened.payload.path,
+		passphrase: opened.passphrase,
+	});
+
+	if (response.result.kind === "failure") {
+		return { failure: presentFailure(response.result.code) };
+	}
+
+	return {
+		stderr: `${opened.stderr}${presentSuccess(`Payload ${response.result.value.outcome}: ${response.result.value.path}`).stderr}`,
+	};
+};
+
+const runGrantPayloadRecipient = async (
+	args: ParsedArgs,
+	input: RunCliInput,
+): Promise<RunCliResult> => {
+	const opened = await openPayloadContext(args, input);
+
+	if ("failure" in opened) {
+		return opened.failure;
+	}
+
+	const isExact = exactCommandHasAllOperands(args);
+	const gate = await runUpdateGateIfNeeded(input, opened, isExact);
+
+	if ("failure" in gate) {
+		return gate.failure;
+	}
+
+	const reference =
+		args.positionals[2] ??
+		(await promptSelectOne(
+			input.terminal,
+			"Grant recipient",
+			await grantPickerChoices(input, opened.payload),
+		));
+
+	if (reference === null || reference === undefined) {
+		return presentFailure("RECIPIENT_REFERENCE_NOT_FOUND", 2);
+	}
+
+	const identityReference =
+		reference === "__custom_identity_string__"
+			? await ensurePromptText(input.terminal)("Identity string")
+			: reference;
+	const recipient = await resolveGrantRecipient(
+		input,
+		opened.payload,
+		identityReference,
+	);
+
+	if (recipient === null) {
+		return presentFailure("RECIPIENT_REFERENCE_NOT_FOUND");
+	}
+
+	if (
+		opened.payload.recipients.some(
+			(item) => item.isSelf && item.ownerId === recipient.ownerId,
+		)
+	) {
+		return presentFailure("CANNOT_GRANT_SELF");
+	}
+
+	const response = await input.core.commands.grantPayloadRecipient({
+		path: opened.payload.path,
+		passphrase: opened.passphrase,
+		recipient,
+	});
+
+	if (response.result.kind === "failure") {
+		return {
+			...presentFailure(response.result.code),
+			stderr: `${gate.stderr}${presentFailure(response.result.code).stderr}`,
+		};
+	}
+
+	const outcomeLabel =
+		response.result.value.outcome === "added"
+			? "granted"
+			: response.result.value.outcome;
+	const successResult = presentSuccess(
+		`Recipient ${outcomeLabel}: ${recipient.displayName}#${recipient.publicKey}`,
+	);
+
+	return {
+		...successResult,
+		stderr: `${gate.stderr}${successResult.stderr}`,
+	};
+};
+
+const resolvePayloadRecipient = (
+	payload: DecryptedPayload,
+	reference: string,
+) =>
+	payload.recipients.find((recipient) =>
+		matchesRecipientReference(recipient, reference),
+	);
+
+const revokePickerChoices = (payload: DecryptedPayload) =>
+	payload.recipients.map((recipient) => ({
+		value: recipient.ownerId,
+		label: `${recipient.localAlias ?? recipient.displayName} ${recipient.ownerId}${
+			recipient.isSelf ? " [you]" : ""
+		}`,
+		disabled: recipient.isSelf,
+	}));
+
+const runRevokePayloadRecipient = async (
+	args: ParsedArgs,
+	input: RunCliInput,
+): Promise<RunCliResult> => {
+	const opened = await openPayloadContext(args, input);
+
+	if ("failure" in opened) {
+		return opened.failure;
+	}
+
+	const isExact = exactCommandHasAllOperands(args);
+	const gate = await runUpdateGateIfNeeded(input, opened, isExact);
+
+	if ("failure" in gate) {
+		return gate.failure;
+	}
+
+	const reference =
+		args.positionals[2] ??
+		(await promptSelectOne(
+			input.terminal,
+			"Revoke recipient",
+			revokePickerChoices(opened.payload),
+		));
+
+	if (reference === null || reference === undefined) {
+		return presentFailure("RECIPIENT_REFERENCE_NOT_FOUND", 2);
+	}
+
+	const recipient = resolvePayloadRecipient(opened.payload, reference);
+
+	if (recipient === undefined) {
+		return presentFailure("RECIPIENT_REFERENCE_NOT_FOUND");
+	}
+
+	if (recipient.isSelf) {
+		return presentFailure("CANNOT_REVOKE_SELF");
+	}
+
+	const response = await input.core.commands.revokePayloadRecipient({
+		path: opened.payload.path,
+		passphrase: opened.passphrase,
+		recipientOwnerId: recipient.ownerId,
+	});
+
+	if (response.result.kind === "failure") {
+		return {
+			...presentFailure(response.result.code),
+			stderr: `${gate.stderr}${presentFailure(response.result.code).stderr}`,
+		};
+	}
+
+	const outcomeLabel =
+		response.result.value.outcome === "removed"
+			? "revoked"
+			: response.result.value.outcome;
+	const successResult = presentSuccess(
+		`Recipient ${outcomeLabel}: ${response.result.value.recipientOwnerId}`,
+	);
+
+	return {
+		...successResult,
+		stderr: `${gate.stderr}${successResult.stderr}`,
+	};
+};
+
+const runUpdatePayload = async (
+	args: ParsedArgs,
+	input: RunCliInput,
+): Promise<RunCliResult> => {
+	const opened = await openPayloadContext(args, input);
+
+	if ("failure" in opened) {
+		return opened.failure;
+	}
+
+	const response = await input.core.commands.updatePayload({
+		path: opened.payload.path,
+		passphrase: opened.passphrase,
+	});
+
+	if (response.result.kind === "failure") {
+		return presentFailure(response.result.code);
+	}
+
+	return presentSuccess(
+		`Payload ${response.result.value.outcome}: ${response.result.value.path}`,
+	);
 };
 
 const runIdentityExport = async (core: CliCore): Promise<RunCliResult> => {
@@ -717,6 +1121,18 @@ export const runCli = async (input: RunCliInput): Promise<RunCliResult> => {
 
 	if (command === "edit") {
 		return runEditPayload(args, input);
+	}
+
+	if (command === "grant") {
+		return runGrantPayloadRecipient(args, input);
+	}
+
+	if (command === "revoke") {
+		return runRevokePayloadRecipient(args, input);
+	}
+
+	if (command === "update") {
+		return runUpdatePayload(args, input);
 	}
 
 	if (command === "identity" && subcommand === "export") {

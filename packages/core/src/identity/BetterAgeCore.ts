@@ -62,6 +62,8 @@ export type RetiredKeySummary = {
 export type PayloadRecipientSummary = {
 	readonly ownerId: OwnerId;
 	readonly displayName: DisplayName;
+	readonly publicKey: string;
+	readonly identityUpdatedAt: IsoUtcTimestamp;
 	readonly handle: string;
 	readonly fingerprint: KeyFingerprint;
 	readonly localAlias: LocalAlias | null;
@@ -367,6 +369,8 @@ const toRecipientSummary = (
 	return {
 		ownerId: recipient.ownerId,
 		displayName: recipient.displayName,
+		publicKey: recipient.publicKey,
+		identityUpdatedAt: recipient.identityUpdatedAt,
 		handle: toHandle({ displayName, fingerprint }),
 		fingerprint,
 		localAlias,

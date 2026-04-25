@@ -166,6 +166,8 @@ describe("BetterAgeCore payload lifecycle", () => {
 						{
 							ownerId: "owner_123",
 							displayName: "Isaac",
+							publicKey: "age1self",
+							identityUpdatedAt: "2026-04-25T10:00:00.000Z",
 							handle: "Isaac#age1self",
 							fingerprint: "age1self",
 							localAlias: null,

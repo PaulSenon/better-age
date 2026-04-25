@@ -66,6 +66,10 @@ const failureMessage = (code: string) => {
 			return "invalid .env content";
 		case "PAYLOAD_PATH_MISSING":
 			return "pass a payload path or run interactively";
+		case "PAYLOAD_UPDATE_REQUIRED":
+			return "run bage update before mutating payload";
+		case "RECIPIENT_REFERENCE_NOT_FOUND":
+			return "recipient reference not found";
 		case "SETUP_NAME_MISSING":
 			return "pass --name or run setup interactively";
 		case "VIEWER_UNAVAILABLE":
