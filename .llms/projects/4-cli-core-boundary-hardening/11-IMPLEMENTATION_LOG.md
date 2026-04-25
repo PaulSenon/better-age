@@ -97,3 +97,54 @@ Notes:
 - Root Biome formatted `.llms/projects/4-cli-core-boundary-hardening/1-BOUNDARY_API_SPEC.ts`.
 - `packages/core/src/persistence/ArtifactDocument.ts` is intentionally pure: no filesystem, no crypto, no app services.
 - Encrypted private key blob crypto round-trips remain Phase 5 real-adapter work.
+
+## 2026-04-25 Phase 3 Start
+
+Goal:
+
+- Build core identity and key lifecycle over fake ports.
+- Keep behavior test-first through public core APIs.
+- Cover setup, export, import/list/forget, rotation, and passphrase change.
+
+Actions completed:
+
+- Added `packages/core/src/identity/BetterAgeCore.ts`.
+- Added fakeable core ports: home repository, identity crypto, clock, random ids.
+- Added public `createBetterAgeCore(...)` factory with command/query groups.
+- Implemented self identity setup with protected current key metadata.
+- Implemented public identity export with no private key material.
+- Implemented known identity import with alias overlay and outcomes: `added`, `updated`, `unchanged`, `alias-updated`.
+- Implemented duplicate/invalid alias checks.
+- Implemented self import and self forget guards.
+- Implemented known identity listing and forgetting by owner id.
+- Implemented self identity and retired key read models.
+- Implemented identity rotation under same owner id, retiring previous key.
+- Implemented passphrase change by decrypting and re-protecting current plus retired key blobs.
+
+TDD notes:
+
+- RED: setup/export test failed on missing core module.
+- GREEN: added minimal core factory, setup, export.
+- RED: import/list failed on missing methods.
+- GREEN: added identity string import, alias overlay, known identity persistence/listing.
+- RED: reimport outcome test failed because existing imports always returned `updated`.
+- GREEN: added unchanged/alias-updated/updated classification.
+- RED: self/list/forget test failed on missing methods.
+- GREEN: added self summary, retired key summary, exact forget behavior.
+- RED: rotation test failed on missing method.
+- GREEN: added current-key decrypt check, new protected key write, retired key metadata update.
+- RED: passphrase change test failed on missing method.
+- GREEN: added re-protection loop across current and retired refs.
+- RED: invalid setup test failed because empty display name was accepted.
+- GREEN: added minimal setup name validation.
+
+Verification:
+
+- `pnpm -F @better-age/core test` passed: 15 unit tests.
+- `pnpm -F @better-age/core check` passed.
+- `pnpm check` passed.
+
+Notes:
+
+- Phase 3 uses fake crypto/home ports only; real filesystem and age adapter proofs remain Phase 5.
+- Current handle/fingerprint derivation for known identities is intentionally deterministic and local to this fake-port core slice.

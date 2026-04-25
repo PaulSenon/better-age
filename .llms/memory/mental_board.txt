@@ -1,4 +1,4 @@
-Current goal: Better Age MVP reimplementation, Phase 2 complete.
+Current goal: Better Age MVP reimplementation, Phase 3 complete.
 
 Active state:
 - Phase 1 skeleton edits done.
@@ -12,9 +12,12 @@ Active state:
 - Public identity string round-trips as `better-age://identity/v1/<base64url-json>`.
 - Core test passed.
 - Root `pnpm check` passed.
+- Phase 3 identity/key lifecycle implemented over fake ports.
+- Core now supports setup, export, import/list/forget known identity, self summary, retired key summary, rotate, passphrase change.
+- Phase 3 tests: 15 unit tests passing.
 
 Next:
-- Phase 3: core identity and key lifecycle over fake ports.
+- Phase 4: core payload lifecycle over fake ports.
 
 Blockers:
 - None currently.
