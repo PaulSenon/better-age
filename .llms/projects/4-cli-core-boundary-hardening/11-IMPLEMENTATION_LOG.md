@@ -200,3 +200,66 @@ Notes:
 
 - Payload crypto remains fake-port only; real encrypted payload proof remains Phase 5.
 - Payload schema migration remains current-v1/no-op; only self-recipient refresh is exercised as an update reason in Phase 4.
+
+## 2026-04-25 Phase 5 Start
+
+Track check:
+
+- Phase 1 workspace split is done.
+- Phase 2 artifact/migration foundation is done.
+- Phase 3 identity/key lifecycle over fake ports is done.
+- Phase 4 payload lifecycle over fake ports is done.
+- Phase 5 is the correct next slice from `plans/better-age-mvp-reimplementation.md`.
+- Work remains inside `@better-age/core`; CLI/varlock remain untouched for later phases.
+
+Goal:
+
+- Add real filesystem and age-backed core adapters.
+- Prove v1 file layout, age-native encrypted key blobs, encrypted payload files, passphrase change, rotation, grant, and revoke through focused integration tests.
+
+Actions completed:
+
+- Added `age-encryption` dependency to `@better-age/core`.
+- Split core test scripts into unit and integration configs.
+- Added `packages/core/src/infra/RealCoreAdapters.ts`.
+- Added node home repository adapter:
+  - `home-state.json`
+  - `keys/<fingerprint>.age`
+  - atomic writes
+- Added node payload repository adapter with atomic writes.
+- Added age identity crypto adapter:
+  - hybrid identity generation
+  - public recipient derivation
+  - passphrase-protected private key blobs
+  - protected private key decrypt/parse
+- Added age payload crypto adapter:
+  - recipient encryption
+  - identity decryption
+  - armored age payloads
+- Added `packages/core/test/integration/real-adapters/RealCoreAdapters.integration.test.ts`.
+- Fixed payload decrypt/open behavior to try current plus retired local keys, so rotated identities can still decrypt old payloads.
+
+TDD notes:
+
+- RED: real adapter integration test failed on missing `RealCoreAdapters`.
+- GREEN: added node fs adapters and age crypto adapters.
+- RED: rotation/passphrase integration exceeded default test timeout.
+- GREEN: raised integration-only timeout to 30s.
+- RED: rotated identity could not decrypt payload encrypted to retired key.
+- GREEN: changed payload decrypt/open to load current + retired key blobs.
+- RED: grant/revoke real-recipient proof added.
+- GREEN: existing grant/revoke behavior worked with real age adapters after retired-key decrypt fix.
+
+Verification:
+
+- `pnpm -F @better-age/core test` passed:
+  - 20 unit tests.
+  - 3 integration tests.
+- `pnpm -F @better-age/core check` passed.
+- `pnpm check` passed.
+
+Notes:
+
+- Integration tests intentionally remain focused and do not duplicate unit branch coverage.
+- Age passphrase crypto is slow enough that integration tests need a longer timeout.
+- Real adapter work validates encrypted key and payload files use age armor.

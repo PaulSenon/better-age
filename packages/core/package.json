@@ -8,9 +8,11 @@
 		"typecheck": "tsc --noEmit",
 		"check": "pnpm run lint && pnpm run typecheck",
 		"test:unit": "vitest run -c vitest.unit.config.ts",
-		"test": "pnpm run test:unit"
+		"test:integration": "vitest run -c vitest.integration.config.ts",
+		"test": "pnpm run test:unit && pnpm run test:integration"
 	},
 	"dependencies": {
+		"age-encryption": "^0.3.0",
 		"effect": "^3.21.1"
 	},
 	"devDependencies": {

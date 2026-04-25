@@ -112,6 +112,9 @@ importers:
 
   packages/core:
     dependencies:
+      age-encryption:
+        specifier: ^0.3.0
+        version: 0.3.0
       effect:
         specifier: ^3.21.1
         version: 3.21.1

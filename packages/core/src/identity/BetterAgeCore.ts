@@ -413,6 +413,30 @@ export const createBetterAgeCore = (ports: BetterAgeCorePorts) => {
 		});
 	};
 
+	const decryptLocalPrivateKeys = async (input: {
+		readonly homeState: HomeStateDocument;
+		readonly passphrase: Passphrase;
+	}) => {
+		const keyRefs = [
+			input.homeState.currentKey.encryptedPrivateKeyRef,
+			...input.homeState.retiredKeys.map((key) => key.encryptedPrivateKeyRef),
+		];
+		const privateKeys: Array<PrivateKeyPlaintext> = [];
+
+		for (const ref of keyRefs) {
+			const encryptedKey =
+				await ports.homeRepository.readEncryptedPrivateKey(ref);
+			privateKeys.push(
+				await ports.identityCrypto.decryptPrivateKey({
+					encryptedKey,
+					passphrase: input.passphrase,
+				}),
+			);
+		}
+
+		return privateKeys;
+	};
+
 	const createPayload = async (input: {
 		readonly path: PayloadPath;
 		readonly passphrase: Passphrase;
@@ -481,9 +505,9 @@ export const createBetterAgeCore = (ports: BetterAgeCorePorts) => {
 			return failure("HOME_STATE_NOT_FOUND", undefined);
 		}
 
-		let privateKey: PrivateKeyPlaintext;
+		let privateKeys: ReadonlyArray<PrivateKeyPlaintext>;
 		try {
-			privateKey = await decryptCurrentPrivateKey({
+			privateKeys = await decryptLocalPrivateKeys({
 				homeState,
 				passphrase: input.passphrase,
 			});
@@ -504,10 +528,15 @@ export const createBetterAgeCore = (ports: BetterAgeCorePorts) => {
 			return failure("PAYLOAD_INVALID", undefined);
 		}
 
-		const decryptedPayload = await payloadCrypto.decryptPayload({
-			armoredPayload: payloadDocument.right.encryptedPayload,
-			privateKeys: [privateKey],
-		});
+		let decryptedPayload: unknown;
+		try {
+			decryptedPayload = await payloadCrypto.decryptPayload({
+				armoredPayload: payloadDocument.right.encryptedPayload,
+				privateKeys,
+			});
+		} catch {
+			return failure("PAYLOAD_ACCESS_DENIED", undefined);
+		}
 		const payloadPlaintext = parsePayloadPlaintext(decryptedPayload);
 
 		if (Either.isLeft(payloadPlaintext)) {
@@ -567,9 +596,9 @@ export const createBetterAgeCore = (ports: BetterAgeCorePorts) => {
 			};
 		}
 
-		let privateKey: PrivateKeyPlaintext;
+		let privateKeys: ReadonlyArray<PrivateKeyPlaintext>;
 		try {
-			privateKey = await decryptCurrentPrivateKey({
+			privateKeys = await decryptLocalPrivateKeys({
 				homeState,
 				passphrase: input.passphrase,
 			});
@@ -599,10 +628,18 @@ export const createBetterAgeCore = (ports: BetterAgeCorePorts) => {
 			};
 		}
 
-		const decryptedPayload = await payloadCrypto.decryptPayload({
-			armoredPayload: payloadDocument.right.encryptedPayload,
-			privateKeys: [privateKey],
-		});
+		let decryptedPayload: unknown;
+		try {
+			decryptedPayload = await payloadCrypto.decryptPayload({
+				armoredPayload: payloadDocument.right.encryptedPayload,
+				privateKeys,
+			});
+		} catch {
+			return {
+				kind: "failure" as const,
+				response: failure("PAYLOAD_ACCESS_DENIED", undefined),
+			};
+		}
 		const payloadPlaintext = parsePayloadPlaintext(decryptedPayload);
 
 		if (Either.isLeft(payloadPlaintext)) {

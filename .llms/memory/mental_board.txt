@@ -1,4 +1,4 @@
-Current goal: Better Age MVP reimplementation, Phase 4 complete.
+Current goal: Better Age MVP reimplementation, Phase 5 complete.
 
 Active state:
 - Phase 1 skeleton edits done.
@@ -20,9 +20,14 @@ Active state:
 - Stale self-recipient notice/write-gate/update refresh covered.
 - Phase 4 total core tests: 20 unit tests passing.
 - Root `pnpm check` passed after Phase 4.
+- Phase 5 real core adapters implemented.
+- Core now has node home/payload repos and age-backed identity/payload crypto.
+- Real adapter tests prove v1 file layout, key blobs, payload round-trip, passphrase change, rotation retired-key decryptability, grant/revoke decryptability.
+- Core tests: 20 unit + 3 integration passing.
+- Root `pnpm check` passed after Phase 5.
 
 Next:
-- Phase 5: real core adapters, filesystem, age-backed crypto integration.
+- Phase 6: new CLI identity slice.
 
 Blockers:
 - None currently.
