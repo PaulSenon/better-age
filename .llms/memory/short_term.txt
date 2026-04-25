@@ -1,0 +1,9 @@
+2026-04-25 Phase 6 complete:
+- New CLI identity slice implemented in `packages/cli`.
+- Public runner: `src/cli/runCli.ts`; presenter: `src/cli/presenter.ts`; real adapter wiring: `src/cli/nodeCli.ts`.
+- CLI contract tests cover setup exact/guided/headless, passphrase confirmation retry, identity export/import/list/forget, stdout/stderr/exit codes.
+- Core `importKnownIdentity` now preserves existing alias when alias omitted.
+- `@better-age/cli` depends on `@better-age/core`; core exposes explicit package entrypoint.
+- No `bage` bin yet.
+- `@effect/cli` is installed/locked, but command tree/parser integration still pending before final packaging/help/completions.
+- Verification passed: `pnpm test`, `pnpm check`, `git diff --check`.

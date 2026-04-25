@@ -128,15 +128,15 @@ Build the first usable CLI slice around identity workflows. Include parser setup
 
 ### Acceptance Criteria
 
-- [ ] `bage setup` works in exact and guided interactive mode.
-- [ ] Headless setup fails with the correct missing operand or passphrase-unavailable behavior.
-- [ ] `bage identity export` prints identity string only to stdout.
-- [ ] `bage identity import` supports optional alias prompting and `--alias`.
-- [ ] `bage identity list` renders human output to stdout.
-- [ ] `bage identity forget` resolves known identities and never mutates payloads.
-- [ ] Passphrase retry behavior works where applicable.
-- [ ] Human errors/warnings/success output is styled through the presenter.
-- [ ] CLI contract tests cover stdout/stderr and exit codes.
+- [x] `bage setup` works in exact and guided interactive mode.
+- [x] Headless setup fails with the correct missing operand or passphrase-unavailable behavior.
+- [x] `bage identity export` prints identity string only to stdout.
+- [x] `bage identity import` supports optional alias prompting and `--alias`.
+- [x] `bage identity list` renders human output to stdout.
+- [x] `bage identity forget` resolves known identities and never mutates payloads.
+- [x] Passphrase retry behavior works where applicable.
+- [x] Human errors/warnings/success output is styled through the presenter.
+- [x] CLI contract tests cover stdout/stderr and exit codes.
 
 ---
 
@@ -242,4 +242,3 @@ Run a final product contract pass across core, CLI, and varlock. Close edge-case
 - [ ] Varlock process integration tests pass.
 - [ ] User-facing docs are updated enough for MVP use.
 - [ ] Legacy package remains private and unreferenced by new packages.
-

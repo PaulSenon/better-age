@@ -263,3 +263,64 @@ Notes:
 - Integration tests intentionally remain focused and do not duplicate unit branch coverage.
 - Age passphrase crypto is slow enough that integration tests need a longer timeout.
 - Real adapter work validates encrypted key and payload files use age armor.
+
+## 2026-04-25 Phase 6 Start
+
+Track check:
+
+- Phase 1 workspace split is done.
+- Phase 2 artifact/migration foundation is done.
+- Phase 3 identity/key lifecycle over fake ports is done.
+- Phase 4 payload lifecycle over fake ports is done.
+- Phase 5 real core adapters are done.
+- Phase 6 is the correct next slice from `plans/better-age-mvp-reimplementation.md`.
+- Scope remains identity CLI only; payload CLI flows stay Phase 7+.
+
+Goal:
+
+- Build the first new CLI identity slice.
+- Cover setup, identity export/import/list/forget, prompt policy, presenter output, stdout/stderr split, and headless/interactive behavior.
+
+Actions completed:
+
+- Added `@better-age/core` workspace dependency to `@better-age/cli`.
+- Added explicit core package entrypoint exports for the core factory, ports, summaries, and real adapters.
+- Added `packages/cli/src/cli/runCli.ts` as the public identity command runner.
+- Added `packages/cli/src/cli/presenter.ts` for human success/error/list rendering and machine-clean identity export output.
+- Added `packages/cli/src/cli/nodeCli.ts` to wire the runner to real core adapters with a default `~/.better-age` home.
+- Added CLI contract tests for:
+  - exact interactive setup.
+  - guided interactive setup.
+  - headless setup missing `--name`.
+  - headless setup passphrase unavailable.
+  - setup passphrase confirmation retry.
+  - machine-clean `identity export`.
+  - headless `identity import --alias`.
+  - interactive alias retry on duplicate alias.
+  - human `identity list`.
+  - `identity forget` resolving local alias to owner id.
+- Fixed core `importKnownIdentity` alias semantics so omitted alias preserves an existing local alias; explicit alias removal remains out of MVP.
+
+TDD notes:
+
+- RED: CLI contract test failed on missing `runCli`.
+- GREEN: added minimal runner with parser, prompt policy, command dispatch, identity reference resolution, and stdout/stderr split.
+- RED: core alias regression test failed because omitted alias cleared the existing alias.
+- GREEN: core import now defaults omitted alias to existing alias when present.
+- REFACTOR: moved human rendering into a presenter boundary without changing contracts.
+- RED: acceptance gaps added for headless missing setup name and passphrase confirmation retry.
+- GREEN: existing runner behavior covered those cases.
+
+Verification:
+
+- `pnpm -F @better-age/cli test:unit` passed: 6 tests.
+- `pnpm -F @better-age/cli check` passed.
+- `pnpm -F @better-age/core check` passed.
+- `pnpm test` passed.
+- `pnpm check` passed.
+- `git diff --check` passed.
+
+Notes:
+
+- The new CLI runner is intentionally small and contract-first; there is no `bage` bin yet.
+- `@effect/cli` remains the chosen CLI dependency, but this phase did not yet replace the runner's tiny argv parser with an `@effect/cli` command tree. That should be handled before packaging/help/completions work, or in the next CLI infrastructure pass.

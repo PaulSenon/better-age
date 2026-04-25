@@ -11,6 +11,7 @@
 		"test": "pnpm run test:unit"
 	},
 	"dependencies": {
+		"@better-age/core": "workspace:*",
 		"@effect/cli": "^0.75.1",
 		"effect": "^3.21.2"
 	},

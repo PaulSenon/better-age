@@ -329,6 +329,19 @@ describe("BetterAgeCore identity lifecycle", () => {
 		});
 		await expect(
 			core.commands.importKnownIdentity({
+				identityString: originalIdentityString,
+			}),
+		).resolves.toMatchObject({
+			result: {
+				kind: "success",
+				value: {
+					handle: "platform#age1team",
+					outcome: "unchanged",
+				},
+			},
+		});
+		await expect(
+			core.commands.importKnownIdentity({
 				identityString: refreshedIdentityString,
 				localAlias: "platform",
 			}),

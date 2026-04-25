@@ -990,11 +990,19 @@ export const createBetterAgeCore = (ports: BetterAgeCorePorts) => {
 		}
 
 		const identity = parsedIdentity.right;
-		const localAlias = input.localAlias ?? null;
 
 		if (identity.ownerId === homeState.ownerId) {
 			return failure("CANNOT_IMPORT_SELF_IDENTITY", undefined);
 		}
+
+		const existingIndex = homeState.knownIdentities.findIndex(
+			(knownIdentity) => knownIdentity.ownerId === identity.ownerId,
+		);
+		const existingIdentity =
+			existingIndex === -1
+				? undefined
+				: homeState.knownIdentities[existingIndex];
+		const localAlias = input.localAlias ?? existingIdentity?.localAlias ?? null;
 
 		if (localAlias !== null && !isValidLocalAlias(localAlias)) {
 			return failure("LOCAL_ALIAS_INVALID", undefined);
@@ -1011,13 +1019,6 @@ export const createBetterAgeCore = (ports: BetterAgeCorePorts) => {
 			return failure("LOCAL_ALIAS_DUPLICATE", undefined);
 		}
 
-		const existingIndex = homeState.knownIdentities.findIndex(
-			(knownIdentity) => knownIdentity.ownerId === identity.ownerId,
-		);
-		const existingIdentity =
-			existingIndex === -1
-				? undefined
-				: homeState.knownIdentities[existingIndex];
 		const nextKnownIdentity = {
 			ownerId: identity.ownerId,
 			displayName: identity.displayName,
