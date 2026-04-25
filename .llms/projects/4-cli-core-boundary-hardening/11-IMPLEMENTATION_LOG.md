@@ -148,3 +148,55 @@ Notes:
 
 - Phase 3 uses fake crypto/home ports only; real filesystem and age adapter proofs remain Phase 5.
 - Current handle/fingerprint derivation for known identities is intentionally deterministic and local to this fake-port core slice.
+
+## 2026-04-25 Phase 4 Start
+
+Track check:
+
+- Phase 1 workspace split is done.
+- Phase 2 artifact/migration foundation is done.
+- Phase 3 identity/key lifecycle over fake ports is done.
+- Phase 4 is the correct next slice from `plans/better-age-mvp-reimplementation.md`.
+- Work remains inside `@better-age/core`; CLI/varlock remain untouched for later phases.
+
+Goal:
+
+- Build core payload lifecycle over fake ports.
+- Cover create, decrypt, edit, grant, revoke, stale self-recipient notice, update gate, update refresh, and semantic failures.
+
+Actions completed:
+
+- Added fakeable payload repository and payload crypto ports to `createBetterAgeCore`.
+- Added `createPayload`.
+- Added `decryptPayload` read model with env keys, recipient summaries, compatibility state, and update recommendation notice.
+- Added `editPayload` with `.env` validation and `edited|unchanged` outcomes.
+- Added `grantPayloadRecipient` with self guard and `added|updated|unchanged` outcomes.
+- Added `revokePayloadRecipient` with self guard and `removed|unchanged` outcomes.
+- Added stale self-recipient write gate returning `PAYLOAD_UPDATE_REQUIRED`.
+- Added `updatePayload` self-recipient refresh with `updated|unchanged` outcomes.
+- Added payload semantic failures: duplicate create, missing payload, wrong passphrase.
+- Added `packages/core/src/identity/BetterAgeCore.payload.test.ts`.
+
+TDD notes:
+
+- RED: create/decrypt payload test failed on missing `createPayload`.
+- GREEN: added payload ports, create, decrypt.
+- RED: edit test failed on missing `editPayload`.
+- GREEN: added env validation, payload open/write helpers, edit outcomes.
+- RED: grant/revoke test failed on missing methods.
+- GREEN: added exact recipient mutations, self guards, idempotent outcomes.
+- RED: stale self test failed because grant was allowed on outdated payload.
+- GREEN: added update-required write gate and `updatePayload`.
+- RED: edge case pass added for duplicate create/missing payload/wrong passphrase.
+- GREEN: existing behavior already mapped those semantic failures.
+
+Verification:
+
+- `pnpm -F @better-age/core test` passed: 20 unit tests.
+- `pnpm -F @better-age/core check` passed.
+- `pnpm check` passed.
+
+Notes:
+
+- Payload crypto remains fake-port only; real encrypted payload proof remains Phase 5.
+- Payload schema migration remains current-v1/no-op; only self-recipient refresh is exercised as an update reason in Phase 4.

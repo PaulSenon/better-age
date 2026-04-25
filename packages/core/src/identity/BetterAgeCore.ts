@@ -1,10 +1,15 @@
 import { Either } from "effect";
 import {
+	encodePayloadDocument,
 	encodePublicIdentityString,
 	type HomeStateDocumentV1,
+	type PayloadDocumentV1,
+	type PayloadPlaintextV1,
 	type PrivateKeyPlaintextV1,
 	type PublicIdentityDocumentV1,
 	parseHomeStateDocument,
+	parsePayloadDocument,
+	parsePayloadPlaintext,
 	parsePublicIdentityString,
 } from "../persistence/ArtifactDocument.js";
 
@@ -15,9 +20,14 @@ export type IsoUtcTimestamp = string;
 export type EncryptedPrivateKeyRef = string;
 export type KeyFingerprint = string;
 export type LocalAlias = string;
+export type PayloadPath = string;
+export type PayloadId = string;
+export type EnvText = string;
 
 export type HomeStateDocument = HomeStateDocumentV1;
 export type PrivateKeyPlaintext = PrivateKeyPlaintextV1;
+export type PayloadPlaintext = PayloadPlaintextV1;
+export type PayloadDocument = PayloadDocumentV1;
 
 export type PublicIdentitySnapshot = {
 	readonly ownerId: OwnerId;
@@ -49,6 +59,37 @@ export type RetiredKeySummary = {
 	readonly retiredAt: IsoUtcTimestamp;
 };
 
+export type PayloadRecipientSummary = {
+	readonly ownerId: OwnerId;
+	readonly displayName: DisplayName;
+	readonly handle: string;
+	readonly fingerprint: KeyFingerprint;
+	readonly localAlias: LocalAlias | null;
+	readonly isSelf: boolean;
+	readonly isStaleSelf: boolean;
+};
+
+export type DecryptedPayload = {
+	readonly path: PayloadPath;
+	readonly payloadId: PayloadId;
+	readonly createdAt: IsoUtcTimestamp;
+	readonly lastRewrittenAt: IsoUtcTimestamp;
+	readonly schemaVersion: number;
+	readonly compatibility: "up-to-date" | "readable-but-outdated";
+	readonly envText: EnvText;
+	readonly envKeys: ReadonlyArray<string>;
+	readonly recipients: ReadonlyArray<PayloadRecipientSummary>;
+};
+
+export type CoreNotice = {
+	readonly level: "warning";
+	readonly code: "PAYLOAD_UPDATE_RECOMMENDED";
+	readonly details: {
+		readonly path: PayloadPath;
+		readonly reasons: ReadonlyArray<"self-recipient-refresh">;
+	};
+};
+
 export type CoreSuccess<TCode extends string, TValue> = {
 	readonly kind: "success";
 	readonly code: TCode;
@@ -63,7 +104,7 @@ export type CoreFailure<TCode extends string, TDetails = undefined> = {
 
 export type CoreResponse<TResult> = {
 	readonly result: TResult;
-	readonly notices: readonly [];
+	readonly notices: ReadonlyArray<CoreNotice>;
 };
 
 export type HomeRepositoryPort = {
@@ -91,17 +132,37 @@ export type IdentityCryptoPort = {
 	}): Promise<PrivateKeyPlaintext>;
 };
 
+export type PayloadRepositoryPort = {
+	readPayloadFile(path: PayloadPath): Promise<string>;
+	writePayloadFile(path: PayloadPath, contents: string): Promise<void>;
+	payloadExists(path: PayloadPath): Promise<boolean>;
+};
+
+export type PayloadCryptoPort = {
+	encryptPayload(input: {
+		readonly plaintext: PayloadPlaintext;
+		readonly recipients: ReadonlyArray<string>;
+	}): Promise<string>;
+	decryptPayload(input: {
+		readonly armoredPayload: string;
+		readonly privateKeys: ReadonlyArray<PrivateKeyPlaintext>;
+	}): Promise<unknown>;
+};
+
 export type ClockPort = {
 	now(): Promise<IsoUtcTimestamp>;
 };
 
 export type RandomIdsPort = {
 	nextOwnerId(): Promise<OwnerId>;
+	nextPayloadId?: () => Promise<PayloadId>;
 };
 
 export type BetterAgeCorePorts = {
 	readonly homeRepository: HomeRepositoryPort;
 	readonly identityCrypto: IdentityCryptoPort;
+	readonly payloadRepository?: PayloadRepositoryPort;
+	readonly payloadCrypto?: PayloadCryptoPort;
 	readonly clock: ClockPort;
 	readonly randomIds: RandomIdsPort;
 };
@@ -121,6 +182,11 @@ const failure = <TCode extends string, TDetails = undefined>(
 	result: { kind: "failure", code, details },
 	notices: [],
 });
+
+const response = <TResult>(
+	result: TResult,
+	notices: ReadonlyArray<CoreNotice>,
+): CoreResponse<TResult> => ({ result, notices });
 
 const toHandle = (input: {
 	readonly displayName: DisplayName;
@@ -239,7 +305,556 @@ const publicIdentityEquals = (
 const isValidDisplayName = (displayName: DisplayName): boolean =>
 	displayName.trim().length > 0;
 
+const envKeysFromText = (envText: EnvText): ReadonlyArray<string> =>
+	envText
+		.split(/\r?\n/)
+		.map((line) => line.trim())
+		.filter((line) => line.length > 0 && !line.startsWith("#"))
+		.map((line) => line.split("=", 1)[0])
+		.filter((key): key is string => key !== undefined && key.length > 0);
+
+const isValidEnvText = (envText: EnvText): boolean =>
+	envText
+		.split(/\r?\n/)
+		.map((line) => line.trim())
+		.every(
+			(line) =>
+				line.length === 0 ||
+				line.startsWith("#") ||
+				/^[A-Za-z_][A-Za-z0-9_]*=.*/.test(line),
+		);
+
+const isSamePublicIdentity = (
+	left: PublicIdentitySnapshot,
+	right: PublicIdentitySnapshot,
+) => publicIdentityEquals(left, right);
+
+const selfRecipientNeedsRefresh = (
+	homeState: HomeStateDocument,
+	payload: PayloadPlaintext,
+) => {
+	const self = toPublicIdentity(homeState);
+	const payloadSelf = payload.recipients.find(
+		(recipient) => recipient.ownerId === homeState.ownerId,
+	);
+
+	return payloadSelf === undefined || !isSamePublicIdentity(payloadSelf, self);
+};
+
+const payloadRewriteReasons = (
+	homeState: HomeStateDocument,
+	payload: PayloadPlaintext,
+): ReadonlyArray<"self-recipient-refresh"> =>
+	selfRecipientNeedsRefresh(homeState, payload)
+		? ["self-recipient-refresh"]
+		: [];
+
+const toRecipientSummary = (
+	homeState: HomeStateDocument,
+	recipient: PayloadPlaintext["recipients"][number],
+): PayloadRecipientSummary => {
+	const knownIdentity = homeState.knownIdentities.find(
+		(identity) => identity.ownerId === recipient.ownerId,
+	);
+	const localAlias = knownIdentity?.localAlias ?? null;
+	const fingerprint = fingerprintFromPublicKey(recipient.publicKey);
+	const isSelf = recipient.ownerId === homeState.ownerId;
+	const displayName = toDisplayName({
+		displayName: recipient.displayName,
+		localAlias,
+	});
+
+	return {
+		ownerId: recipient.ownerId,
+		displayName: recipient.displayName,
+		handle: toHandle({ displayName, fingerprint }),
+		fingerprint,
+		localAlias,
+		isSelf,
+		isStaleSelf:
+			isSelf && !isSamePublicIdentity(recipient, toPublicIdentity(homeState)),
+	};
+};
+
+const parsePayloadFile = (contents: string) => {
+	try {
+		return parsePayloadDocument(JSON.parse(contents));
+	} catch {
+		return parsePayloadDocument(undefined);
+	}
+};
+
 export const createBetterAgeCore = (ports: BetterAgeCorePorts) => {
+	const requirePayloadPorts = () => {
+		if (
+			ports.payloadRepository === undefined ||
+			ports.payloadCrypto === undefined
+		) {
+			throw new Error("Payload ports are required");
+		}
+
+		return {
+			payloadRepository: ports.payloadRepository,
+			payloadCrypto: ports.payloadCrypto,
+		};
+	};
+
+	const decryptCurrentPrivateKey = async (input: {
+		readonly homeState: HomeStateDocument;
+		readonly passphrase: Passphrase;
+	}) => {
+		const encryptedKey = await ports.homeRepository.readEncryptedPrivateKey(
+			input.homeState.currentKey.encryptedPrivateKeyRef,
+		);
+
+		return ports.identityCrypto.decryptPrivateKey({
+			encryptedKey,
+			passphrase: input.passphrase,
+		});
+	};
+
+	const createPayload = async (input: {
+		readonly path: PayloadPath;
+		readonly passphrase: Passphrase;
+	}) => {
+		const { payloadRepository, payloadCrypto } = requirePayloadPorts();
+		const homeState = await loadCurrentHomeState(ports.homeRepository);
+
+		if (homeState === null) {
+			return failure("HOME_STATE_NOT_FOUND", undefined);
+		}
+
+		if (await payloadRepository.payloadExists(input.path)) {
+			return failure("PAYLOAD_ALREADY_EXISTS", undefined);
+		}
+
+		try {
+			await decryptCurrentPrivateKey({
+				homeState,
+				passphrase: input.passphrase,
+			});
+		} catch {
+			return failure("PASSPHRASE_INCORRECT", undefined);
+		}
+
+		const now = await ports.clock.now();
+		const payloadId =
+			(await ports.randomIds.nextPayloadId?.()) ?? `payload_${Date.now()}`;
+		const self = toPublicIdentity(homeState);
+		const plaintext: PayloadPlaintext = {
+			kind: "better-age/payload",
+			version: 1,
+			payloadId,
+			createdAt: now,
+			lastRewrittenAt: now,
+			envText: "",
+			recipients: [self],
+		};
+		const encryptedPayload = await payloadCrypto.encryptPayload({
+			plaintext,
+			recipients: [self.publicKey],
+		});
+
+		await payloadRepository.writePayloadFile(
+			input.path,
+			encodePayloadDocument({
+				kind: "better-age/payload",
+				version: 1,
+				encryptedPayload,
+			}),
+		);
+
+		return success("PAYLOAD_CREATED", {
+			path: input.path,
+			payloadId,
+		});
+	};
+
+	const decryptPayload = async (input: {
+		readonly path: PayloadPath;
+		readonly passphrase: Passphrase;
+	}) => {
+		const { payloadRepository, payloadCrypto } = requirePayloadPorts();
+		const homeState = await loadCurrentHomeState(ports.homeRepository);
+
+		if (homeState === null) {
+			return failure("HOME_STATE_NOT_FOUND", undefined);
+		}
+
+		let privateKey: PrivateKeyPlaintext;
+		try {
+			privateKey = await decryptCurrentPrivateKey({
+				homeState,
+				passphrase: input.passphrase,
+			});
+		} catch {
+			return failure("PASSPHRASE_INCORRECT", undefined);
+		}
+
+		let rawPayloadFile: string;
+		try {
+			rawPayloadFile = await payloadRepository.readPayloadFile(input.path);
+		} catch {
+			return failure("PAYLOAD_NOT_FOUND", undefined);
+		}
+
+		const payloadDocument = parsePayloadFile(rawPayloadFile);
+
+		if (Either.isLeft(payloadDocument)) {
+			return failure("PAYLOAD_INVALID", undefined);
+		}
+
+		const decryptedPayload = await payloadCrypto.decryptPayload({
+			armoredPayload: payloadDocument.right.encryptedPayload,
+			privateKeys: [privateKey],
+		});
+		const payloadPlaintext = parsePayloadPlaintext(decryptedPayload);
+
+		if (Either.isLeft(payloadPlaintext)) {
+			return failure("PAYLOAD_INVALID", undefined);
+		}
+
+		const plaintext = payloadPlaintext.right;
+		const needsSelfRefresh = selfRecipientNeedsRefresh(homeState, plaintext);
+		const notices: ReadonlyArray<CoreNotice> = needsSelfRefresh
+			? [
+					{
+						level: "warning",
+						code: "PAYLOAD_UPDATE_RECOMMENDED",
+						details: {
+							path: input.path,
+							reasons: ["self-recipient-refresh"],
+						},
+					},
+				]
+			: [];
+
+		return response(
+			{
+				kind: "success",
+				code: "PAYLOAD_DECRYPTED",
+				value: {
+					path: input.path,
+					payloadId: plaintext.payloadId,
+					createdAt: plaintext.createdAt,
+					lastRewrittenAt: plaintext.lastRewrittenAt,
+					schemaVersion: plaintext.version,
+					compatibility: needsSelfRefresh
+						? "readable-but-outdated"
+						: "up-to-date",
+					envText: plaintext.envText,
+					envKeys: envKeysFromText(plaintext.envText),
+					recipients: plaintext.recipients.map((recipient) =>
+						toRecipientSummary(homeState, recipient),
+					),
+				} satisfies DecryptedPayload,
+			},
+			notices,
+		);
+	};
+
+	const openPayloadPlaintext = async (input: {
+		readonly path: PayloadPath;
+		readonly passphrase: Passphrase;
+	}) => {
+		const { payloadRepository, payloadCrypto } = requirePayloadPorts();
+		const homeState = await loadCurrentHomeState(ports.homeRepository);
+
+		if (homeState === null) {
+			return {
+				kind: "failure" as const,
+				response: failure("HOME_STATE_NOT_FOUND", undefined),
+			};
+		}
+
+		let privateKey: PrivateKeyPlaintext;
+		try {
+			privateKey = await decryptCurrentPrivateKey({
+				homeState,
+				passphrase: input.passphrase,
+			});
+		} catch {
+			return {
+				kind: "failure" as const,
+				response: failure("PASSPHRASE_INCORRECT", undefined),
+			};
+		}
+
+		let rawPayloadFile: string;
+		try {
+			rawPayloadFile = await payloadRepository.readPayloadFile(input.path);
+		} catch {
+			return {
+				kind: "failure" as const,
+				response: failure("PAYLOAD_NOT_FOUND", undefined),
+			};
+		}
+
+		const payloadDocument = parsePayloadFile(rawPayloadFile);
+
+		if (Either.isLeft(payloadDocument)) {
+			return {
+				kind: "failure" as const,
+				response: failure("PAYLOAD_INVALID", undefined),
+			};
+		}
+
+		const decryptedPayload = await payloadCrypto.decryptPayload({
+			armoredPayload: payloadDocument.right.encryptedPayload,
+			privateKeys: [privateKey],
+		});
+		const payloadPlaintext = parsePayloadPlaintext(decryptedPayload);
+
+		if (Either.isLeft(payloadPlaintext)) {
+			return {
+				kind: "failure" as const,
+				response: failure("PAYLOAD_INVALID", undefined),
+			};
+		}
+
+		return {
+			kind: "success" as const,
+			homeState,
+			payloadCrypto,
+			payloadRepository,
+			plaintext: payloadPlaintext.right,
+		};
+	};
+
+	const writePayloadPlaintext = async (input: {
+		readonly path: PayloadPath;
+		readonly payloadCrypto: PayloadCryptoPort;
+		readonly payloadRepository: PayloadRepositoryPort;
+		readonly plaintext: PayloadPlaintext;
+	}) => {
+		const encryptedPayload = await input.payloadCrypto.encryptPayload({
+			plaintext: input.plaintext,
+			recipients: input.plaintext.recipients.map(
+				(recipient) => recipient.publicKey,
+			),
+		});
+
+		await input.payloadRepository.writePayloadFile(
+			input.path,
+			encodePayloadDocument({
+				kind: "better-age/payload",
+				version: 1,
+				encryptedPayload,
+			}),
+		);
+	};
+
+	const editPayload = async (input: {
+		readonly path: PayloadPath;
+		readonly passphrase: Passphrase;
+		readonly editedEnvText: EnvText;
+	}) => {
+		if (!isValidEnvText(input.editedEnvText)) {
+			return failure("PAYLOAD_ENV_INVALID", undefined);
+		}
+
+		const opened = await openPayloadPlaintext(input);
+
+		if (opened.kind === "failure") {
+			return opened.response;
+		}
+
+		if (payloadRewriteReasons(opened.homeState, opened.plaintext).length > 0) {
+			return failure("PAYLOAD_UPDATE_REQUIRED", {
+				path: input.path,
+				reasons: payloadRewriteReasons(opened.homeState, opened.plaintext),
+			});
+		}
+
+		const outcome =
+			opened.plaintext.envText === input.editedEnvText ? "unchanged" : "edited";
+
+		if (outcome === "edited") {
+			await writePayloadPlaintext({
+				path: input.path,
+				payloadCrypto: opened.payloadCrypto,
+				payloadRepository: opened.payloadRepository,
+				plaintext: {
+					...opened.plaintext,
+					envText: input.editedEnvText,
+					lastRewrittenAt: await ports.clock.now(),
+				},
+			});
+		}
+
+		return success("PAYLOAD_EDITED", {
+			path: input.path,
+			payloadId: opened.plaintext.payloadId,
+			outcome,
+		});
+	};
+
+	const grantPayloadRecipient = async (input: {
+		readonly path: PayloadPath;
+		readonly passphrase: Passphrase;
+		readonly recipient: PublicIdentitySnapshot;
+	}) => {
+		const opened = await openPayloadPlaintext(input);
+
+		if (opened.kind === "failure") {
+			return opened.response;
+		}
+
+		if (input.recipient.ownerId === opened.homeState.ownerId) {
+			return failure("CANNOT_GRANT_SELF", undefined);
+		}
+
+		if (payloadRewriteReasons(opened.homeState, opened.plaintext).length > 0) {
+			return failure("PAYLOAD_UPDATE_REQUIRED", {
+				path: input.path,
+				reasons: payloadRewriteReasons(opened.homeState, opened.plaintext),
+			});
+		}
+
+		const existingRecipient = opened.plaintext.recipients.find(
+			(recipient) => recipient.ownerId === input.recipient.ownerId,
+		);
+		const outcome =
+			existingRecipient === undefined
+				? "added"
+				: publicIdentityEquals(existingRecipient, input.recipient)
+					? "unchanged"
+					: "updated";
+
+		if (outcome !== "unchanged") {
+			const recipients =
+				existingRecipient === undefined
+					? [...opened.plaintext.recipients, input.recipient]
+					: opened.plaintext.recipients.map((recipient) =>
+							recipient.ownerId === input.recipient.ownerId
+								? input.recipient
+								: recipient,
+						);
+
+			await writePayloadPlaintext({
+				path: input.path,
+				payloadCrypto: opened.payloadCrypto,
+				payloadRepository: opened.payloadRepository,
+				plaintext: {
+					...opened.plaintext,
+					recipients,
+					lastRewrittenAt: await ports.clock.now(),
+				},
+			});
+		}
+
+		return success("PAYLOAD_RECIPIENT_GRANTED", {
+			path: input.path,
+			payloadId: opened.plaintext.payloadId,
+			recipient: input.recipient,
+			outcome,
+			...(outcome === "unchanged"
+				? { unchangedReason: "already-granted" as const }
+				: {}),
+		});
+	};
+
+	const revokePayloadRecipient = async (input: {
+		readonly path: PayloadPath;
+		readonly passphrase: Passphrase;
+		readonly recipientOwnerId: OwnerId;
+	}) => {
+		const opened = await openPayloadPlaintext(input);
+
+		if (opened.kind === "failure") {
+			return opened.response;
+		}
+
+		if (input.recipientOwnerId === opened.homeState.ownerId) {
+			return failure("CANNOT_REVOKE_SELF", undefined);
+		}
+
+		if (payloadRewriteReasons(opened.homeState, opened.plaintext).length > 0) {
+			return failure("PAYLOAD_UPDATE_REQUIRED", {
+				path: input.path,
+				reasons: payloadRewriteReasons(opened.homeState, opened.plaintext),
+			});
+		}
+
+		const existingRecipient = opened.plaintext.recipients.find(
+			(recipient) => recipient.ownerId === input.recipientOwnerId,
+		);
+		const outcome = existingRecipient === undefined ? "unchanged" : "removed";
+
+		if (outcome === "removed") {
+			await writePayloadPlaintext({
+				path: input.path,
+				payloadCrypto: opened.payloadCrypto,
+				payloadRepository: opened.payloadRepository,
+				plaintext: {
+					...opened.plaintext,
+					recipients: opened.plaintext.recipients.filter(
+						(recipient) => recipient.ownerId !== input.recipientOwnerId,
+					),
+					lastRewrittenAt: await ports.clock.now(),
+				},
+			});
+		}
+
+		return success("PAYLOAD_RECIPIENT_REVOKED", {
+			path: input.path,
+			payloadId: opened.plaintext.payloadId,
+			recipientOwnerId: input.recipientOwnerId,
+			outcome,
+			...(outcome === "unchanged"
+				? { unchangedReason: "recipient-not-granted" as const }
+				: {}),
+		});
+	};
+
+	const updatePayload = async (input: {
+		readonly path: PayloadPath;
+		readonly passphrase: Passphrase;
+	}) => {
+		const opened = await openPayloadPlaintext(input);
+
+		if (opened.kind === "failure") {
+			return opened.response;
+		}
+
+		const rewriteReasons = payloadRewriteReasons(
+			opened.homeState,
+			opened.plaintext,
+		);
+
+		if (rewriteReasons.length === 0) {
+			return success("PAYLOAD_UPDATED", {
+				path: input.path,
+				payloadId: opened.plaintext.payloadId,
+				outcome: "unchanged",
+				rewriteReasons,
+			});
+		}
+
+		const self = toPublicIdentity(opened.homeState);
+		const otherRecipients = opened.plaintext.recipients.filter(
+			(recipient) => recipient.ownerId !== opened.homeState.ownerId,
+		);
+
+		await writePayloadPlaintext({
+			path: input.path,
+			payloadCrypto: opened.payloadCrypto,
+			payloadRepository: opened.payloadRepository,
+			plaintext: {
+				...opened.plaintext,
+				recipients: [self, ...otherRecipients],
+				lastRewrittenAt: await ports.clock.now(),
+			},
+		});
+
+		return success("PAYLOAD_UPDATED", {
+			path: input.path,
+			payloadId: opened.plaintext.payloadId,
+			outcome: "updated",
+			rewriteReasons,
+		});
+	};
+
 	const createSelfIdentity = async (input: {
 		readonly displayName: DisplayName;
 		readonly passphrase: Passphrase;
@@ -598,12 +1213,18 @@ export const createBetterAgeCore = (ports: BetterAgeCorePorts) => {
 	return {
 		commands: {
 			changeIdentityPassphrase,
+			createPayload,
 			createSelfIdentity,
+			editPayload,
 			forgetKnownIdentity,
+			grantPayloadRecipient,
 			importKnownIdentity,
 			rotateSelfIdentity,
+			revokePayloadRecipient,
+			updatePayload,
 		},
 		queries: {
+			decryptPayload,
 			exportSelfIdentityString,
 			getSelfIdentity,
 			listKnownIdentities,

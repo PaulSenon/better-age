@@ -1,4 +1,4 @@
-Current goal: Better Age MVP reimplementation, Phase 3 complete.
+Current goal: Better Age MVP reimplementation, Phase 4 complete.
 
 Active state:
 - Phase 1 skeleton edits done.
@@ -15,9 +15,14 @@ Active state:
 - Phase 3 identity/key lifecycle implemented over fake ports.
 - Core now supports setup, export, import/list/forget known identity, self summary, retired key summary, rotate, passphrase change.
 - Phase 3 tests: 15 unit tests passing.
+- Phase 4 payload lifecycle implemented over fake ports.
+- Core now supports create/decrypt/edit/grant/revoke/update payload behavior.
+- Stale self-recipient notice/write-gate/update refresh covered.
+- Phase 4 total core tests: 20 unit tests passing.
+- Root `pnpm check` passed after Phase 4.
 
 Next:
-- Phase 4: core payload lifecycle over fake ports.
+- Phase 5: real core adapters, filesystem, age-backed crypto integration.
 
 Blockers:
 - None currently.
