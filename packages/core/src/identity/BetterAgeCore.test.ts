@@ -163,6 +163,24 @@ describe("BetterAgeCore identity lifecycle", () => {
 			publicKey: "age1self",
 			identityUpdatedAt: "2026-04-25T10:00:00.000Z",
 		});
+
+		await expect(
+			core.queries.parseIdentityString({
+				identityString: exported.result.value.identityString,
+			}),
+		).resolves.toEqual({
+			result: {
+				kind: "success",
+				code: "IDENTITY_STRING_PARSED",
+				value: {
+					ownerId: "owner_123",
+					displayName: "Isaac",
+					publicKey: "age1self",
+					identityUpdatedAt: "2026-04-25T10:00:00.000Z",
+				},
+			},
+			notices: [],
+		});
 	});
 
 	it("imports a known identity with alias and lists it without private material", async () => {
@@ -486,6 +504,19 @@ describe("BetterAgeCore identity lifecycle", () => {
 		await core.commands.rotateSelfIdentity({ passphrase: "old passphrase" });
 
 		await expect(
+			core.queries.verifySelfIdentityPassphrase({
+				passphrase: "old passphrase",
+			}),
+		).resolves.toEqual({
+			result: {
+				kind: "success",
+				code: "PASSPHRASE_VERIFIED",
+				value: { ownerId: "owner_123" },
+			},
+			notices: [],
+		});
+
+		await expect(
 			core.commands.changeIdentityPassphrase({
 				currentPassphrase: "old passphrase",
 				nextPassphrase: "new passphrase",
@@ -536,6 +567,11 @@ describe("BetterAgeCore identity lifecycle", () => {
 		});
 		await expect(
 			core.commands.rotateSelfIdentity({ passphrase: "wrong" }),
+		).resolves.toMatchObject({
+			result: { kind: "failure", code: "PASSPHRASE_INCORRECT" },
+		});
+		await expect(
+			core.queries.verifySelfIdentityPassphrase({ passphrase: "wrong" }),
 		).resolves.toMatchObject({
 			result: { kind: "failure", code: "PASSPHRASE_INCORRECT" },
 		});

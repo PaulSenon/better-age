@@ -35,6 +35,15 @@ export const createNodeCli = (options: NodeCliOptions) => {
 			await runCli({
 				argv,
 				core,
+				parseIdentityString: async (identityString) => {
+					const response = await core.queries.parseIdentityString({
+						identityString,
+					});
+
+					return response.result.kind === "success"
+						? response.result.value
+						: null;
+				},
 				payloadPathExists: payloadRepository.payloadExists,
 				terminal: options.terminal,
 			}),

@@ -1,4 +1,4 @@
-Current goal: Better Age MVP reimplementation, Phase 8 complete.
+Current goal: Better Age MVP reimplementation, Phase 11 complete.
 
 Active state:
 - Phase 1 workspace split done: legacy CLI is `packages/cli-legacy`, private, no `bage` bin.
@@ -9,24 +9,29 @@ Active state:
 - Phase 6 new CLI identity slice done.
 - Phase 7 new CLI payload create/read/edit slice done.
 - Phase 8 new CLI sharing/maintenance slice done.
+- Phase 9 new CLI identity security slice done.
+- Phase 10 varlock/load protocol slice done.
+- Phase 11 final contract hardening done.
 - Append-only implementation log: `.llms/projects/4-cli-core-boundary-hardening/11-IMPLEMENTATION_LOG.md`.
 
-Phase 8 notes:
-- `runCli` now supports `grant`, `revoke`, and `update`.
-- Exact grant resolves known refs, payload recipient refs, and identity strings via injected parser.
-- Guided grant/revoke use `terminal.selectOne` picker options.
-- Outdated write gate applies to exact/guided mutation flows; guided update-now resumes.
-- Core payload recipient summaries now expose `publicKey` and `identityUpdatedAt`.
-- No `bage` bin yet.
-- `@effect/cli` dependency exists, but command tree/parser integration still pending.
+Phase 11 notes:
+- New CLI now has `interactive` / `i` thin session router.
+- New CLI package now publishes `bage` from `./dist/bin/bage.js`.
+- Added basic Node terminal adapter for prompts/selects over stdin/stderr.
+- Core now exposes `queries.parseIdentityString`; node CLI wires it for grant identity strings.
+- CLI README documents MVP command surface and stdout/stderr policy.
+- `@effect/cli` dependency exists, but command tree/parser integration remains deferred.
 
 Latest verification:
+- `pnpm -F @better-age/cli test:unit` passed.
+- `pnpm -F @better-age/cli check` passed.
+- `pnpm -F @better-age/core test:unit` passed.
 - `pnpm test` passed.
 - `pnpm check` passed.
 - `git diff --check` passed.
 
 Next:
-- Phase 9: CLI identity security slice (`identity rotate`, `identity passphrase`).
+- Review Phase 11 output and decide whether to run a separate build/release hardening pass.
 
 Blockers:
 - None currently.

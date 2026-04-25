@@ -68,18 +68,29 @@ export const createBetterAgeRuntime = (
 				`--protocol-version=${BETTER_AGE_PROTOCOL_VERSION}`,
 				config.path,
 			];
-			const child = shouldUseShellLauncher(commandPrefix)
-				? spawnProcess(
-						`${commandPrefix} ${fixedArgs.map(shellQuoteArg).join(" ")}`,
-						[],
-						{
-							shell: true,
+			let child: SpawnedProcess;
+
+			try {
+				child = shouldUseShellLauncher(commandPrefix)
+					? spawnProcess(
+							`${commandPrefix} ${fixedArgs.map(shellQuoteArg).join(" ")}`,
+							[],
+							{
+								shell: true,
+								stdio: ["inherit", "pipe", "inherit"],
+							},
+						)
+					: spawnProcess(commandPrefix, fixedArgs, {
 							stdio: ["inherit", "pipe", "inherit"],
-						},
-					)
-				: spawnProcess(commandPrefix, fixedArgs, {
-						stdio: ["inherit", "pipe", "inherit"],
-					});
+						});
+			} catch (cause) {
+				const error =
+					cause instanceof Error ? cause : new Error("unknown process error");
+				reject(
+					new Error(createCommandStartFailureMessage(commandPrefix, error)),
+				);
+				return;
+			}
 
 			if (!child.stdout) {
 				reject(new Error("bage load stdout pipe was not available"));

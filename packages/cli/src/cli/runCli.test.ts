@@ -130,6 +130,19 @@ const makeCore = (overrides: CoreOverrides = {}) => {
 					rewriteReasons: ["self-recipient-refresh"],
 				});
 			},
+			rotateSelfIdentity: async (input) => {
+				calls.push({ name: "rotateSelfIdentity", input });
+				return success("SELF_IDENTITY_ROTATED", {
+					ownerId: "owner_self",
+					nextFingerprint: "fp_rotated",
+				});
+			},
+			changeIdentityPassphrase: async (input) => {
+				calls.push({ name: "changeIdentityPassphrase", input });
+				return success("PASSPHRASE_CHANGED", {
+					ownerId: "owner_self",
+				});
+			},
 			forgetKnownIdentity: async (input) => {
 				calls.push({ name: "forgetKnownIdentity", input });
 				return success("KNOWN_IDENTITY_FORGOTTEN", {
@@ -170,6 +183,10 @@ const makeCore = (overrides: CoreOverrides = {}) => {
 			listKnownIdentities: async () =>
 				success("KNOWN_IDENTITIES_LISTED", [knownSarah, knownNora]),
 			listRetiredKeys: async () => success("RETIRED_KEYS_LISTED", []),
+			verifySelfIdentityPassphrase: async (input) => {
+				calls.push({ name: "verifySelfIdentityPassphrase", input });
+				return success("PASSPHRASE_VERIFIED", { ownerId: "owner_self" });
+			},
 			decryptPayload: async (input) => {
 				calls.push({ name: "decryptPayload", input });
 				return success("PAYLOAD_DECRYPTED", decryptedPayload);
@@ -1046,6 +1063,166 @@ describe("runCli command contracts", () => {
 		).resolves.toMatchObject({
 			exitCode: 0,
 			stderr: "[OK] Payload unchanged: secrets.env.enc\n",
+		});
+	});
+
+	it("rotates self identity with passphrase retry and update remediation", async () => {
+		const rotated = makeCore({
+			commands: {
+				rotateSelfIdentity: async (input) => {
+					rotated.calls.push({ name: "rotateSelfIdentity", input });
+					return input.passphrase === "correct horse"
+						? success("SELF_IDENTITY_ROTATED", {
+								ownerId: "owner_self",
+								nextFingerprint: "fp_rotated",
+							})
+						: failure("PASSPHRASE_INCORRECT");
+				},
+			},
+		});
+		const passphrases = ["wrong", "correct horse"];
+
+		await expect(
+			runCli({
+				argv: ["identity", "rotate"],
+				core: rotated.core,
+				terminal: {
+					mode: "interactive",
+					promptSecret: async () => passphrases.shift() ?? "",
+				},
+			}),
+		).resolves.toEqual({
+			exitCode: 0,
+			stdout: "",
+			stderr:
+				"[ERROR] PASSPHRASE_INCORRECT: invalid passphrase, try again\n[OK] Identity rotated: fp_rotated\n[WARN] Existing payloads may need update: run bage update\n",
+		});
+		expect(rotated.calls).toEqual([
+			{ name: "rotateSelfIdentity", input: { passphrase: "wrong" } },
+			{
+				name: "rotateSelfIdentity",
+				input: { passphrase: "correct horse" },
+			},
+		]);
+
+		const headless = makeCore();
+		await expect(
+			runCli({
+				argv: ["identity", "rotate"],
+				core: headless.core,
+				terminal: { mode: "headless" },
+			}),
+		).resolves.toEqual({
+			exitCode: 1,
+			stdout: "",
+			stderr:
+				"[ERROR] PASSPHRASE_UNAVAILABLE: cannot prompt in headless mode\n",
+		});
+		expect(headless.calls).toEqual([]);
+	});
+
+	it("changes identity passphrase with current retry and next confirmation retry", async () => {
+		const changed = makeCore({
+			queries: {
+				verifySelfIdentityPassphrase: async (input) => {
+					changed.calls.push({
+						name: "verifySelfIdentityPassphrase",
+						input,
+					});
+					return input.passphrase === "old passphrase"
+						? success("PASSPHRASE_VERIFIED", { ownerId: "owner_self" })
+						: failure("PASSPHRASE_INCORRECT");
+				},
+			},
+		});
+		const secrets = [
+			"wrong",
+			"old passphrase",
+			"new passphrase",
+			"mismatch",
+			"new passphrase",
+			"new passphrase",
+		];
+
+		await expect(
+			runCli({
+				argv: ["identity", "passphrase"],
+				core: changed.core,
+				terminal: {
+					mode: "interactive",
+					promptSecret: async () => secrets.shift() ?? "",
+				},
+			}),
+		).resolves.toEqual({
+			exitCode: 0,
+			stdout: "",
+			stderr:
+				"[ERROR] PASSPHRASE_INCORRECT: invalid passphrase, try again\n[ERROR] PASSPHRASE_CONFIRMATION_MISMATCH: passphrase confirmation did not match\n[OK] Passphrase changed\n",
+		});
+		expect(changed.calls).toEqual([
+			{
+				name: "verifySelfIdentityPassphrase",
+				input: { passphrase: "wrong" },
+			},
+			{
+				name: "verifySelfIdentityPassphrase",
+				input: { passphrase: "old passphrase" },
+			},
+			{
+				name: "changeIdentityPassphrase",
+				input: {
+					currentPassphrase: "old passphrase",
+					nextPassphrase: "new passphrase",
+				},
+			},
+		]);
+
+		const headless = makeCore();
+		await expect(
+			runCli({
+				argv: ["identity", "passphrase"],
+				core: headless.core,
+				terminal: { mode: "headless" },
+			}),
+		).resolves.toEqual({
+			exitCode: 1,
+			stdout: "",
+			stderr:
+				"[ERROR] PASSPHRASE_UNAVAILABLE: cannot prompt in headless mode\n",
+		});
+		expect(headless.calls).toEqual([]);
+	});
+
+	it("routes the interactive session and i alias through direct command flows", async () => {
+		const routed = makeCore();
+
+		await expect(
+			runCli({
+				argv: ["i"],
+				core: routed.core,
+				terminal: {
+					mode: "interactive",
+					selectOne: async () => "identity list",
+				},
+			}),
+		).resolves.toMatchObject({
+			exitCode: 0,
+			stderr: "",
+			stdout:
+				"Self\n  Isaac owner_self fp_self\n\nKnown identities\n  ops owner_sarah age1sarah\n  Nora owner_nora age1nora\n\nRetired keys\n  none\n",
+		});
+
+		await expect(
+			runCli({
+				argv: ["interactive"],
+				core: makeCore().core,
+				terminal: { mode: "headless" },
+			}),
+		).resolves.toEqual({
+			exitCode: 1,
+			stdout: "",
+			stderr:
+				"[ERROR] INTERACTIVE_UNAVAILABLE: interactive terminal is unavailable\n",
 		});
 	});
 });

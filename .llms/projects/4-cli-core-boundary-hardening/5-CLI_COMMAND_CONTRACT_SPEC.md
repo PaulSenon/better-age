@@ -565,6 +565,7 @@ stderr: prompts/errors/success/remediation
 Core:
 
 ```txt
+queries.verifySelfIdentityPassphrase({ passphrase: currentPassphrase })
 commands.changeIdentityPassphrase({ currentPassphrase, nextPassphrase })
 ```
 
@@ -573,7 +574,10 @@ Flow:
 ```txt
 if headless:
   fail PASSPHRASE_UNAVAILABLE
-prompt current passphrase with standard retry
+prompt current passphrase
+verify current passphrase against current private key
+if wrong:
+  retry current passphrase up to 3 attempts before asking for new passphrase
 prompt new passphrase + confirm
 if mismatch:
   retry pair

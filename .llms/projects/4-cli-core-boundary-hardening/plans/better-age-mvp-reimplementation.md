@@ -193,13 +193,13 @@ Add the remaining identity security commands to the new CLI: identity rotation a
 
 ### Acceptance Criteria
 
-- [ ] `bage identity rotate` prompts for passphrase and preserves OwnerId.
-- [ ] Rotation moves previous key to retired keys and renders update remediation.
-- [ ] `bage identity passphrase` prompts current passphrase with retry.
-- [ ] New passphrase confirmation mismatch retries the pair.
-- [ ] Passphrase change reencrypts current and retired key blobs.
-- [ ] Headless mode fails passphrase unavailable for both commands.
-- [ ] Success/warning output uses presenter and never machine stdout.
+- [x] `bage identity rotate` prompts for passphrase and preserves OwnerId.
+- [x] Rotation moves previous key to retired keys and renders update remediation.
+- [x] `bage identity passphrase` prompts current passphrase with retry.
+- [x] New passphrase confirmation mismatch retries the pair.
+- [x] Passphrase change reencrypts current and retired key blobs.
+- [x] Headless mode fails passphrase unavailable for both commands.
+- [x] Success/warning output uses presenter and never machine stdout.
 
 ---
 
@@ -213,13 +213,13 @@ Adapt varlock to the new CLI `load` protocol. Preserve the proven stdio contract
 
 ### Acceptance Criteria
 
-- [ ] Varlock spawns new `bage load --protocol-version=1`.
-- [ ] Stdin is inherited for passphrase prompts.
-- [ ] Stdout is captured as raw env text.
-- [ ] Stderr carries prompts, warnings, and errors.
-- [ ] Non-zero load exits map to adapter failure.
-- [ ] Stdio setup failures map to adapter failure.
-- [ ] Varlock does not import core and does not handle passphrases directly.
+- [x] Varlock spawns new `bage load --protocol-version=1`.
+- [x] Stdin is inherited for passphrase prompts.
+- [x] Stdout is captured as raw env text.
+- [x] Stderr carries prompts, warnings, and errors.
+- [x] Non-zero load exits map to adapter failure.
+- [x] Stdio setup failures map to adapter failure.
+- [x] Varlock does not import core and does not handle passphrases directly.
 
 ---
 
@@ -233,12 +233,12 @@ Run a final product contract pass across core, CLI, and varlock. Close edge-case
 
 ### Acceptance Criteria
 
-- [ ] Full command surface matches the target command list.
-- [ ] Error/message mapping is covered by tests or snapshots.
-- [ ] Machine stdout commands are clean under success and failure.
-- [ ] Guided/headless/exact behavior is covered for representative commands.
-- [ ] Migration and fixture tests pass.
-- [ ] Real adapter integration tests pass.
-- [ ] Varlock process integration tests pass.
-- [ ] User-facing docs are updated enough for MVP use.
-- [ ] Legacy package remains private and unreferenced by new packages.
+- [x] Full command surface matches the target command list.
+- [x] Error/message mapping is covered by tests or snapshots.
+- [x] Machine stdout commands are clean under success and failure.
+- [x] Guided/headless/exact behavior is covered for representative commands.
+- [x] Migration and fixture tests pass.
+- [x] Real adapter integration tests pass.
+- [x] Varlock process integration tests pass.
+- [x] User-facing docs are updated enough for MVP use.
+- [x] Legacy package remains private and unreferenced by new packages.

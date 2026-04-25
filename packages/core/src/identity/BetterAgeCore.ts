@@ -977,6 +977,25 @@ export const createBetterAgeCore = (ports: BetterAgeCorePorts) => {
 		});
 	};
 
+	const parseIdentityString = async (input: {
+		readonly identityString: string;
+	}) => {
+		const parsedIdentity = parsePublicIdentityString(input.identityString);
+
+		if (Either.isLeft(parsedIdentity)) {
+			return failure("IDENTITY_STRING_INVALID", undefined);
+		}
+
+		const identity = parsedIdentity.right;
+
+		return success("IDENTITY_STRING_PARSED", {
+			ownerId: identity.ownerId,
+			displayName: identity.displayName,
+			publicKey: identity.publicKey,
+			identityUpdatedAt: identity.identityUpdatedAt,
+		});
+	};
+
 	const importKnownIdentity = async (input: {
 		readonly identityString: string;
 		readonly localAlias?: LocalAlias | null;
@@ -1209,6 +1228,34 @@ export const createBetterAgeCore = (ports: BetterAgeCorePorts) => {
 		});
 	};
 
+	const verifySelfIdentityPassphrase = async (input: {
+		readonly passphrase: Passphrase;
+	}) => {
+		const homeState = await loadCurrentHomeState(ports.homeRepository);
+
+		if (homeState === null) {
+			return failure("HOME_STATE_NOT_FOUND", undefined);
+		}
+
+		const encryptedCurrentKey =
+			await ports.homeRepository.readEncryptedPrivateKey(
+				homeState.currentKey.encryptedPrivateKeyRef,
+			);
+
+		try {
+			await ports.identityCrypto.decryptPrivateKey({
+				encryptedKey: encryptedCurrentKey,
+				passphrase: input.passphrase,
+			});
+		} catch {
+			return failure("PASSPHRASE_INCORRECT", undefined);
+		}
+
+		return success("PASSPHRASE_VERIFIED", {
+			ownerId: homeState.ownerId,
+		});
+	};
+
 	const changeIdentityPassphrase = async (input: {
 		readonly currentPassphrase: Passphrase;
 		readonly nextPassphrase: Passphrase;
@@ -1271,6 +1318,8 @@ export const createBetterAgeCore = (ports: BetterAgeCorePorts) => {
 			getSelfIdentity,
 			listKnownIdentities,
 			listRetiredKeys,
+			parseIdentityString,
+			verifySelfIdentityPassphrase,
 		},
 	};
 };

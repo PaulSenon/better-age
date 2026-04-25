@@ -472,3 +472,176 @@ Notes:
 - `@effect/cli` command-tree/parser integration is still pending.
 - There is still no `bage` bin.
 - Real prompt/editor/viewer implementations are still ports only; command behavior is contract-tested.
+
+## 2026-04-25 Phase 9 Start
+
+Track check:
+
+- Phase 8 is complete.
+- Phase 9 is the correct next slice from `plans/better-age-mvp-reimplementation.md`.
+- Scope is new CLI identity security: `identity rotate` and `identity passphrase`.
+- Next planned slice remains varlock/load protocol integration.
+
+Goal:
+
+- Add identity rotation and identity passphrase change to the new CLI.
+- Preserve stdout silence for human security commands.
+- Keep passphrase prompts interactive-only, with retry behavior matching the flow spec.
+
+Actions completed:
+
+- Added CLI `identity rotate`.
+  - prompts passphrase interactively.
+  - retries wrong passphrase up to 3 attempts.
+  - calls `commands.rotateSelfIdentity`.
+  - renders success and payload-update remediation warning on stderr.
+  - fails headless with `PASSPHRASE_UNAVAILABLE` before core calls.
+- Added CLI `identity passphrase`, plus aliases `identity pass` and `identity pw`.
+  - prompts current passphrase interactively.
+  - verifies current passphrase before asking for new passphrase.
+  - retries wrong current passphrase up to 3 attempts.
+  - retries new/confirm mismatch.
+  - calls `commands.changeIdentityPassphrase`.
+  - fails headless with `PASSPHRASE_UNAVAILABLE` before core calls.
+- Added core `queries.verifySelfIdentityPassphrase`.
+  - decrypts the current private key as the credential check.
+  - returns `PASSPHRASE_VERIFIED` or `PASSPHRASE_INCORRECT`.
+  - avoids asking for new passphrase after a known-bad current passphrase.
+- Updated boundary and CLI contract specs to include the verification query in the `identity passphrase` flow.
+
+TDD notes:
+
+- RED: `identity rotate` and `identity passphrase` returned `COMMAND_UNKNOWN`.
+- GREEN: added command dispatch and minimal flows.
+- RED: passphrase-change test exposed that CLI asked for new passphrase before validating current passphrase.
+- GREEN: added non-mutating core passphrase verification query and made CLI validate current first.
+- RED/GREEN: core unit test now covers correct and wrong verification behavior.
+
+Verification:
+
+- `pnpm -F @better-age/cli test:unit` passed: 19 tests.
+- `pnpm -F @better-age/core test:unit` passed: 20 tests.
+- `pnpm test` passed.
+- `pnpm check` passed.
+- `git diff --check` passed.
+
+Notes:
+
+- `pnpm check` initially failed only on Biome formatting in `runCli.ts`; formatting was applied.
+
+## 2026-04-25 Phase 10 Start
+
+Track check:
+
+- Phase 9 is complete.
+- Phase 10 is the correct next slice from `plans/better-age-mvp-reimplementation.md`.
+- Scope is `@better-age/varlock` load protocol integration.
+- Existing varlock runtime already used the target `bage load --protocol-version=1 <path>` contract, so this phase mostly hardened gaps.
+
+Goal:
+
+- Preserve the proven varlock stdio contract:
+  - stdin inherited for passphrase prompts.
+  - stdout piped and returned as raw env text.
+  - stderr inherited for prompts, warnings, and errors.
+- Ensure adapter failures are normalized for load exits and process setup failures.
+- Keep varlock independent from core/passphrase handling.
+
+Actions completed:
+
+- Confirmed varlock runtime spawns:
+  - default launcher: `bage load --protocol-version=1 <path>`.
+  - custom shell launcher: `<command> 'load' '--protocol-version=1' '<path>'`.
+- Confirmed stdio contract:
+  - `stdin`: `inherit`.
+  - `stdout`: `pipe`.
+  - `stderr`: `inherit`.
+- Added contract tests for:
+  - non-zero `bage load` exit mapping to adapter failure.
+  - missing stdout pipe mapping to adapter failure.
+  - synchronous launcher/setup throws mapping to the same start-failure remediation as async spawn errors.
+- Updated runtime to catch synchronous `spawnProcess` failures and wrap them with the adapter failure message.
+- Confirmed `@better-age/varlock` has no dependency on `@better-age/core` and does not handle passphrases directly.
+
+TDD notes:
+
+- RED: sync launcher setup failure surfaced raw `stdio setup failed`.
+- GREEN: wrapped process creation in `try/catch` and reused `createCommandStartFailureMessage`.
+- Added explicit acceptance tests for non-zero exits and stdout pipe absence; existing behavior already satisfied them.
+
+Verification:
+
+- `pnpm -F @better-age/varlock test:unit` passed: 15 tests.
+- `pnpm -F @better-age/varlock check` passed.
+- `pnpm test` passed.
+- `pnpm check` passed.
+- `git diff --check` passed.
+
+Notes:
+
+- No CLI bin was added in this phase; varlock keeps assuming `bage` is runnable or a custom command is supplied.
+
+## 2026-04-25 Phase 11 Start
+
+Track check:
+
+- Phase 10 is complete.
+- Phase 11 is the final contract hardening slice from `plans/better-age-mvp-reimplementation.md`.
+- Scope is cross-package product contract closure before MVP implementation work is considered ready for deeper release hardening.
+
+Goal:
+
+- Close concrete target-surface gaps.
+- Add package/bin contract coverage.
+- Ensure docs reflect MVP command behavior.
+- Keep legacy package private and unreferenced.
+
+Actions completed:
+
+- Added root `interactive` command and `i` alias to the new CLI.
+  - headless mode fails with `INTERACTIVE_UNAVAILABLE`.
+  - interactive mode uses `terminal.selectOne`.
+  - selected entries route back into the same direct command flows.
+- Added explicit presenter text for `INTERACTIVE_UNAVAILABLE`.
+- Added new CLI package contract tests.
+  - `@better-age/cli` publishes `bage` from `./dist/bin/bage.js`.
+  - `@better-age/cli` has a build script.
+  - `@better-age/cli` does not depend on `@better-age/cli-legacy`.
+  - `@better-age/cli-legacy` stays private and has no `bage` bin.
+- Added `packages/cli/src/bin/bage.ts`.
+  - runs `createNodeCli`.
+  - writes result stdout/stderr to process streams.
+  - sets `process.exitCode`.
+- Added `packages/cli/src/cli/nodeTerminal.ts`.
+  - detects interactive/headless from tty state.
+  - provides basic text, secret, and select prompts over stdin/stderr.
+- Added `packages/cli/tsconfig.build.json` and package `build` script for dist emission.
+- Added core `queries.parseIdentityString`.
+  - returns a public identity snapshot.
+  - returns `IDENTITY_STRING_INVALID` for invalid identity strings.
+- Wired `createNodeCli` to use `core.queries.parseIdentityString` for exact grant identity-string input.
+- Updated `packages/cli/README.md` with MVP command surface and stdout/stderr policy.
+- Marked Phase 11 acceptance criteria complete.
+
+TDD notes:
+
+- RED: `i` / `interactive` returned `COMMAND_UNKNOWN`.
+- GREEN: added session router and interactive unavailable failure.
+- RED: package contract test found missing `bin.bage`.
+- GREEN: added bin manifest, node terminal adapter, and binary entrypoint.
+- RED: core test found missing `queries.parseIdentityString`.
+- GREEN: added parser query and node CLI wiring.
+
+Verification:
+
+- `pnpm -F @better-age/cli test:unit` passed: 22 tests.
+- `pnpm -F @better-age/cli check` passed.
+- `pnpm -F @better-age/core test:unit` passed: 20 tests.
+- `pnpm test` passed.
+- `pnpm check` passed.
+- `git diff --check` passed.
+
+Notes:
+
+- Build script was added but not executed in this phase; per repo instruction, builds are not run unless explicitly requested.
+- `@effect/cli` remains installed but command-tree/parser integration was not forced into this final hardening slice because the current contract runner already covers the target command behavior.

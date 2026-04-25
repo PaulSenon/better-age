@@ -21,6 +21,10 @@ class SpawnedProcessStub extends EventEmitter {
 	}
 }
 
+class SpawnedProcessWithoutStdoutStub extends EventEmitter {
+	readonly stdout = null;
+}
+
 describe("createBetterAgeRuntime", () => {
 	it("spawns bage load and returns raw env text", async () => {
 		const spawnCalls: Array<{
@@ -154,6 +158,55 @@ describe("createBetterAgeRuntime", () => {
 				"Install @better-age/cli and ensure `bage` is runnable from this shell.",
 				"Cause: spawn bage ENOENT",
 			].join("\n"),
+		);
+	});
+
+	it("maps synchronous launcher setup failures to adapter failures", async () => {
+		const runtime = createBetterAgeRuntime({
+			spawnProcess: () => {
+				throw new Error("stdio setup failed");
+			},
+		});
+
+		runtime.init({ path: "./.env.enc" });
+
+		await expect(runtime.loadEnvText()).rejects.toThrow(
+			[
+				"better-age CLI command failed to start",
+				"Configured launcher: bage",
+				"Install @better-age/cli and ensure `bage` is runnable from this shell.",
+				"Cause: stdio setup failed",
+			].join("\n"),
+		);
+	});
+
+	it("maps non-zero load exits to adapter failures", async () => {
+		const child = new SpawnedProcessStub();
+		const runtime = createBetterAgeRuntime({
+			spawnProcess: () => {
+				queueMicrotask(() => {
+					child.close(2);
+				});
+				return child;
+			},
+		});
+
+		runtime.init({ path: "./.env.enc" });
+
+		await expect(runtime.loadEnvText()).rejects.toThrow(
+			"bage load failed with exit code 2",
+		);
+	});
+
+	it("maps missing stdout pipe to adapter failure", async () => {
+		const runtime = createBetterAgeRuntime({
+			spawnProcess: () => new SpawnedProcessWithoutStdoutStub(),
+		});
+
+		runtime.init({ path: "./.env.enc" });
+
+		await expect(runtime.loadEnvText()).rejects.toThrow(
+			"bage load stdout pipe was not available",
 		);
 	});
 

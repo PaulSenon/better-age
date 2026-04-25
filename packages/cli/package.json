@@ -2,7 +2,11 @@
 	"name": "@better-age/cli",
 	"version": "0.0.1",
 	"type": "module",
+	"bin": {
+		"bage": "./dist/bin/bage.js"
+	},
 	"scripts": {
+		"build": "tsc -p tsconfig.build.json",
 		"lint": "biome check .",
 		"lint:fix": "biome check . --write",
 		"typecheck": "tsc --noEmit",

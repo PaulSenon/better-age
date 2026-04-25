@@ -961,6 +961,11 @@ export type ListRetiredKeysErrorCode = HomeReadErrorCode;
 
 export type ExportSelfIdentityStringErrorCode = HomeReadErrorCode;
 
+export type VerifySelfIdentityPassphraseErrorCode =
+	| HomeReadErrorCode
+	| "PASSPHRASE_INCORRECT"
+	| "PRIVATE_KEY_DECRYPT_FAILED";
+
 export type ParseIdentityStringErrorCode = IdentityParseErrorCode;
 
 export type ResolveKnownIdentityErrorCode =
@@ -1020,6 +1025,19 @@ export interface BetterAgeCoreQueries {
 				readonly handle: Handle;
 			},
 			ExportSelfIdentityStringErrorCode
+		>,
+		BetterAgeCoreNotice
+	>;
+
+	verifySelfIdentityPassphrase(input: {
+		readonly passphrase: Passphrase;
+	}): CoreMethodResult<
+		CoreResult<
+			"PASSPHRASE_VERIFIED",
+			{
+				readonly ownerId: OwnerId;
+			},
+			VerifySelfIdentityPassphraseErrorCode
 		>,
 		BetterAgeCoreNotice
 	>;
@@ -1906,7 +1924,7 @@ export interface BetterAgeCliCommandToCoreMapping {
 		readonly import: "commands.importKnownIdentity";
 		readonly forget: "queries.resolveKnownIdentity+commands.forgetKnownIdentity";
 		readonly rotate: "commands.rotateSelfIdentity";
-		readonly passphrase: "commands.changeIdentityPassphrase";
+		readonly passphrase: "queries.verifySelfIdentityPassphrase+commands.changeIdentityPassphrase";
 	};
 	readonly interactive: {
 		readonly session: "commands+shared-flows over file and identity command surfaces";
@@ -1937,7 +1955,8 @@ export const CLI_COMMAND_TO_CORE_MAPPING: BetterAgeCliCommandToCoreMapping = {
 		import: "commands.importKnownIdentity",
 		forget: "queries.resolveKnownIdentity+commands.forgetKnownIdentity",
 		rotate: "commands.rotateSelfIdentity",
-		passphrase: "commands.changeIdentityPassphrase",
+		passphrase:
+			"queries.verifySelfIdentityPassphrase+commands.changeIdentityPassphrase",
 	},
 	interactive: {
 		session: "commands+shared-flows over file and identity command surfaces",

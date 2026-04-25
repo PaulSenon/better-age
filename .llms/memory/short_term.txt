@@ -30,3 +30,35 @@
 - Core `PayloadRecipientSummary` now includes `publicKey` and `identityUpdatedAt`.
 - Verification passed: `pnpm test`, `pnpm check`, `git diff --check`.
 - Next phase: Phase 9 identity security (`identity rotate`, `identity passphrase`).
+
+2026-04-25 Phase 9 complete:
+- New CLI identity security slice implemented in `packages/cli/src/cli/runCli.ts`.
+- Added `identity rotate`, `identity passphrase`, `identity pass`, and `identity pw`.
+- Rotate prompts passphrase, retries wrong passphrase, calls `commands.rotateSelfIdentity`, and warns to run `bage update`.
+- Passphrase change verifies current passphrase before prompting new/confirm, retries wrong current and confirmation mismatch, then calls `commands.changeIdentityPassphrase`.
+- Core gained `queries.verifySelfIdentityPassphrase` for non-mutating current-key credential checks.
+- Specs updated: boundary API and CLI command contract now include passphrase verification query.
+- Verification passed: `pnpm test`, `pnpm check`, `git diff --check`.
+- Next phase: Phase 10 varlock/load protocol integration.
+
+2026-04-25 Phase 10 complete:
+- Varlock load protocol slice hardened in `packages/varlock/src/runtime/createBetterAgeRuntime.ts`.
+- Runtime spawns `bage load --protocol-version=1 <path>` by default.
+- Custom launcher still goes through shell with quoted load args.
+- Stdio contract remains stdin inherit, stdout pipe, stderr inherit.
+- Added tests for non-zero load exit, missing stdout pipe, and synchronous launcher/setup throw.
+- Sync launcher/setup throw now maps to adapter start-failure remediation instead of surfacing raw error.
+- Varlock still does not import core or handle passphrases.
+- Verification passed: `pnpm -F @better-age/varlock test:unit`, `pnpm -F @better-age/varlock check`, `pnpm test`, `pnpm check`, `git diff --check`.
+- Next phase: Phase 11 final contract hardening.
+
+2026-04-25 Phase 11 complete:
+- Added `interactive` / `i` command routing in `packages/cli/src/cli/runCli.ts`.
+- Added `INTERACTIVE_UNAVAILABLE` presenter text.
+- Added CLI package contract tests proving new `bage` bin and legacy private/no-bin state.
+- Added `packages/cli/src/bin/bage.ts` binary entrypoint.
+- Added `packages/cli/src/cli/nodeTerminal.ts` basic stdin/stderr terminal adapter.
+- Added `packages/cli/tsconfig.build.json` and `build` script.
+- Added core `queries.parseIdentityString` and wired node CLI grant identity-string parsing through it.
+- Updated `packages/cli/README.md` with command surface and stdout/stderr policy.
+- Verification passed: `pnpm -F @better-age/cli test:unit`, `pnpm -F @better-age/cli check`, `pnpm -F @better-age/core test:unit`, `pnpm test`, `pnpm check`, `git diff --check`.

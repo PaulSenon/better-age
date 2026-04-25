@@ -1,4 +1,5 @@
 export { createNodeCli } from "./cli/nodeCli.js";
+export { createNodeTerminal } from "./cli/nodeTerminal.js";
 export type {
 	CliCore,
 	CliTerminal,

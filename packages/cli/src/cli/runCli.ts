@@ -160,6 +160,18 @@ export type CliCore = {
 				readonly rewriteReasons: ReadonlyArray<string>;
 			}>
 		>;
+		readonly rotateSelfIdentity: (input: {
+			readonly passphrase: string;
+		}) => Promise<
+			CoreResponse<{
+				readonly ownerId: string;
+				readonly nextFingerprint: string;
+			}>
+		>;
+		readonly changeIdentityPassphrase: (input: {
+			readonly currentPassphrase: string;
+			readonly nextPassphrase: string;
+		}) => Promise<CoreResponse<{ readonly ownerId: string }>>;
 	};
 	readonly queries: {
 		readonly exportSelfIdentityString: () => Promise<
@@ -169,6 +181,9 @@ export type CliCore = {
 			readonly path: string;
 			readonly passphrase: string;
 		}) => Promise<CoreResponse<DecryptedPayload>>;
+		readonly verifySelfIdentityPassphrase: (input: {
+			readonly passphrase: string;
+		}) => Promise<CoreResponse<{ readonly ownerId: string }>>;
 		readonly getSelfIdentity: () => Promise<CoreResponse<SelfIdentity>>;
 		readonly listKnownIdentities: () => Promise<
 			CoreResponse<ReadonlyArray<KnownIdentity>>
@@ -324,6 +339,41 @@ const acquireNewPassphrase = async (
 	}
 
 	return { failure: presentFailure("PASSPHRASE_CONFIRMATION_MISMATCH") };
+};
+
+const acquireConfirmedPassphrase = async (
+	terminal: CliTerminal,
+): Promise<
+	| { readonly passphrase: string; readonly stderr: string }
+	| { readonly failure: RunCliResult }
+> => {
+	const promptSecret = requirePromptSecret(terminal);
+
+	if (promptSecret === null) {
+		return { failure: presentFailure("PASSPHRASE_UNAVAILABLE") };
+	}
+
+	let stderr = "";
+
+	for (let attempt = 0; attempt < 3; attempt++) {
+		const passphrase = await promptSecret("New passphrase");
+		const confirmation = await promptSecret("Confirm passphrase");
+
+		if (passphrase === confirmation) {
+			return { passphrase, stderr };
+		}
+
+		if (attempt < 2) {
+			stderr += presentFailure("PASSPHRASE_CONFIRMATION_MISMATCH").stderr;
+		}
+	}
+
+	return {
+		failure: {
+			...presentFailure("PASSPHRASE_CONFIRMATION_MISMATCH"),
+			stderr: `${stderr}${presentFailure("PASSPHRASE_CONFIRMATION_MISMATCH").stderr}`,
+		},
+	};
 };
 
 const resolveKnownIdentity = (
@@ -1095,9 +1145,163 @@ const runIdentityForget = async (
 	return presentSuccess(`Identity forgotten: ${response.result.value.ownerId}`);
 };
 
+const runIdentityRotate = async (input: RunCliInput): Promise<RunCliResult> => {
+	if (input.terminal.mode === "headless") {
+		return presentFailure("PASSPHRASE_UNAVAILABLE");
+	}
+
+	let stderr = "";
+
+	for (let attempt = 0; attempt < 3; attempt++) {
+		const passphrase = await acquirePassphrase(input.terminal);
+
+		if ("failure" in passphrase) {
+			return passphrase.failure;
+		}
+
+		const response = await input.core.commands.rotateSelfIdentity({
+			passphrase: passphrase.passphrase,
+		});
+
+		if (response.result.kind === "success") {
+			const success = presentSuccess(
+				`Identity rotated: ${response.result.value.nextFingerprint}`,
+			);
+
+			return {
+				...success,
+				stderr: `${stderr}${success.stderr}${presentWarning("Existing payloads may need update: run bage update")}`,
+			};
+		}
+
+		if (response.result.code !== "PASSPHRASE_INCORRECT" || attempt === 2) {
+			const failure = presentFailure(response.result.code);
+
+			return { ...failure, stderr: `${stderr}${failure.stderr}` };
+		}
+
+		stderr += "[ERROR] PASSPHRASE_INCORRECT: invalid passphrase, try again\n";
+	}
+
+	return presentFailure("PASSPHRASE_INCORRECT");
+};
+
+const runIdentityPassphrase = async (
+	input: RunCliInput,
+): Promise<RunCliResult> => {
+	const promptSecret = requirePromptSecret(input.terminal);
+
+	if (promptSecret === null) {
+		return presentFailure("PASSPHRASE_UNAVAILABLE");
+	}
+
+	let stderr = "";
+
+	for (let attempt = 0; attempt < 3; attempt++) {
+		const currentPassphrase = await promptSecret("Current passphrase");
+		const verification = await input.core.queries.verifySelfIdentityPassphrase({
+			passphrase: currentPassphrase,
+		});
+
+		if (verification.result.kind === "failure") {
+			if (
+				verification.result.code !== "PASSPHRASE_INCORRECT" ||
+				attempt === 2
+			) {
+				const failure = presentFailure(verification.result.code);
+
+				return { ...failure, stderr: `${stderr}${failure.stderr}` };
+			}
+
+			stderr += "[ERROR] PASSPHRASE_INCORRECT: invalid passphrase, try again\n";
+			continue;
+		}
+
+		const nextPassphrase = await acquireConfirmedPassphrase(input.terminal);
+
+		if ("failure" in nextPassphrase) {
+			return {
+				...nextPassphrase.failure,
+				stderr: `${stderr}${nextPassphrase.failure.stderr}`,
+			};
+		}
+
+		stderr += nextPassphrase.stderr;
+
+		const response = await input.core.commands.changeIdentityPassphrase({
+			currentPassphrase,
+			nextPassphrase: nextPassphrase.passphrase,
+		});
+
+		if (response.result.kind === "success") {
+			const success = presentSuccess("Passphrase changed");
+
+			return { ...success, stderr: `${stderr}${success.stderr}` };
+		}
+
+		const failure = presentFailure(response.result.code);
+
+		return { ...failure, stderr: `${stderr}${failure.stderr}` };
+	}
+
+	return presentFailure("PASSPHRASE_INCORRECT");
+};
+
+const interactiveCommandChoices = [
+	{ value: "create", label: "create", disabled: false },
+	{ value: "edit", label: "edit", disabled: false },
+	{ value: "grant", label: "grant", disabled: false },
+	{ value: "inspect", label: "inspect", disabled: false },
+	{ value: "load", label: "load", disabled: false },
+	{ value: "revoke", label: "revoke", disabled: false },
+	{ value: "update", label: "update", disabled: false },
+	{ value: "view", label: "view", disabled: false },
+	{ value: "identity export", label: "identity export", disabled: false },
+	{ value: "identity import", label: "identity import", disabled: false },
+	{ value: "identity list", label: "identity list", disabled: false },
+	{ value: "identity forget", label: "identity forget", disabled: false },
+	{
+		value: "identity passphrase",
+		label: "identity passphrase",
+		disabled: false,
+	},
+	{ value: "identity rotate", label: "identity rotate", disabled: false },
+	{ value: "setup", label: "setup", disabled: false },
+	{ value: "__cancel__", label: "Cancel", disabled: false },
+] as const;
+
+const runInteractiveSession = async (
+	input: RunCliInput,
+): Promise<RunCliResult> => {
+	if (
+		input.terminal.mode === "headless" ||
+		input.terminal.selectOne === undefined
+	) {
+		return presentFailure("INTERACTIVE_UNAVAILABLE");
+	}
+
+	const selected = await input.terminal.selectOne(
+		"Command",
+		interactiveCommandChoices,
+	);
+
+	if (selected === "__cancel__") {
+		return presentFailure("CANCELLED", 130);
+	}
+
+	return await runCli({
+		...input,
+		argv: selected.split(" "),
+	});
+};
+
 export const runCli = async (input: RunCliInput): Promise<RunCliResult> => {
 	const args = parseArgs(input.argv);
 	const [command, subcommand] = args.positionals;
+
+	if (command === "interactive" || command === "i") {
+		return runInteractiveSession(input);
+	}
 
 	if (command === "setup") {
 		return runSetup(args, input);
@@ -1149,6 +1353,19 @@ export const runCli = async (input: RunCliInput): Promise<RunCliResult> => {
 
 	if (command === "identity" && subcommand === "forget") {
 		return runIdentityForget(args, input);
+	}
+
+	if (command === "identity" && subcommand === "rotate") {
+		return runIdentityRotate(input);
+	}
+
+	if (
+		command === "identity" &&
+		(subcommand === "passphrase" ||
+			subcommand === "pass" ||
+			subcommand === "pw")
+	) {
+		return runIdentityPassphrase(input);
 	}
 
 	return presentFailure("COMMAND_UNKNOWN", 2);

@@ -44,6 +44,8 @@ const failureMessage = (code: string) => {
 			return "run bage setup first";
 		case "IDENTITY_REFERENCE_NOT_FOUND":
 			return "identity reference not found";
+		case "INTERACTIVE_UNAVAILABLE":
+			return "interactive terminal is unavailable";
 		case "LOCAL_ALIAS_DUPLICATE":
 			return "alias already exists";
 		case "LOCAL_ALIAS_INVALID":
