@@ -6,6 +6,7 @@ import {
 	presentSuccess,
 	presentWarning,
 } from "./presenter.js";
+import { CliPromptCancelledError } from "./secretPrompt.js";
 
 export type CliTerminalMode = "interactive" | "headless";
 
@@ -292,6 +293,29 @@ const requirePromptSecret = (
 ): ((label: string) => Promise<string>) | null =>
 	terminal.mode === "headless" ? null : (terminal.promptSecret ?? null);
 
+const isPromptCancelledError = (
+	cause: unknown,
+): cause is CliPromptCancelledError =>
+	cause instanceof CliPromptCancelledError ||
+	(cause instanceof Error && cause.name === "CliPromptCancelledError");
+
+const readSecretPrompt = async (
+	promptSecret: (label: string) => Promise<string>,
+	label: string,
+): Promise<
+	{ readonly secret: string } | { readonly failure: RunCliResult }
+> => {
+	try {
+		return { secret: await promptSecret(label) };
+	} catch (cause) {
+		if (isPromptCancelledError(cause)) {
+			return { failure: presentFailure("CANCELLED", 130) };
+		}
+
+		throw cause;
+	}
+};
+
 const acquirePassphrase = async (
 	terminal: CliTerminal,
 ): Promise<
@@ -303,7 +327,13 @@ const acquirePassphrase = async (
 		return { failure: presentFailure("PASSPHRASE_UNAVAILABLE") };
 	}
 
-	return { passphrase: await promptSecret("Passphrase") };
+	const prompted = await readSecretPrompt(promptSecret, "Passphrase");
+
+	if ("failure" in prompted) {
+		return prompted;
+	}
+
+	return { passphrase: prompted.secret };
 };
 
 const renderNotices = (notices: ReadonlyArray<CoreNotice>): string =>
@@ -338,11 +368,23 @@ const acquireNewPassphrase = async (
 	}
 
 	for (let attempt = 0; attempt < 3; attempt++) {
-		const passphrase = await promptSecret("Passphrase");
-		const confirmation = await promptSecret("Confirm passphrase");
+		const passphrase = await readSecretPrompt(promptSecret, "Passphrase");
 
-		if (passphrase === confirmation) {
-			return { passphrase };
+		if ("failure" in passphrase) {
+			return passphrase;
+		}
+
+		const confirmation = await readSecretPrompt(
+			promptSecret,
+			"Confirm passphrase",
+		);
+
+		if ("failure" in confirmation) {
+			return confirmation;
+		}
+
+		if (passphrase.secret === confirmation.secret) {
+			return { passphrase: passphrase.secret };
 		}
 	}
 
@@ -364,11 +406,23 @@ const acquireConfirmedPassphrase = async (
 	let stderr = "";
 
 	for (let attempt = 0; attempt < 3; attempt++) {
-		const passphrase = await promptSecret("New passphrase");
-		const confirmation = await promptSecret("Confirm passphrase");
+		const passphrase = await readSecretPrompt(promptSecret, "New passphrase");
 
-		if (passphrase === confirmation) {
-			return { passphrase, stderr };
+		if ("failure" in passphrase) {
+			return passphrase;
+		}
+
+		const confirmation = await readSecretPrompt(
+			promptSecret,
+			"Confirm passphrase",
+		);
+
+		if ("failure" in confirmation) {
+			return confirmation;
+		}
+
+		if (passphrase.secret === confirmation.secret) {
+			return { passphrase: passphrase.secret, stderr };
 		}
 
 		if (attempt < 2) {
@@ -1206,9 +1260,17 @@ const runIdentityPassphrase = async (
 	let stderr = "";
 
 	for (let attempt = 0; attempt < 3; attempt++) {
-		const currentPassphrase = await promptSecret("Current passphrase");
+		const currentPassphrase = await readSecretPrompt(
+			promptSecret,
+			"Current passphrase",
+		);
+
+		if ("failure" in currentPassphrase) {
+			return currentPassphrase.failure;
+		}
+
 		const verification = await input.core.queries.verifySelfIdentityPassphrase({
-			passphrase: currentPassphrase,
+			passphrase: currentPassphrase.secret,
 		});
 
 		if (verification.result.kind === "failure") {
@@ -1237,7 +1299,7 @@ const runIdentityPassphrase = async (
 		stderr += nextPassphrase.stderr;
 
 		const response = await input.core.commands.changeIdentityPassphrase({
-			currentPassphrase,
+			currentPassphrase: currentPassphrase.secret,
 			nextPassphrase: nextPassphrase.passphrase,
 		});
 

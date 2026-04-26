@@ -94,3 +94,19 @@
 - Specs updated in persistence/test strategy/boundary docs; Phase 2 checklist marked complete.
 - Verification passed: `pnpm test`, `pnpm check`, `git diff --check`.
 - Next phase: Phase 3 Hidden Secret Prompt.
+
+2026-04-26 Runtime CLI release readiness Phase 3 start:
+- Plan source: `.llms/projects/4-cli-core-boundary-hardening/plans/runtime-cli-release-readiness.md`.
+- Current phase: Hidden Secret Prompt.
+- Scope: replace echoing readline passphrase prompt in `packages/cli/src/cli/nodeTerminal.ts` with TTY-only hidden raw-mode secret prompt, keep text prompt/readline for non-secret input.
+- TDD target: state-machine unit tests for hidden input, enter, backspace, Ctrl-C, EOF; terminal factory tests for TTY preflight; existing `runCli` passphrase retry tests must remain passing; then `pnpm test`, `pnpm check`, `git diff --check`.
+
+2026-04-26 Runtime CLI release readiness Phase 3 complete:
+- Added `packages/cli/src/cli/secretPrompt.ts`: local raw-mode hidden secret prompt runtime plus pure reducer for input, backspace, submit, Ctrl-C, and EOF.
+- Added `secretPrompt.test.ts` proving typed secret characters are captured but not written, backspace works, Ctrl-C/EOF cancel with newline.
+- `createNodeTerminal` now accepts injectable streams, exposes prompts only when stdin and stderr are TTYs, and uses `readHiddenSecret` for `promptSecret`; no prompts are exposed in headless mode.
+- Added `nodeTerminal.test.ts` for TTY preflight.
+- Added `CliPromptCancelledError` mapping in `runCli` so secret prompt Ctrl-C/EOF returns `[ERROR] CANCELLED` exit 130 instead of rejecting.
+- Existing passphrase retry tests still pass; CLI unit test count now 33.
+- Verification passed: `pnpm test`, `pnpm check`, `git diff --check`.
+- Next phase: Phase 4 Editor Runtime.

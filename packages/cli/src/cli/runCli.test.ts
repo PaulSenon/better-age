@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { type CliCore, runCli } from "./runCli.js";
+import { CliPromptCancelledError } from "./secretPrompt.js";
 
 const success = <TValue>(code: string, value: TValue) => ({
 	result: { kind: "success" as const, code, value },
@@ -313,6 +314,29 @@ describe("runCli command contracts", () => {
 				input: { displayName: "Isaac", passphrase: "correct horse" },
 			},
 		]);
+	});
+
+	it("maps secret prompt cancellation to command cancellation", async () => {
+		const { calls, core } = makeCore();
+
+		await expect(
+			runCli({
+				argv: ["create", "secrets.env.enc"],
+				core,
+				payloadPathExists: async () => false,
+				terminal: {
+					mode: "interactive",
+					promptSecret: async () => {
+						throw new CliPromptCancelledError();
+					},
+				},
+			}),
+		).resolves.toEqual({
+			exitCode: 130,
+			stdout: "",
+			stderr: "[ERROR] CANCELLED: command cancelled\n",
+		});
+		expect(calls).toEqual([]);
 	});
 
 	it("keeps identity export stdout pipe-safe", async () => {

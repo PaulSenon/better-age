@@ -74,14 +74,14 @@ Replace the current echoing readline secret prompt with a release-ready TTY-only
 
 ### Acceptance Criteria
 
-- [ ] Passphrase input is hidden and does not echo characters.
-- [ ] Secret prompt requires interactive stdin and stderr TTYs.
-- [ ] No passphrase is accepted through argv, env, or piped stdin.
-- [ ] No-TTY preflight maps to passphrase unavailable.
-- [ ] Ctrl-C during prompt maps to cancel.
-- [ ] Active-prompt EOF maps to cancel.
-- [ ] Existing passphrase retry tests still pass.
-- [ ] Unit tests cover the prompt state machine where practical.
+- [x] Passphrase input is hidden and does not echo characters.
+- [x] Secret prompt requires interactive stdin and stderr TTYs.
+- [x] No passphrase is accepted through argv, env, or piped stdin.
+- [x] No-TTY preflight maps to passphrase unavailable.
+- [x] Ctrl-C during prompt maps to cancel.
+- [x] Active-prompt EOF maps to cancel.
+- [x] Existing passphrase retry tests still pass.
+- [x] Unit tests cover the prompt state machine where practical.
 
 ---
 
