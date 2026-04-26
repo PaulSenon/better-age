@@ -558,6 +558,7 @@ describe("runCli command contracts", () => {
 
 	it("views payload plaintext through secure viewer without stdout", async () => {
 		let viewedText = "";
+		let viewedPath = "";
 
 		await expect(
 			runCli({
@@ -567,8 +568,9 @@ describe("runCli command contracts", () => {
 				terminal: {
 					mode: "interactive",
 					promptSecret: async () => "correct horse",
-					openViewer: async (envText) => {
+					openViewer: async (envText, path) => {
 						viewedText = envText;
+						viewedPath = path;
 					},
 				},
 			}),
@@ -578,6 +580,23 @@ describe("runCli command contracts", () => {
 			stderr: "[OK] Viewer closed\n",
 		});
 		expect(viewedText).toBe(decryptedPayload.envText);
+		expect(viewedPath).toBe("secrets.env.enc");
+
+		await expect(
+			runCli({
+				argv: ["view", "secrets.env.enc"],
+				core: makeCore().core,
+				payloadPathExists: async () => true,
+				terminal: {
+					mode: "interactive",
+					promptSecret: async () => "correct horse",
+				},
+			}),
+		).resolves.toEqual({
+			exitCode: 1,
+			stdout: "",
+			stderr: "[ERROR] VIEWER_UNAVAILABLE: secure viewer is unavailable\n",
+		});
 	});
 
 	it("edits payload with cancel, unchanged, invalid retry, and changed save", async () => {

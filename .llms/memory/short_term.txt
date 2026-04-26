@@ -126,3 +126,18 @@
 - Specs updated: core boundary includes editor preference query/command; Phase 4 checklist marked complete.
 - Verification passed: `pnpm test`, `pnpm check`, `git diff --check`.
 - Next phase: Phase 5 Secure Viewer.
+
+2026-04-26 Runtime CLI release readiness Phase 5 start:
+- Plan source: `.llms/projects/4-cli-core-boundary-hardening/plans/runtime-cli-release-readiness.md`.
+- Current phase: Secure Viewer.
+- Scope: add isolated in-process stderr/TTY viewer behind terminal adapter; scrolling, quit, headless unavailable; no stdout plaintext.
+- TDD target: viewer state/navigation tests, node viewer runtime tests, wire `createNodeTerminal.openViewer`, keep `runCli` view tests passing, then `pnpm test`, `pnpm check`, `git diff --check`.
+
+2026-04-26 Runtime CLI release readiness Phase 5 complete:
+- Added `packages/cli/src/cli/secureViewer.ts`: isolated in-process viewer state/rendering/runtime with alternate screen, stderr rendering, scrolling, resize, raw-mode keyboard quit, and explicit TTY unavailable error.
+- `createNodeTerminal` now exposes `openViewer(envText, path)` only for interactive TTY runtimes with viewer capabilities.
+- `runCli view` now passes payload path to viewer; stdout remains empty and missing viewer maps to `VIEWER_UNAVAILABLE`.
+- Added tests for viewer viewport/rendering, navigation clamps, key mapping, runtime open/scroll/quit cleanup, terminal wiring, and view path/no-stdout contract.
+- Phase 5 checklist marked complete in runtime CLI release readiness plan.
+- Verification passed: `pnpm -F @better-age/cli test:unit`, `pnpm test`, `pnpm check`, `git diff --check`.
+- Next phase: Phase 6 Real Interactive Loop.

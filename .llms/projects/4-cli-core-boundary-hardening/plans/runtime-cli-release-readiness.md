@@ -120,14 +120,14 @@ Add a small isolated in-process secure viewer for `view`. It should render plain
 
 ### Acceptance Criteria
 
-- [ ] `view` uses the in-process viewer in interactive terminals.
-- [ ] Viewer renders plaintext only to terminal UI/stderr-compatible output, never stdout.
-- [ ] Viewer supports scrolling for long payloads.
-- [ ] Viewer supports keyboard quit.
-- [ ] Viewer cancel/quit returns to command flow cleanly.
-- [ ] Viewer unavailable/headless paths fail explicitly.
-- [ ] Viewer logic is isolated behind the terminal adapter boundary.
-- [ ] Unit tests cover viewer state/navigation where practical.
+- [x] `view` uses the in-process viewer in interactive terminals.
+- [x] Viewer renders plaintext only to terminal UI/stderr-compatible output, never stdout.
+- [x] Viewer supports scrolling for long payloads.
+- [x] Viewer supports keyboard quit.
+- [x] Viewer cancel/quit returns to command flow cleanly.
+- [x] Viewer unavailable/headless paths fail explicitly.
+- [x] Viewer logic is isolated behind the terminal adapter boundary.
+- [x] Unit tests cover viewer state/navigation where practical.
 
 ---
 

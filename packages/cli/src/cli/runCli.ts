@@ -219,7 +219,7 @@ export type CliTerminal = {
 		  }
 		| { readonly kind: "saved"; readonly text: string }
 	>;
-	readonly openViewer?: (envText: string) => Promise<void>;
+	readonly openViewer?: (envText: string, path: string) => Promise<void>;
 	readonly promptText?: (label: string) => Promise<string>;
 	readonly promptSecret?: (label: string) => Promise<string>;
 	readonly selectOne?: (
@@ -696,7 +696,7 @@ const runViewPayload = async (
 		return presentFailure("VIEWER_UNAVAILABLE");
 	}
 
-	await input.terminal.openViewer(opened.payload.envText);
+	await input.terminal.openViewer(opened.payload.envText, opened.payload.path);
 
 	return {
 		...presentSuccess("Viewer closed"),
