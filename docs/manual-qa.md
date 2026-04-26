@@ -33,6 +33,9 @@ packages/cli/dist/bage --help
 - Run `packages/cli/dist/bage setup --name QA`.
 - Type a passphrase and confirmation.
 - Confirm typed characters are hidden or masked by the prompt UI.
+- Type a wrong passphrase during an edit/read flow.
+- Confirm the wrong-passphrase error appears before the retry prompt, not after
+  returning to the menu.
 - Press Ctrl-C during a passphrase prompt.
 - Confirm Ctrl-C abort exits cleanly with code 130, does not act like Back, and
   leaves the terminal usable.
@@ -99,6 +102,7 @@ packages/cli/dist/bage --help
 - Save invalid `.env` text from edit.
 - Confirm the validation error is visible before a Reopen Editor / Cancel
   recovery menu.
+- Confirm the invalid `.env` error is not delayed until returning to the menu.
 
 ## Guided identity flows
 

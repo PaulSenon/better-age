@@ -31,7 +31,7 @@ Audit notes:
 - Need parity matrix against legacy prototype + active specs + user QA.
 
 Latest verification:
-- QA follow-up fixes passed: `pnpm test`, `pnpm check`, `git diff --check`.
+- Immediate feedback QA fix passed: `pnpm test`, `pnpm check`, `git diff --check`.
 
 Next:
 - Continue user manual QA against built CLI.

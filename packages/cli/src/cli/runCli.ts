@@ -361,6 +361,26 @@ const renderNotices = (notices: ReadonlyArray<CoreNotice>): string =>
 		)
 		.join("");
 
+const emitInteractiveFeedback = async (
+	input: RunCliInput,
+	result: RunCliResult,
+): Promise<string> => {
+	if (
+		input.terminal.mode !== "interactive" ||
+		input.terminal.writeResult === undefined
+	) {
+		return result.stderr;
+	}
+
+	await input.terminal.writeResult(
+		styleRunCliResult(result, {
+			color: input.terminal.presentation?.color ?? false,
+		}),
+	);
+
+	return "";
+};
+
 const isValidEnvText = (envText: string): boolean =>
 	envText
 		.split(/\r?\n/)
@@ -408,12 +428,12 @@ const acquireNewPassphrase = async (
 };
 
 const acquireConfirmedPassphrase = async (
-	terminal: CliTerminal,
+	input: RunCliInput,
 ): Promise<
 	| { readonly passphrase: string; readonly stderr: string }
 	| { readonly failure: RunCliResult }
 > => {
-	const promptSecret = requirePromptSecret(terminal);
+	const promptSecret = requirePromptSecret(input.terminal);
 
 	if (promptSecret === null) {
 		return { failure: presentFailure("PASSPHRASE_UNAVAILABLE") };
@@ -442,7 +462,10 @@ const acquireConfirmedPassphrase = async (
 		}
 
 		if (attempt < 2) {
-			stderr += presentFailure("PASSPHRASE_CONFIRMATION_MISMATCH").stderr;
+			stderr += await emitInteractiveFeedback(
+				input,
+				presentFailure("PASSPHRASE_CONFIRMATION_MISMATCH"),
+			);
 		}
 	}
 
@@ -758,7 +781,11 @@ const openPayloadContext = async (
 		}
 
 		if (attempt < 2) {
-			stderr += "[ERROR] PASSPHRASE_INCORRECT: invalid passphrase, try again\n";
+			stderr += await emitInteractiveFeedback(input, {
+				exitCode: 1,
+				stdout: "",
+				stderr: "[ERROR] PASSPHRASE_INCORRECT: invalid passphrase, try again\n",
+			});
 		}
 	}
 
@@ -895,7 +922,10 @@ const runEditPayload = async (
 		}
 
 		if (!isValidEnvText(editorText)) {
-			stderr += presentFailure("PAYLOAD_ENV_INVALID").stderr;
+			stderr += await emitInteractiveFeedback(
+				input,
+				presentFailure("PAYLOAD_ENV_INVALID"),
+			);
 			const selected = await promptSelectOne(
 				input.terminal,
 				"Invalid .env content",
@@ -1049,7 +1079,10 @@ const promptCustomGrantIdentity = async (
 		}
 
 		if (attempt < 2) {
-			stderr += presentFailure("IDENTITY_STRING_INVALID").stderr;
+			stderr += await emitInteractiveFeedback(
+				input,
+				presentFailure("IDENTITY_STRING_INVALID"),
+			);
 		}
 	}
 
@@ -1374,7 +1407,10 @@ const runIdentityImport = async (
 			identityStringFromArgs === undefined &&
 			response.result.code === "IDENTITY_STRING_INVALID"
 		) {
-			stderr += presentFailure(response.result.code).stderr;
+			stderr += await emitInteractiveFeedback(
+				input,
+				presentFailure(response.result.code),
+			);
 			continue;
 		}
 
@@ -1384,7 +1420,10 @@ const runIdentityImport = async (
 			(response.result.code === "LOCAL_ALIAS_DUPLICATE" ||
 				response.result.code === "LOCAL_ALIAS_INVALID")
 		) {
-			stderr += presentFailure(response.result.code).stderr;
+			stderr += await emitInteractiveFeedback(
+				input,
+				presentFailure(response.result.code),
+			);
 			continue;
 		}
 
@@ -1510,7 +1549,11 @@ const runIdentityRotate = async (input: RunCliInput): Promise<RunCliResult> => {
 			return { ...failure, stderr: `${stderr}${failure.stderr}` };
 		}
 
-		stderr += "[ERROR] PASSPHRASE_INCORRECT: invalid passphrase, try again\n";
+		stderr += await emitInteractiveFeedback(input, {
+			exitCode: 1,
+			stdout: "",
+			stderr: "[ERROR] PASSPHRASE_INCORRECT: invalid passphrase, try again\n",
+		});
 	}
 
 	return presentFailure("PASSPHRASE_INCORRECT");
@@ -1551,11 +1594,15 @@ const runIdentityPassphrase = async (
 				return { ...failure, stderr: `${stderr}${failure.stderr}` };
 			}
 
-			stderr += "[ERROR] PASSPHRASE_INCORRECT: invalid passphrase, try again\n";
+			stderr += await emitInteractiveFeedback(input, {
+				exitCode: 1,
+				stdout: "",
+				stderr: "[ERROR] PASSPHRASE_INCORRECT: invalid passphrase, try again\n",
+			});
 			continue;
 		}
 
-		const nextPassphrase = await acquireConfirmedPassphrase(input.terminal);
+		const nextPassphrase = await acquireConfirmedPassphrase(input);
 
 		if ("failure" in nextPassphrase) {
 			return {

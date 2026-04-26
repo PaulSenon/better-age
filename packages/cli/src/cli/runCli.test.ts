@@ -847,6 +847,50 @@ describe("runCli command contracts", () => {
 		});
 	});
 
+	it("emits recoverable edit feedback immediately in interactive sessions", async () => {
+		const passphrases = ["wrong", "correct horse"];
+		const emitted: Array<string> = [];
+		let editCount = 0;
+		const core = makeCore({
+			queries: {
+				decryptPayload: async (input) => {
+					core.calls.push({ name: "decryptPayload", input });
+					return input.passphrase === "correct horse"
+						? success("PAYLOAD_DECRYPTED", decryptedPayload)
+						: failure("PASSPHRASE_INCORRECT");
+				},
+			},
+		});
+
+		await expect(
+			runCli({
+				argv: ["edit", "secrets.env.enc"],
+				core: core.core,
+				payloadPathExists: async () => true,
+				terminal: {
+					mode: "interactive",
+					promptSecret: async () => passphrases.shift() ?? "",
+					openEditor: async () =>
+						editCount++ === 0
+							? { kind: "saved", text: "bad env" }
+							: { kind: "saved", text: "API_KEY=new-value\n" },
+					selectOne: async () => "reopen-editor",
+					writeResult: (result) => {
+						emitted.push(result.stderr);
+					},
+				},
+			}),
+		).resolves.toEqual({
+			exitCode: 0,
+			stdout: "",
+			stderr: "[OK] Payload edited: secrets.env.enc\n",
+		});
+		expect(emitted).toEqual([
+			"[ERROR] PASSPHRASE_INCORRECT: invalid passphrase, try again\n",
+			"[ERROR] PAYLOAD_ENV_INVALID: invalid .env content\n",
+		]);
+	});
+
 	it("applies payload command mode rules and passphrase retry", async () => {
 		const headless = makeCore();
 		await expect(

@@ -268,6 +268,13 @@
 - Invalid edit save now logs `PAYLOAD_ENV_INVALID`, then shows Reopen Editor / Cancel while preserving edited text for reopen.
 - Specs/docs updated to clarify `.env.enc` discovery and invalid edit recovery.
 - Verification passed: `pnpm test`, `pnpm check`, `git diff --check`.
+
+2026-04-26 QA follow-up: immediate recoverable feedback:
+- Wrong passphrase retries now emit feedback immediately through `terminal.writeResult` in interactive sessions instead of buffering until menu return.
+- Invalid edit `.env` feedback now emits before the Reopen Editor / Cancel recovery menu.
+- Same immediate-feedback helper is used for guided invalid identity-string/alias retries and identity security passphrase retry/mismatch loops.
+- Direct/non-session callers without `writeResult` still receive buffered stderr in the returned result.
+- Verification passed: `pnpm test`, `pnpm check`, `git diff --check`.
 - Suggested next: use `domain-model` to re-grill target as "legacy feature parity unless explicitly deprecated", build parity matrix from legacy tests/specs/user QA, then implement with TDD plus real terminal/manual or PTY coverage.
 
 2026-04-26 Release UX parity hardening PRD:

@@ -110,6 +110,9 @@ bage interactive
   string entry.
 - `identity forget` lists known identities only and never changes payload files.
 - Guided identity import retries invalid strings and duplicate aliases.
+- Recoverable prompt-loop feedback, such as wrong passphrases or invalid edited
+  `.env` content, is printed immediately in interactive sessions instead of
+  being buffered until the command returns to the menu.
 - `edit` resolves `$VISUAL`, then `$EDITOR`, then remembered editor preference,
   then interactive editor picker.
 - Invalid edited `.env` content logs the validation failure, then offers Reopen
