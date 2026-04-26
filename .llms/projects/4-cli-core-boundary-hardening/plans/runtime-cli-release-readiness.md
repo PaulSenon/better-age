@@ -95,18 +95,18 @@ Implement prototype-parity external editor resolution for `edit`: environment ov
 
 ### Acceptance Criteria
 
-- [ ] `$VISUAL` / `$EDITOR` wins over saved preference.
-- [ ] Saved editor preference is used when no env override exists.
-- [ ] Saved editor availability is validated through PATH before use.
-- [ ] Missing saved editor falls back to picker without auto-clearing state.
-- [ ] Interactive picker offers common editors.
-- [ ] Picker supports one-time and remember decisions.
-- [ ] Remember persists editor command string in Home State preferences.
-- [ ] One-time choice does not mutate Home State.
-- [ ] Headless/no-editor path fails editor unavailable.
-- [ ] Editor non-zero exit maps to explicit editor failure.
-- [ ] Temp file cleanup is best-effort.
-- [ ] Plaintext never goes to stdout.
+- [x] `$VISUAL` / `$EDITOR` wins over saved preference.
+- [x] Saved editor preference is used when no env override exists.
+- [x] Saved editor availability is validated through PATH before use.
+- [x] Missing saved editor falls back to picker without auto-clearing state.
+- [x] Interactive picker offers common editors.
+- [x] Picker supports one-time and remember decisions.
+- [x] Remember persists editor command string in Home State preferences.
+- [x] One-time choice does not mutate Home State.
+- [x] Headless/no-editor path fails editor unavailable.
+- [x] Editor non-zero exit maps to explicit editor failure.
+- [x] Temp file cleanup is best-effort.
+- [x] Plaintext never goes to stdout.
 
 ---
 

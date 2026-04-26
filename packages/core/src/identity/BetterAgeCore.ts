@@ -62,6 +62,10 @@ export type HomeStatus =
 			readonly self: SelfIdentitySummary;
 	  };
 
+export type EditorPreference = {
+	readonly editorCommand: string | null;
+};
+
 export type RetiredKeySummary = {
 	readonly fingerprint: KeyFingerprint;
 	readonly retiredAt: IsoUtcTimestamp;
@@ -1141,6 +1145,36 @@ export const createBetterAgeCore = (ports: BetterAgeCorePorts) => {
 		} as const);
 	};
 
+	const getEditorPreference = async () => {
+		const homeState = await loadCurrentHomeState(ports.homeRepository);
+
+		return success("EDITOR_PREFERENCE_READ", {
+			editorCommand: homeState?.preferences.editorCommand ?? null,
+		});
+	};
+
+	const setEditorPreference = async (input: {
+		readonly editorCommand: string | null;
+	}) => {
+		const homeState = await loadCurrentHomeState(ports.homeRepository);
+
+		if (homeState === null) {
+			return failure("HOME_STATE_NOT_FOUND", undefined);
+		}
+
+		await ports.homeRepository.saveCurrentHomeStateDocument({
+			...homeState,
+			preferences: {
+				...homeState.preferences,
+				editorCommand: input.editorCommand,
+			},
+		});
+
+		return success("EDITOR_PREFERENCE_SAVED", {
+			editorCommand: input.editorCommand,
+		});
+	};
+
 	const listRetiredKeys = async () => {
 		const homeState = await loadCurrentHomeState(ports.homeRepository);
 
@@ -1337,11 +1371,13 @@ export const createBetterAgeCore = (ports: BetterAgeCorePorts) => {
 			importKnownIdentity,
 			rotateSelfIdentity,
 			revokePayloadRecipient,
+			setEditorPreference,
 			updatePayload,
 		},
 		queries: {
 			decryptPayload,
 			exportSelfIdentityString,
+			getEditorPreference,
 			getHomeStatus,
 			getSelfIdentity,
 			listKnownIdentities,

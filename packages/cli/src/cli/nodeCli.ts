@@ -9,6 +9,10 @@ import {
 	createNodePayloadRepository,
 } from "@better-age/core";
 import { runCliWithGrammar } from "./commandGrammar.js";
+import {
+	createDefaultNodeEditorRuntime,
+	openNodeEditor,
+} from "./nodeEditor.js";
 import type { CliTerminal } from "./runCli.js";
 
 export type NodeCliOptions = {
@@ -30,6 +34,37 @@ export const createNodeCli = (options: NodeCliOptions) => {
 			nextPayloadId: async () => `payload_${randomUUID()}`,
 		},
 	});
+	const terminal: CliTerminal =
+		options.terminal.mode === "interactive" &&
+		options.terminal.openEditor === undefined
+			? {
+					...options.terminal,
+					openEditor: async (initialText) =>
+						await openNodeEditor(
+							createDefaultNodeEditorRuntime({
+								getSavedEditorCommand: async () => {
+									const response = await core.queries.getEditorPreference();
+
+									return response.result.kind === "success"
+										? response.result.value.editorCommand
+										: null;
+								},
+								isInteractive: true,
+								selectOne: options.terminal.selectOne,
+								setSavedEditorCommand: async (editorCommand) => {
+									const response = await core.commands.setEditorPreference({
+										editorCommand,
+									});
+
+									if (response.result.kind === "failure") {
+										throw new Error(response.result.code);
+									}
+								},
+							}),
+							initialText,
+						),
+				}
+			: options.terminal;
 
 	return {
 		run: async (argv: ReadonlyArray<string>) =>
@@ -46,7 +81,7 @@ export const createNodeCli = (options: NodeCliOptions) => {
 						: null;
 				},
 				payloadPathExists: payloadRepository.payloadExists,
-				terminal: options.terminal,
+				terminal,
 			}),
 	};
 };

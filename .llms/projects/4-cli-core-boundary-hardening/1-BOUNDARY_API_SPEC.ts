@@ -558,6 +558,10 @@ export type HomeStatus =
 	| { readonly status: "not-setup" }
 	| { readonly status: "setup"; readonly self: SelfIdentitySummary };
 
+export interface EditorPreference {
+	readonly editorCommand: string | null;
+}
+
 export interface RetiredKeySummary {
 	readonly fingerprint: KeyFingerprint;
 	readonly retiredAt: IsoUtcTimestamp;
@@ -980,6 +984,8 @@ export type ListRetiredKeysErrorCode = HomeReadErrorCode;
 
 export type ExportSelfIdentityStringErrorCode = HomeReadErrorCode;
 
+export type GetEditorPreferenceErrorCode = never;
+
 export type VerifySelfIdentityPassphraseErrorCode =
 	| HomeReadErrorCode
 	| "PASSPHRASE_INCORRECT"
@@ -1010,6 +1016,15 @@ export type DecryptPayloadErrorCode =
 export interface BetterAgeCoreQueries {
 	getHomeStatus(): CoreMethodResult<
 		CoreResult<"HOME_STATUS_QUERIED", HomeStatus, never>,
+		BetterAgeCoreNotice
+	>;
+
+	getEditorPreference(): CoreMethodResult<
+		CoreResult<
+			"EDITOR_PREFERENCE_READ",
+			EditorPreference,
+			GetEditorPreferenceErrorCode
+		>,
 		BetterAgeCoreNotice
 	>;
 
@@ -1280,6 +1295,17 @@ export interface BetterAgeCoreCommands {
 				readonly ownerId: OwnerId;
 			},
 			ChangePassphraseErrorCode
+		>,
+		BetterAgeCoreNotice
+	>;
+
+	setEditorPreference(input: {
+		readonly editorCommand: string | null;
+	}): CoreMethodResult<
+		CoreResult<
+			"EDITOR_PREFERENCE_SAVED",
+			EditorPreference,
+			HomeReadErrorCode | HomeWriteErrorCode
 		>,
 		BetterAgeCoreNotice
 	>;

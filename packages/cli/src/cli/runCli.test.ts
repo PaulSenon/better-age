@@ -144,6 +144,12 @@ const makeCore = (overrides: CoreOverrides = {}) => {
 					ownerId: "owner_self",
 				});
 			},
+			setEditorPreference: async (input) => {
+				calls.push({ name: "setEditorPreference", input });
+				return success("EDITOR_PREFERENCE_SAVED", {
+					editorCommand: input.editorCommand,
+				});
+			},
 			forgetKnownIdentity: async (input) => {
 				calls.push({ name: "forgetKnownIdentity", input });
 				return success("KNOWN_IDENTITY_FORGOTTEN", {
@@ -162,6 +168,8 @@ const makeCore = (overrides: CoreOverrides = {}) => {
 			...overrides.commands,
 		},
 		queries: {
+			getEditorPreference: async () =>
+				success("EDITOR_PREFERENCE_READ", { editorCommand: null }),
 			exportSelfIdentityString: async () =>
 				success("SELF_IDENTITY_STRING_EXPORTED", {
 					identityString: "bage-id-v1:abc123",
@@ -573,6 +581,27 @@ describe("runCli command contracts", () => {
 	});
 
 	it("edits payload with cancel, unchanged, invalid retry, and changed save", async () => {
+		await expect(
+			runCli({
+				argv: ["edit", "secrets.env.enc"],
+				core: makeCore().core,
+				payloadPathExists: async () => true,
+				terminal: {
+					mode: "interactive",
+					promptSecret: async () => "correct horse",
+					openEditor: async () => ({
+						kind: "failure",
+						code: "EDITOR_EXIT_NON_ZERO",
+					}),
+				},
+			}),
+		).resolves.toEqual({
+			exitCode: 1,
+			stdout: "",
+			stderr:
+				"[ERROR] EDITOR_EXIT_NON_ZERO: editor exited with a non-zero status\n",
+		});
+
 		await expect(
 			runCli({
 				argv: ["edit", "secrets.env.enc"],

@@ -110,3 +110,19 @@
 - Existing passphrase retry tests still pass; CLI unit test count now 33.
 - Verification passed: `pnpm test`, `pnpm check`, `git diff --check`.
 - Next phase: Phase 4 Editor Runtime.
+
+2026-04-26 Runtime CLI release readiness Phase 4 start:
+- Plan source: `.llms/projects/4-cli-core-boundary-hardening/plans/runtime-cli-release-readiness.md`.
+- Current phase: Editor Runtime.
+- Scope: implement release editor adapter for `edit`: `$VISUAL`/`$EDITOR`, saved home preference, picker with one-time/remember, attached editor spawn, temp file lifecycle, no plaintext stdout.
+- TDD target: core editor preference query/command tests, node editor resolution/launch/temp tests, wire `createNodeCli` to provide `openEditor` when terminal is interactive, keep existing edit flow tests passing, then `pnpm test`, `pnpm check`, `git diff --check`.
+
+2026-04-26 Runtime CLI release readiness Phase 4 complete:
+- Core gained `queries.getEditorPreference()` and `commands.setEditorPreference({ editorCommand })` backed by Home State v2 `preferences.editorCommand`.
+- Added `packages/cli/src/cli/nodeEditor.ts` release editor adapter: `$VISUAL` then `$EDITOR`, saved editor preference, PATH availability check, common-editor picker, one-time/remember, temp file create/read/cleanup, attached `spawn(..., { stdio: "inherit" })`.
+- `createNodeCli` wires `openEditor` for interactive terminals using the core preference methods; headless terminals still have no editor and fail `EDITOR_UNAVAILABLE`.
+- `runCli` now handles editor adapter failures and maps non-zero editor exit to `EDITOR_EXIT_NON_ZERO`.
+- Tests added/updated: core editor preference test, `nodeEditor.test.ts`, edit failure contract in `runCli.test.ts`; CLI unit test count now 39.
+- Specs updated: core boundary includes editor preference query/command; Phase 4 checklist marked complete.
+- Verification passed: `pnpm test`, `pnpm check`, `git diff --check`.
+- Next phase: Phase 5 Secure Viewer.

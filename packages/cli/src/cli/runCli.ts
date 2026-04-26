@@ -180,8 +180,14 @@ export type CliCore = {
 			readonly currentPassphrase: string;
 			readonly nextPassphrase: string;
 		}) => Promise<CoreResponse<{ readonly ownerId: string }>>;
+		readonly setEditorPreference: (input: {
+			readonly editorCommand: string | null;
+		}) => Promise<CoreResponse<{ readonly editorCommand: string | null }>>;
 	};
 	readonly queries: {
+		readonly getEditorPreference: () => Promise<
+			CoreResponse<{ readonly editorCommand: string | null }>
+		>;
 		readonly exportSelfIdentityString: () => Promise<
 			CoreResponse<{ readonly identityString: string }>
 		>;
@@ -205,10 +211,12 @@ export type CliCore = {
 
 export type CliTerminal = {
 	readonly mode: CliTerminalMode;
-	readonly openEditor?: (
-		initialText: string,
-	) => Promise<
+	readonly openEditor?: (initialText: string) => Promise<
 		| { readonly kind: "cancel" }
+		| {
+				readonly kind: "failure";
+				readonly code: "EDITOR_EXIT_NON_ZERO" | "EDITOR_UNAVAILABLE";
+		  }
 		| { readonly kind: "saved"; readonly text: string }
 	>;
 	readonly openViewer?: (envText: string) => Promise<void>;
@@ -732,6 +740,13 @@ const runEditPayload = async (
 
 	for (let attempt = 0; attempt < 5; attempt++) {
 		const edited = await input.terminal.openEditor(editorText);
+
+		if (edited.kind === "failure") {
+			return {
+				...presentFailure(edited.code),
+				stderr: `${stderr}${presentFailure(edited.code).stderr}`,
+			};
+		}
 
 		if (edited.kind === "cancel") {
 			return {

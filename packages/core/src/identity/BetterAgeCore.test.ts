@@ -235,6 +235,50 @@ describe("BetterAgeCore identity lifecycle", () => {
 		});
 	});
 
+	it("reads and saves the editor preference in home state", async () => {
+		const { core, getHomeState } = makeHarness();
+
+		await expect(core.queries.getEditorPreference()).resolves.toMatchObject({
+			result: {
+				kind: "success",
+				code: "EDITOR_PREFERENCE_READ",
+				value: { editorCommand: null },
+			},
+		});
+
+		await core.commands.createSelfIdentity({
+			displayName: "Isaac",
+			passphrase: "correct horse",
+		});
+
+		await expect(core.queries.getEditorPreference()).resolves.toEqual({
+			result: {
+				kind: "success",
+				code: "EDITOR_PREFERENCE_READ",
+				value: { editorCommand: null },
+			},
+			notices: [],
+		});
+
+		await expect(
+			core.commands.setEditorPreference({ editorCommand: "nvim" }),
+		).resolves.toEqual({
+			result: {
+				kind: "success",
+				code: "EDITOR_PREFERENCE_SAVED",
+				value: { editorCommand: "nvim" },
+			},
+			notices: [],
+		});
+
+		expect(getHomeState()).toMatchObject({
+			preferences: { editorCommand: "nvim" },
+		});
+		await expect(core.queries.getEditorPreference()).resolves.toMatchObject({
+			result: { kind: "success", value: { editorCommand: "nvim" } },
+		});
+	});
+
 	it("persists migrated home-state v1 before returning current state", async () => {
 		const { core, getHomeState, getSavedHomeStates } = makeHarness({
 			initialHomeState: validHomeStateDocumentV1,

@@ -1,6 +1,7 @@
 export type {
 	BetterAgeCorePorts,
 	ClockPort,
+	EditorPreference,
 	HomeRepositoryPort,
 	HomeStatus,
 	IdentityCryptoPort,

@@ -40,6 +40,8 @@ const failureMessage = (code: string) => {
 			return "command cancelled";
 		case "EDITOR_UNAVAILABLE":
 			return "editor is unavailable";
+		case "EDITOR_EXIT_NON_ZERO":
+			return "editor exited with a non-zero status";
 		case "HOME_STATE_NOT_FOUND":
 			return "run bage setup first";
 		case "IDENTITY_REFERENCE_NOT_FOUND":

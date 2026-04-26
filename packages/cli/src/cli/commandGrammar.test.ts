@@ -80,8 +80,16 @@ const makeCore = () => {
 				calls.push({ name: "changeIdentityPassphrase", input });
 				return success("PASSPHRASE_CHANGED", { ownerId: "owner_self" });
 			},
+			setEditorPreference: async (input) => {
+				calls.push({ name: "setEditorPreference", input });
+				return success("EDITOR_PREFERENCE_SAVED", {
+					editorCommand: input.editorCommand,
+				});
+			},
 		},
 		queries: {
+			getEditorPreference: async () =>
+				success("EDITOR_PREFERENCE_READ", { editorCommand: null }),
 			exportSelfIdentityString: async () =>
 				success("SELF_IDENTITY_STRING_EXPORTED", {
 					identityString: "bage-id-v1:abc123",
