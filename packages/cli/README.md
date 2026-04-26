@@ -39,25 +39,31 @@ Payload truth lives in the payload itself:
 
 ## Command groups
 
-Identity and home state:
-- `setup`
-- `me`
-- `add-identity`
-- `forget-identity`
-- `identities`
-- `rotate`
-- `change-passphrase`
+```txt
+# file related
+bage create
+bage edit
+bage grant
+bage inspect
+bage load --protocol-version=1
+bage revoke
+bage update
+bage view
 
-Payloads:
-- `interactive`
-- `create`
-- `inspect`
-- `view`
-- `edit`
-- `grant`
-- `revoke`
-- `update`
-- `load --protocol-version=1`
+# identity related
+bage identity export
+bage identity forget
+bage identity import
+bage identity list
+bage identity passphrase # alias "pw" | "pass"
+bage identity rotate
+
+# first time setup
+bage setup
+
+# interractive mode
+bage interactive # alias "i"
+```
 
 ## Quick start
 
