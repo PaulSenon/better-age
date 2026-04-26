@@ -154,7 +154,17 @@ export const createBetterAgeRuntime = (
 				);
 			}
 
-			loadPromise ??= invokeLoad(initConfig);
+			if (loadPromise === undefined) {
+				const nextLoad = invokeLoad(initConfig).catch((cause) => {
+					if (loadPromise === nextLoad) {
+						loadPromise = undefined;
+					}
+
+					throw cause;
+				});
+				loadPromise = nextLoad;
+			}
+
 			return loadPromise;
 		},
 	};

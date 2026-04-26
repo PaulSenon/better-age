@@ -66,6 +66,8 @@ const failureMessage = (code: string) => {
 			return "identity reference not found";
 		case "IDENTITY_STRING_INVALID":
 			return "identity string is invalid";
+		case "IDENTITY_KEY_UPDATE_REQUIRES_TRUST":
+			return "identity key update requires explicit trust";
 		case "INTERACTIVE_UNAVAILABLE":
 			return "interactive terminal is unavailable";
 		case "LOCAL_ALIAS_DUPLICATE":
@@ -102,6 +104,8 @@ const failureMessage = (code: string) => {
 			return "pass a payload path or run interactively";
 		case "PAYLOAD_UPDATE_REQUIRED":
 			return "run bage update before mutating payload";
+		case "PAYLOAD_WRITE_VERIFICATION_FAILED":
+			return "encrypted payload failed verification before write";
 		case "PRIVATE_KEY_INVALID":
 			return "local private key artifact is invalid";
 		case "RECIPIENT_REFERENCE_NOT_FOUND":

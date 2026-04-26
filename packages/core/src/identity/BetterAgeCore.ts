@@ -115,6 +115,12 @@ export type CoreNotice = {
 				readonly paths: ReadonlyArray<string>;
 			};
 	  }
+	| {
+			readonly code: "RETIRED_KEY_UNREADABLE";
+			readonly details: {
+				readonly fingerprint: KeyFingerprint;
+			};
+	  }
 );
 
 export type CoreSuccess<TCode extends string, TValue> = {
@@ -141,6 +147,12 @@ export type HomeRepositoryPort = {
 	writeEncryptedPrivateKey(input: {
 		readonly ref: EncryptedPrivateKeyRef;
 		readonly encryptedKey: string;
+	}): Promise<void>;
+	replaceEncryptedPrivateKeys(input: {
+		readonly keys: ReadonlyArray<{
+			readonly ref: EncryptedPrivateKeyRef;
+			readonly encryptedKey: string;
+		}>;
 	}): Promise<void>;
 	consumeSecurityNotices?(): ReadonlyArray<CoreNotice>;
 };
@@ -544,6 +556,104 @@ export const createBetterAgeCore = (ports: BetterAgeCorePorts) => {
 		return privateKeys;
 	};
 
+	const decryptPayloadWithLocalKey = async (input: {
+		readonly armoredPayload: string;
+		readonly homeState: HomeStateDocument;
+		readonly passphrase: Passphrase;
+		readonly payloadCrypto: PayloadCryptoPort;
+	}): Promise<
+		| {
+				readonly kind: "success";
+				readonly currentPrivateKey: PrivateKeyPlaintext;
+				readonly decryptedPayload: unknown;
+				readonly notices: ReadonlyArray<CoreNotice>;
+				readonly privateKeys: ReadonlyArray<PrivateKeyPlaintext>;
+		  }
+		| {
+				readonly kind: "failure";
+				readonly response: CoreResponse<CoreFailure<string, undefined>>;
+		  }
+	> => {
+		let currentPrivateKey: PrivateKeyPlaintext;
+
+		try {
+			currentPrivateKey = await decryptCurrentPrivateKey({
+				homeState: input.homeState,
+				passphrase: input.passphrase,
+			});
+		} catch (cause) {
+			return {
+				kind: "failure",
+				response: passphraseOrPrivateKeyFailure(cause),
+			};
+		}
+
+		try {
+			return {
+				kind: "success",
+				currentPrivateKey,
+				decryptedPayload: await input.payloadCrypto.decryptPayload({
+					armoredPayload: input.armoredPayload,
+					privateKeys: [currentPrivateKey],
+				}),
+				notices: [],
+				privateKeys: [currentPrivateKey],
+			};
+		} catch {
+			// Try retired keys below.
+		}
+
+		const notices: Array<CoreNotice> = [];
+
+		for (const retiredKey of input.homeState.retiredKeys) {
+			let retiredPrivateKey: PrivateKeyPlaintext;
+
+			try {
+				const encryptedKey = await ports.homeRepository.readEncryptedPrivateKey(
+					retiredKey.encryptedPrivateKeyRef,
+				);
+				retiredPrivateKey = await ports.identityCrypto.decryptPrivateKey({
+					encryptedKey,
+					passphrase: input.passphrase,
+				});
+			} catch {
+				notices.push({
+					level: "warning",
+					code: "RETIRED_KEY_UNREADABLE",
+					details: { fingerprint: retiredKey.fingerprint },
+				});
+				continue;
+			}
+
+			try {
+				return {
+					kind: "success",
+					currentPrivateKey,
+					decryptedPayload: await input.payloadCrypto.decryptPayload({
+						armoredPayload: input.armoredPayload,
+						privateKeys: [retiredPrivateKey],
+					}),
+					notices,
+					privateKeys: [retiredPrivateKey],
+				};
+			} catch {
+				// Keep looking for a retired key that can read this payload.
+			}
+		}
+
+		return {
+			kind: "failure",
+			response: response(
+				{
+					kind: "failure" as const,
+					code: "PAYLOAD_ACCESS_DENIED",
+					details: undefined,
+				},
+				notices,
+			),
+		};
+	};
+
 	const createPayload = async (input: {
 		readonly path: PayloadPath;
 		readonly passphrase: Passphrase;
@@ -563,8 +673,9 @@ export const createBetterAgeCore = (ports: BetterAgeCorePorts) => {
 			return failure("PAYLOAD_ALREADY_EXISTS", undefined);
 		}
 
+		let currentPrivateKey: PrivateKeyPlaintext;
 		try {
-			await decryptCurrentPrivateKey({
+			currentPrivateKey = await decryptCurrentPrivateKey({
 				homeState,
 				passphrase: input.passphrase,
 			});
@@ -594,6 +705,15 @@ export const createBetterAgeCore = (ports: BetterAgeCorePorts) => {
 			plaintext,
 			recipients: [self.publicKey],
 		});
+		const writeVerification = await verifyPayloadWrite({
+			encryptedPayload,
+			payloadCrypto,
+			privateKeys: [currentPrivateKey],
+		});
+
+		if (!writeVerification) {
+			return failure("PAYLOAD_WRITE_VERIFICATION_FAILED", undefined);
+		}
 
 		await payloadRepository.writePayloadFile(
 			input.path,
@@ -617,16 +737,6 @@ export const createBetterAgeCore = (ports: BetterAgeCorePorts) => {
 			return failure("HOME_STATE_NOT_FOUND", undefined);
 		}
 
-		let privateKeys: ReadonlyArray<PrivateKeyPlaintext>;
-		try {
-			privateKeys = await decryptLocalPrivateKeys({
-				homeState,
-				passphrase: input.passphrase,
-			});
-		} catch (cause) {
-			return passphraseOrPrivateKeyFailure(cause);
-		}
-
 		let rawPayloadFile: string;
 		try {
 			rawPayloadFile = await payloadRepository.readPayloadFile(input.path);
@@ -640,16 +750,17 @@ export const createBetterAgeCore = (ports: BetterAgeCorePorts) => {
 			return failure("PAYLOAD_INVALID", undefined);
 		}
 
-		let decryptedPayload: unknown;
-		try {
-			decryptedPayload = await payloadCrypto.decryptPayload({
-				armoredPayload: payloadDocument.right.encryptedPayload,
-				privateKeys,
-			});
-		} catch {
-			return failure("PAYLOAD_ACCESS_DENIED", undefined);
+		const decrypted = await decryptPayloadWithLocalKey({
+			armoredPayload: payloadDocument.right.encryptedPayload,
+			homeState,
+			passphrase: input.passphrase,
+			payloadCrypto,
+		});
+
+		if (decrypted.kind === "failure") {
+			return decrypted.response;
 		}
-		const payloadPlaintext = parsePayloadPlaintext(decryptedPayload);
+		const payloadPlaintext = parsePayloadPlaintext(decrypted.decryptedPayload);
 
 		if (Either.isLeft(payloadPlaintext)) {
 			return failure("PAYLOAD_INVALID", undefined);
@@ -690,7 +801,7 @@ export const createBetterAgeCore = (ports: BetterAgeCorePorts) => {
 					),
 				} satisfies DecryptedPayload,
 			},
-			notices,
+			[...decrypted.notices, ...notices],
 		);
 	};
 
@@ -705,19 +816,6 @@ export const createBetterAgeCore = (ports: BetterAgeCorePorts) => {
 			return {
 				kind: "failure" as const,
 				response: failure("HOME_STATE_NOT_FOUND", undefined),
-			};
-		}
-
-		let privateKeys: ReadonlyArray<PrivateKeyPlaintext>;
-		try {
-			privateKeys = await decryptLocalPrivateKeys({
-				homeState,
-				passphrase: input.passphrase,
-			});
-		} catch (cause) {
-			return {
-				kind: "failure" as const,
-				response: passphraseOrPrivateKeyFailure(cause),
 			};
 		}
 
@@ -740,19 +838,20 @@ export const createBetterAgeCore = (ports: BetterAgeCorePorts) => {
 			};
 		}
 
-		let decryptedPayload: unknown;
-		try {
-			decryptedPayload = await payloadCrypto.decryptPayload({
-				armoredPayload: payloadDocument.right.encryptedPayload,
-				privateKeys,
-			});
-		} catch {
+		const decrypted = await decryptPayloadWithLocalKey({
+			armoredPayload: payloadDocument.right.encryptedPayload,
+			homeState,
+			passphrase: input.passphrase,
+			payloadCrypto,
+		});
+
+		if (decrypted.kind === "failure") {
 			return {
 				kind: "failure" as const,
-				response: failure("PAYLOAD_ACCESS_DENIED", undefined),
+				response: decrypted.response,
 			};
 		}
-		const payloadPlaintext = parsePayloadPlaintext(decryptedPayload);
+		const payloadPlaintext = parsePayloadPlaintext(decrypted.decryptedPayload);
 
 		if (Either.isLeft(payloadPlaintext)) {
 			return {
@@ -764,10 +863,31 @@ export const createBetterAgeCore = (ports: BetterAgeCorePorts) => {
 		return {
 			kind: "success" as const,
 			homeState,
+			notices: decrypted.notices,
 			payloadCrypto,
 			payloadRepository,
 			plaintext: payloadPlaintext.right,
+			currentPrivateKey: decrypted.currentPrivateKey,
+			privateKeys: decrypted.privateKeys,
 		};
+	};
+
+	const verifyPayloadWrite = async (input: {
+		readonly encryptedPayload: string;
+		readonly payloadCrypto: PayloadCryptoPort;
+		readonly privateKeys: ReadonlyArray<PrivateKeyPlaintext>;
+	}) => {
+		try {
+			const decryptedPayload = await input.payloadCrypto.decryptPayload({
+				armoredPayload: input.encryptedPayload,
+				privateKeys: input.privateKeys,
+			});
+			const payloadPlaintext = parsePayloadPlaintext(decryptedPayload);
+
+			return Either.isRight(payloadPlaintext);
+		} catch {
+			return false;
+		}
 	};
 
 	const writePayloadPlaintext = async (input: {
@@ -775,6 +895,7 @@ export const createBetterAgeCore = (ports: BetterAgeCorePorts) => {
 		readonly payloadCrypto: PayloadCryptoPort;
 		readonly payloadRepository: PayloadRepositoryPort;
 		readonly plaintext: PayloadPlaintext;
+		readonly privateKey: PrivateKeyPlaintext;
 	}) => {
 		const encryptedPayload = await input.payloadCrypto.encryptPayload({
 			plaintext: input.plaintext,
@@ -782,11 +903,22 @@ export const createBetterAgeCore = (ports: BetterAgeCorePorts) => {
 				(recipient) => recipient.publicKey,
 			),
 		});
+		const writeVerification = await verifyPayloadWrite({
+			encryptedPayload,
+			payloadCrypto: input.payloadCrypto,
+			privateKeys: [input.privateKey],
+		});
+
+		if (!writeVerification) {
+			return failure("PAYLOAD_WRITE_VERIFICATION_FAILED", undefined);
+		}
 
 		await input.payloadRepository.writePayloadFile(
 			input.path,
 			formatPayloadFileEnvelope(encryptedPayload),
 		);
+
+		return null;
 	};
 
 	const editPayload = async (input: {
@@ -815,16 +947,21 @@ export const createBetterAgeCore = (ports: BetterAgeCorePorts) => {
 			opened.plaintext.envText === input.editedEnvText ? "unchanged" : "edited";
 
 		if (outcome === "edited") {
-			await writePayloadPlaintext({
+			const writeFailure = await writePayloadPlaintext({
 				path: input.path,
 				payloadCrypto: opened.payloadCrypto,
 				payloadRepository: opened.payloadRepository,
+				privateKey: opened.currentPrivateKey,
 				plaintext: {
 					...opened.plaintext,
 					envText: input.editedEnvText,
 					lastRewrittenAt: await ports.clock.now(),
 				},
 			});
+
+			if (writeFailure !== null) {
+				return writeFailure;
+			}
 		}
 
 		return success("PAYLOAD_EDITED", {
@@ -876,16 +1013,21 @@ export const createBetterAgeCore = (ports: BetterAgeCorePorts) => {
 								: recipient,
 						);
 
-			await writePayloadPlaintext({
+			const writeFailure = await writePayloadPlaintext({
 				path: input.path,
 				payloadCrypto: opened.payloadCrypto,
 				payloadRepository: opened.payloadRepository,
+				privateKey: opened.currentPrivateKey,
 				plaintext: {
 					...opened.plaintext,
 					recipients,
 					lastRewrittenAt: await ports.clock.now(),
 				},
 			});
+
+			if (writeFailure !== null) {
+				return writeFailure;
+			}
 		}
 
 		return success("PAYLOAD_RECIPIENT_GRANTED", {
@@ -927,10 +1069,11 @@ export const createBetterAgeCore = (ports: BetterAgeCorePorts) => {
 		const outcome = existingRecipient === undefined ? "unchanged" : "removed";
 
 		if (outcome === "removed") {
-			await writePayloadPlaintext({
+			const writeFailure = await writePayloadPlaintext({
 				path: input.path,
 				payloadCrypto: opened.payloadCrypto,
 				payloadRepository: opened.payloadRepository,
+				privateKey: opened.currentPrivateKey,
 				plaintext: {
 					...opened.plaintext,
 					recipients: opened.plaintext.recipients.filter(
@@ -939,6 +1082,10 @@ export const createBetterAgeCore = (ports: BetterAgeCorePorts) => {
 					lastRewrittenAt: await ports.clock.now(),
 				},
 			});
+
+			if (writeFailure !== null) {
+				return writeFailure;
+			}
 		}
 
 		return success("PAYLOAD_RECIPIENT_REVOKED", {
@@ -981,16 +1128,21 @@ export const createBetterAgeCore = (ports: BetterAgeCorePorts) => {
 			(recipient) => recipient.ownerId !== opened.homeState.ownerId,
 		);
 
-		await writePayloadPlaintext({
+		const writeFailure = await writePayloadPlaintext({
 			path: input.path,
 			payloadCrypto: opened.payloadCrypto,
 			payloadRepository: opened.payloadRepository,
+			privateKey: opened.currentPrivateKey,
 			plaintext: {
 				...opened.plaintext,
 				recipients: [self, ...otherRecipients],
 				lastRewrittenAt: await ports.clock.now(),
 			},
 		});
+
+		if (writeFailure !== null) {
+			return writeFailure;
+		}
 
 		return success("PAYLOAD_UPDATED", {
 			path: input.path,
@@ -1103,6 +1255,7 @@ export const createBetterAgeCore = (ports: BetterAgeCorePorts) => {
 	const importKnownIdentity = async (input: {
 		readonly identityString: string;
 		readonly localAlias?: LocalAlias | null;
+		readonly trustKeyUpdate?: boolean;
 	}) => {
 		const homeState = await loadCurrentHomeState(ports.homeRepository);
 
@@ -1130,6 +1283,17 @@ export const createBetterAgeCore = (ports: BetterAgeCorePorts) => {
 				? undefined
 				: homeState.knownIdentities[existingIndex];
 		const localAlias = input.localAlias ?? existingIdentity?.localAlias ?? null;
+		const publicKeyChanged =
+			existingIdentity !== undefined &&
+			existingIdentity.publicKey !== identity.publicKey;
+
+		if (publicKeyChanged && input.trustKeyUpdate !== true) {
+			return failure("IDENTITY_KEY_UPDATE_REQUIRES_TRUST", {
+				ownerId: identity.ownerId,
+				oldFingerprint: fingerprintFromPublicKey(existingIdentity.publicKey),
+				newFingerprint: fingerprintFromPublicKey(identity.publicKey),
+			});
+		}
 
 		if (localAlias !== null && !isValidLocalAlias(localAlias)) {
 			return failure("LOCAL_ALIAS_INVALID", undefined);
@@ -1417,6 +1581,10 @@ export const createBetterAgeCore = (ports: BetterAgeCorePorts) => {
 			homeState.currentKey.encryptedPrivateKeyRef,
 			...homeState.retiredKeys.map((key) => key.encryptedPrivateKeyRef),
 		];
+		const nextEncryptedKeys: Array<{
+			readonly ref: EncryptedPrivateKeyRef;
+			readonly encryptedKey: string;
+		}> = [];
 
 		for (const ref of keyRefs) {
 			const encryptedKey =
@@ -1431,10 +1599,29 @@ export const createBetterAgeCore = (ports: BetterAgeCorePorts) => {
 					privateKey,
 					passphrase: input.nextPassphrase,
 				});
-
-				await ports.homeRepository.writeEncryptedPrivateKey({
-					ref,
+				await ports.identityCrypto.decryptPrivateKey({
 					encryptedKey: nextEncryptedKey,
+					passphrase: input.nextPassphrase,
+				});
+
+				nextEncryptedKeys.push({ ref, encryptedKey: nextEncryptedKey });
+			} catch (cause) {
+				return passphraseOrPrivateKeyFailure(cause);
+			}
+		}
+
+		await ports.homeRepository.replaceEncryptedPrivateKeys({
+			keys: nextEncryptedKeys,
+		});
+
+		for (const ref of keyRefs) {
+			const encryptedKey =
+				await ports.homeRepository.readEncryptedPrivateKey(ref);
+
+			try {
+				await ports.identityCrypto.decryptPrivateKey({
+					encryptedKey,
+					passphrase: input.nextPassphrase,
 				});
 			} catch (cause) {
 				return passphraseOrPrivateKeyFailure(cause);

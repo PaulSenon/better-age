@@ -138,6 +138,7 @@ export type CliCore = {
 		readonly importKnownIdentity: (input: {
 			readonly identityString: string;
 			readonly localAlias?: string | null;
+			readonly trustKeyUpdate?: boolean;
 		}) => Promise<
 			CoreResponse<{
 				readonly ownerId: string;
@@ -304,6 +305,9 @@ const parseArgs = (argv: ReadonlyArray<string>): ParsedArgs => {
 const ensurePromptText = (terminal: CliTerminal) =>
 	terminal.promptText ?? (async () => "");
 
+const ensureConfirm = (terminal: CliTerminal) =>
+	terminal.confirm ?? (async () => false);
+
 const requirePromptSecret = (
 	terminal: CliTerminal,
 ): ((label: string) => Promise<string>) | null =>
@@ -381,6 +385,65 @@ const emitInteractiveFeedback = async (
 	);
 
 	return "";
+};
+
+const identityKeyUpdateLabel = (details: unknown) => {
+	if (
+		typeof details === "object" &&
+		details !== null &&
+		"oldFingerprint" in details &&
+		"newFingerprint" in details &&
+		typeof details.oldFingerprint === "string" &&
+		typeof details.newFingerprint === "string"
+	) {
+		return `Trust identity key update ${details.oldFingerprint} -> ${details.newFingerprint}?`;
+	}
+
+	return "Trust identity key update?";
+};
+
+const importKnownIdentityWithTrustGate = async (input: {
+	readonly cli: RunCliInput;
+	readonly identityString: string;
+	readonly localAlias?: string;
+	readonly trustKeyUpdate?: boolean;
+}) => {
+	const importInput = {
+		identityString: input.identityString,
+		...(input.localAlias === undefined ? {} : { localAlias: input.localAlias }),
+		...(input.trustKeyUpdate === true ? { trustKeyUpdate: true } : {}),
+	};
+	const response =
+		await input.cli.core.commands.importKnownIdentity(importInput);
+
+	if (
+		response.result.kind !== "failure" ||
+		response.result.code !== "IDENTITY_KEY_UPDATE_REQUIRES_TRUST" ||
+		input.trustKeyUpdate === true ||
+		input.cli.terminal.mode !== "interactive"
+	) {
+		return response;
+	}
+
+	const trusted = await ensureConfirm(input.cli.terminal)(
+		identityKeyUpdateLabel(response.result.details),
+	);
+
+	if (!trusted) {
+		return {
+			result: {
+				kind: "failure" as const,
+				code: "CANCELLED",
+				details: undefined,
+			},
+			notices: [],
+		};
+	}
+
+	return await input.cli.core.commands.importKnownIdentity({
+		...importInput,
+		trustKeyUpdate: true,
+	});
 };
 
 const isValidEnvText = (envText: string): boolean =>
@@ -1109,7 +1172,8 @@ const promptCustomGrantIdentity = async (
 		const recipient = await input.parseIdentityString?.(identityString);
 
 		if (recipient !== null && recipient !== undefined) {
-			const response = await input.core.commands.importKnownIdentity({
+			const response = await importKnownIdentityWithTrustGate({
+				cli: input,
 				identityString,
 			});
 
@@ -1413,6 +1477,7 @@ const runIdentityImport = async (
 
 	let stderr = "";
 	const aliasFromOption = args.options.alias;
+	const trustKeyUpdate = args.options["trust-key-update"] === "true";
 	const maxAttempts = input.terminal.mode === "interactive" ? 3 : 1;
 
 	for (let attempt = 0; attempt < maxAttempts; attempt++) {
@@ -1436,9 +1501,11 @@ const runIdentityImport = async (
 			promptedAlias === undefined || promptedAlias.length === 0
 				? undefined
 				: promptedAlias;
-		const response = await input.core.commands.importKnownIdentity({
+		const response = await importKnownIdentityWithTrustGate({
+			cli: input,
 			identityString,
 			...(localAlias === undefined ? {} : { localAlias }),
+			...(trustKeyUpdate ? { trustKeyUpdate } : {}),
 		});
 
 		if (response.result.kind === "success") {

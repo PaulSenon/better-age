@@ -435,3 +435,43 @@
 - Existing loose home/key permissions are auto-repaired and surfaced as `LOCAL_PERMISSIONS_REPAIRED` notices.
 - Permission repair failure is mapped as `LOCAL_PERMISSION_REPAIR_FAILED` and has CLI presenter text.
 - Real adapter integration tests cover strict created modes and loose permission repair before key read.
+
+2026-04-26 Security Release Hardening Phase 3 complete:
+- Passphrase change now decrypts all old key files, re-encrypts all new blobs, and verifies the new blobs before any key write.
+- Core commits prepared passphrase-change keys through `replaceEncryptedPrivateKeys`, then re-reads stable files and verifies they decrypt with the new passphrase.
+- Node home repository implements key transaction commit with `.new` files, `.bak` backups, and `keys/.passphrase-change.json` marker.
+- Recovery runs before home/key reads and restores `.bak` over stable paths, removes `.new`, and deletes the marker.
+- Successful passphrase change removes marker/backups/new files synchronously.
+- Unit/integration tests cover no write before decrypt-all, rollback on storage failure, crash-marker recovery, and no transaction leftovers.
+
+2026-04-26 Security Release Hardening Phase 4 complete:
+- Payload create/edit/grant/revoke/update now encrypt next state in memory and decrypt/parse the encrypted result before writing.
+- Verification failure returns `PAYLOAD_WRITE_VERIFICATION_FAILED` and writes nothing.
+- Payload repository no longer writes `<payload>.tmp`; MVP payload writes are direct after in-memory verification only.
+- Payload reads try current key first, then retired keys lazily.
+- Corrupt/missing retired keys emit `RETIRED_KEY_UNREADABLE` warnings and do not become false `PASSPHRASE_INCORRECT`.
+- Verification passed: `pnpm -F @better-age/core test:unit -- BetterAgeCore.payload.test.ts`, `pnpm -F @better-age/core check`.
+
+2026-04-26 Security Release Hardening Phase 5 complete:
+- V1 identity reimport with same owner id + changed public key now fails with `IDENTITY_KEY_UPDATE_REQUIRES_TRUST` unless explicitly trusted.
+- Failure details include owner id plus old/new fingerprints for CLI confirmation.
+- Alias-only and unchanged-key imports continue without trust.
+- CLI supports `--trust-key-update` for exact/headless import.
+- Interactive import confirms old/new key fingerprints and retries with trust; custom guided grant identity import uses same gate.
+- Verification passed: `pnpm -F @better-age/cli test:unit -- runCli.test.ts commandGrammar.test.ts`, `pnpm -F @better-age/core check`, `pnpm -F @better-age/cli check`.
+
+2026-04-26 Security Release Hardening Phase 6 complete:
+- Secure viewer now renders C0/DEL/C1 control characters visibly (for example `\\x1b`, `\\x07`, `\\r`) before writing frames to stderr.
+- Viewer sanitization is display-only at viewer state/render boundary; payload content is not mutated.
+- Default editor temp creation now uses a private temp dir, random temp filename, `0600` file mode, and existing cleanup still removes file/dir after editor exit.
+- CLI docs now describe external-editor plaintext residual risk.
+- Varlock runtime clears cached load promise on rejection, preserving only successful per-process memoization.
+- Varlock docs now state plaintext stdout/stderr policy, retry behavior, and trusted-local `command=` assumption.
+- Verification passed: `pnpm -F @better-age/cli test:unit -- secureViewer.test.ts nodeEditor.test.ts`, `pnpm -F @better-age/varlock test:unit -- createBetterAgeRuntime.test.ts`, `pnpm -F @better-age/cli check`, `pnpm -F @better-age/varlock check`.
+
+2026-04-26 Security Release Hardening Phase 7 complete:
+- `docs/manual-qa.md` now includes security QA for editor temp cleanup/risk, viewer control-character escaping, V1 identity trust gate, and varlock failed-load retry.
+- Security release hardening plan checkboxes are complete.
+- Deferred/off-scope work remains parked in `.llms/memory/backlog.txt`, including signed Identity V2, structured varlock launcher, strict/in-process editor, branded IDs, core export split, and payload atomic replace.
+- Full verification passed: `pnpm test`, `pnpm check`, `git diff --check`.
+- Release readiness is still pending user manual QA; do not claim released/ready until user QA passes.

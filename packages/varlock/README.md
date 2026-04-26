@@ -7,7 +7,7 @@ Design constraints:
 - plugin stays thin
 - CLI stays source of truth
 - plugin shells out to `bage load --protocol-version=1 <path>`
-- one varlock process caches one load result in memory
+- one varlock process caches one successful load result in memory
 - plugin never receives, stores, or forwards passphrases
 
 ## Contract
@@ -57,6 +57,10 @@ Stdio contract:
 `command=` is a launcher prefix only. The plugin still appends
 `load --protocol-version=1 <path>`.
 
+For MVP, `command=` is trusted local configuration. If it contains spaces the
+runtime invokes it through the shell so launcher prefixes like `pnpm exec bage`
+work; do not feed untrusted input into this field.
+
 Example:
 
 ```env
@@ -85,6 +89,8 @@ pnpm exec bage 'load' '--protocol-version=1' '.env.enc'
 - stderr stays attached to the invoking shell.
 - plugin errors if the launcher cannot start.
 - plugin errors if `bage load` exits non-zero.
+- failed loads are not cached; a later call can retry.
+- successful loads are cached in memory for the current process only.
 - v0 supports one `initBetterAge` config per process.
 
 ## Development

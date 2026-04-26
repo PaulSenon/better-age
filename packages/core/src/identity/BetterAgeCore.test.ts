@@ -38,6 +38,7 @@ const rotatedPrivateKey = {
 const makeHarness = (
 	options: {
 		readonly generatedPrivateKeys?: ReadonlyArray<PrivateKeyPlaintext>;
+		readonly failOnWriteRef?: string;
 		readonly initialHomeState?: unknown;
 		readonly nowValues?: ReadonlyArray<string>;
 	} = {},
@@ -49,6 +50,7 @@ const makeHarness = (
 	let generatedPrivateKeyIndex = 0;
 	const nowValues = options.nowValues ?? ["2026-04-25T10:00:00.000Z"];
 	let nowIndex = 0;
+	let failOnWriteRef = options.failOnWriteRef;
 
 	const homeRepository: HomeRepositoryPort = {
 		loadHomeStateDocument: async () => homeState,
@@ -58,7 +60,38 @@ const makeHarness = (
 		},
 		readEncryptedPrivateKey: async (ref) => encryptedKeys.get(ref) ?? "",
 		writeEncryptedPrivateKey: async ({ ref, encryptedKey }) => {
+			if (ref === failOnWriteRef) {
+				throw new Error("write failed");
+			}
+
 			encryptedKeys.set(ref, encryptedKey);
+		},
+		replaceEncryptedPrivateKeys: async ({ keys }) => {
+			const backups = new Map<string, string | undefined>();
+
+			try {
+				for (const key of keys) {
+					if (!backups.has(key.ref)) {
+						backups.set(key.ref, encryptedKeys.get(key.ref));
+					}
+
+					if (key.ref === failOnWriteRef) {
+						throw new Error("write failed");
+					}
+
+					encryptedKeys.set(key.ref, key.encryptedKey);
+				}
+			} catch (error) {
+				for (const [ref, encryptedKey] of backups) {
+					if (encryptedKey === undefined) {
+						encryptedKeys.delete(ref);
+					} else {
+						encryptedKeys.set(ref, encryptedKey);
+					}
+				}
+
+				throw error;
+			}
 		},
 	};
 
@@ -105,6 +138,9 @@ const makeHarness = (
 		encryptedKeys,
 		getHomeState: () => homeState,
 		getSavedHomeStates: () => savedHomeStates,
+		setFailOnWriteRef: (ref: string | undefined) => {
+			failOnWriteRef = ref;
+		},
 	};
 };
 
@@ -525,6 +561,23 @@ describe("BetterAgeCore identity lifecycle", () => {
 			}),
 		).resolves.toMatchObject({
 			result: {
+				kind: "failure",
+				code: "IDENTITY_KEY_UPDATE_REQUIRES_TRUST",
+				details: {
+					ownerId: "owner_team",
+					oldFingerprint: "age1team",
+					newFingerprint: "age1team-rotated",
+				},
+			},
+		});
+		await expect(
+			core.commands.importKnownIdentity({
+				identityString: refreshedIdentityString,
+				localAlias: "platform",
+				trustKeyUpdate: true,
+			}),
+		).resolves.toMatchObject({
+			result: {
 				kind: "success",
 				value: {
 					handle: "platform#age1team-rotated",
@@ -695,6 +748,63 @@ describe("BetterAgeCore identity lifecycle", () => {
 		);
 		expect(encryptedKeys.get("keys/fp_rotated.age")).toBe(
 			"protected:new passphrase:AGE-SECRET-KEY-ROTATED",
+		);
+	});
+
+	it("does not rewrite any key when one local key cannot be decrypted during passphrase change", async () => {
+		const { core, encryptedKeys } = makeHarness({
+			generatedPrivateKeys: [privateKey, rotatedPrivateKey],
+			nowValues: ["2026-04-25T10:00:00.000Z", "2026-04-25T12:00:00.000Z"],
+		});
+		await core.commands.createSelfIdentity({
+			displayName: "Isaac",
+			passphrase: "old passphrase",
+		});
+		await core.commands.rotateSelfIdentity({ passphrase: "old passphrase" });
+		encryptedKeys.set(
+			"keys/fp_self.age",
+			"protected:other passphrase:AGE-SECRET-KEY-SELF",
+		);
+
+		await expect(
+			core.commands.changeIdentityPassphrase({
+				currentPassphrase: "old passphrase",
+				nextPassphrase: "new passphrase",
+			}),
+		).resolves.toMatchObject({
+			result: { kind: "failure", code: "PASSPHRASE_INCORRECT" },
+		});
+		expect(encryptedKeys.get("keys/fp_rotated.age")).toBe(
+			"protected:old passphrase:AGE-SECRET-KEY-ROTATED",
+		);
+		expect(encryptedKeys.get("keys/fp_self.age")).toBe(
+			"protected:other passphrase:AGE-SECRET-KEY-SELF",
+		);
+	});
+
+	it("restores previously written keys when passphrase change storage fails", async () => {
+		const { core, encryptedKeys, setFailOnWriteRef } = makeHarness({
+			generatedPrivateKeys: [privateKey, rotatedPrivateKey],
+			nowValues: ["2026-04-25T10:00:00.000Z", "2026-04-25T12:00:00.000Z"],
+		});
+		await core.commands.createSelfIdentity({
+			displayName: "Isaac",
+			passphrase: "old passphrase",
+		});
+		await core.commands.rotateSelfIdentity({ passphrase: "old passphrase" });
+		setFailOnWriteRef("keys/fp_self.age");
+
+		await expect(
+			core.commands.changeIdentityPassphrase({
+				currentPassphrase: "old passphrase",
+				nextPassphrase: "new passphrase",
+			}),
+		).rejects.toThrow("write failed");
+		expect(encryptedKeys.get("keys/fp_rotated.age")).toBe(
+			"protected:old passphrase:AGE-SECRET-KEY-ROTATED",
+		);
+		expect(encryptedKeys.get("keys/fp_self.age")).toBe(
+			"protected:old passphrase:AGE-SECRET-KEY-SELF",
 		);
 	});
 

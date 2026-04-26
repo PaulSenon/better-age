@@ -46,6 +46,7 @@ const makeHarness = (
 	let homeState: unknown | null = null;
 	const encryptedKeys = new Map<string, string>();
 	const payloadFiles = new Map<string, string>();
+	let corruptNextEncryptedPayload = false;
 	const generatedPrivateKeys = options.generatedPrivateKeys ?? [privateKey];
 	let generatedPrivateKeyIndex = 0;
 	const nowValues = options.nowValues ?? ["2026-04-25T10:00:00.000Z"];
@@ -59,6 +60,11 @@ const makeHarness = (
 		readEncryptedPrivateKey: async (ref) => encryptedKeys.get(ref) ?? "",
 		writeEncryptedPrivateKey: async ({ ref, encryptedKey }) => {
 			encryptedKeys.set(ref, encryptedKey);
+		},
+		replaceEncryptedPrivateKeys: async ({ keys }) => {
+			for (const key of keys) {
+				encryptedKeys.set(key.ref, key.encryptedKey);
+			}
 		},
 	};
 	const identityCrypto: IdentityCryptoPort = {
@@ -95,19 +101,48 @@ const makeHarness = (
 		},
 	};
 	const payloadCrypto: PayloadCryptoPort = {
-		encryptPayload: async ({ plaintext }) =>
-			[
+		encryptPayload: async ({ plaintext }) => {
+			if (corruptNextEncryptedPayload) {
+				corruptNextEncryptedPayload = false;
+
+				return [
+					"-----BEGIN AGE ENCRYPTED FILE-----",
+					"recipients:age1self",
+					"encrypted:null",
+					"-----END AGE ENCRYPTED FILE-----",
+				].join("\n");
+			}
+
+			return [
 				"-----BEGIN AGE ENCRYPTED FILE-----",
+				`recipients:${plaintext.recipients.map((recipient) => recipient.publicKey).join(",")}`,
 				`encrypted:${JSON.stringify(plaintext)}`,
 				"-----END AGE ENCRYPTED FILE-----",
-			].join("\n"),
-		decryptPayload: async ({ armoredPayload }) =>
-			JSON.parse(
+			].join("\n");
+		},
+		decryptPayload: async ({ armoredPayload, privateKeys }) => {
+			const recipients =
+				armoredPayload
+					.split("\n")
+					.find((line) => line.startsWith("recipients:"))
+					?.slice("recipients:".length)
+					.split(",") ?? [];
+
+			if (
+				!privateKeys.some((privateKey) =>
+					recipients.includes(privateKey.publicKey),
+				)
+			) {
+				throw new Error("PAYLOAD_ACCESS_DENIED");
+			}
+
+			return JSON.parse(
 				armoredPayload
 					.split("\n")
 					.find((line) => line.startsWith("encrypted:"))
 					?.slice("encrypted:".length) ?? "null",
-			) as unknown,
+			) as unknown;
+		},
 	};
 	const core = createBetterAgeCore({
 		clock: {
@@ -129,7 +164,14 @@ const makeHarness = (
 		},
 	});
 
-	return { core, payloadFiles };
+	return {
+		core,
+		encryptedKeys,
+		payloadFiles,
+		corruptNextEncryptedPayload: () => {
+			corruptNextEncryptedPayload = true;
+		},
+	};
 };
 
 describe("BetterAgeCore payload lifecycle", () => {
@@ -277,6 +319,56 @@ describe("BetterAgeCore payload lifecycle", () => {
 				},
 			},
 		});
+	});
+
+	it("does not persist payload mutations when encrypted output fails verification", async () => {
+		const { core, corruptNextEncryptedPayload, payloadFiles } = makeHarness();
+		await core.commands.createSelfIdentity({
+			displayName: "Isaac",
+			passphrase: "correct horse",
+		});
+		await core.commands.createPayload({
+			path: ".env.enc",
+			passphrase: "correct horse",
+		});
+		const originalPayloadFile = payloadFiles.get(".env.enc");
+		corruptNextEncryptedPayload();
+
+		await expect(
+			core.commands.editPayload({
+				path: ".env.enc",
+				passphrase: "correct horse",
+				editedEnvText: "TOKEN=secret\n",
+			}),
+		).resolves.toMatchObject({
+			result: {
+				kind: "failure",
+				code: "PAYLOAD_WRITE_VERIFICATION_FAILED",
+			},
+		});
+		expect(payloadFiles.get(".env.enc")).toBe(originalPayloadFile);
+	});
+
+	it("does not create a payload file when encrypted output fails verification", async () => {
+		const { core, corruptNextEncryptedPayload, payloadFiles } = makeHarness();
+		await core.commands.createSelfIdentity({
+			displayName: "Isaac",
+			passphrase: "correct horse",
+		});
+		corruptNextEncryptedPayload();
+
+		await expect(
+			core.commands.createPayload({
+				path: ".env.enc",
+				passphrase: "correct horse",
+			}),
+		).resolves.toMatchObject({
+			result: {
+				kind: "failure",
+				code: "PAYLOAD_WRITE_VERIFICATION_FAILED",
+			},
+		});
+		expect(payloadFiles.has(".env.enc")).toBe(false);
 	});
 
 	it("grants and revokes recipients with self guards and idempotent outcomes", async () => {
@@ -465,6 +557,33 @@ describe("BetterAgeCore payload lifecycle", () => {
 				code: "PAYLOAD_UPDATED",
 				value: { outcome: "unchanged", rewriteReasons: [] },
 			},
+		});
+	});
+
+	it("does not report wrong passphrase when a corrupt retired key cannot decrypt a stale payload", async () => {
+		const { core, encryptedKeys } = makeHarness({
+			generatedPrivateKeys: [privateKey, rotatedPrivateKey],
+			nowValues: ["2026-04-25T10:00:00.000Z", "2026-04-25T12:00:00.000Z"],
+		});
+		await core.commands.createSelfIdentity({
+			displayName: "Isaac",
+			passphrase: "correct horse",
+		});
+		await core.commands.createPayload({
+			path: ".env.enc",
+			passphrase: "correct horse",
+		});
+		await core.commands.rotateSelfIdentity({ passphrase: "correct horse" });
+		encryptedKeys.set("keys/fp_self.age", "corrupt retired key");
+
+		await expect(
+			core.queries.decryptPayload({
+				path: ".env.enc",
+				passphrase: "correct horse",
+			}),
+		).resolves.toMatchObject({
+			notices: [{ code: "RETIRED_KEY_UNREADABLE" }],
+			result: { kind: "failure", code: "PAYLOAD_ACCESS_DENIED" },
 		});
 	});
 

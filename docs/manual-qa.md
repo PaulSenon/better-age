@@ -50,12 +50,20 @@ packages/cli/dist/bage --help
 - Confirm the remembered editor opens without re-prompting.
 - Set `$VISUAL` to a different available editor.
 - Confirm `$VISUAL` wins over remembered preference.
+- Confirm the editor opens on a temp file outside the project directory.
+- After closing the editor, confirm the Better Age temp file is removed.
+- Remember residual risk: editor swap files, backups, crash recovery, plugins, or
+  shell tooling may still leave plaintext outside Better Age's control.
 
 ## Secure viewer scrolling and quit
 
 - Create or use a payload with enough env lines to exceed terminal height.
 - Run `packages/cli/dist/bage view <payload>`.
 - Confirm plaintext appears only in the viewer UI.
+- Add a test value containing control characters, for example an ESC or carriage
+  return, then view it.
+- Confirm controls render visibly, such as `\x1b` or `\r`, and do not affect the
+  terminal title, clipboard, cursor, or previous screen.
 - Use `j`, `k`, page down, page up, `g`, and `G`.
 - Press `q`.
 - Confirm the viewer closes and the shell is usable.
@@ -117,6 +125,10 @@ packages/cli/dist/bage --help
 - Import an identity with a duplicate alias in guided mode.
 - Confirm the error is shown immediately and the flow allows reprompt, skip, or
   cancel.
+- Import a known owner id with a changed public key.
+- Confirm interactive mode shows old/new fingerprints and requires explicit
+  trust before updating.
+- Confirm headless/exact import fails unless `--trust-key-update` is passed.
 - Revoke without an identity ref.
 - Confirm only payload recipients are listed.
 - Confirm revoke does not offer arbitrary identity string entry.
@@ -157,3 +169,6 @@ packages/cli/dist/bage identity export > /tmp/bage.identity 2> /tmp/bage.err
 - Confirm stdin is inherited for passphrase prompt.
 - Confirm stderr is inherited for prompt and warnings.
 - Confirm stdout is consumed as env text by varlock.
+- Force one `bage load` failure in the same varlock process, then retry.
+- Confirm the failed load is not cached forever and a later successful load can
+  proceed.

@@ -1,5 +1,8 @@
+import { rm, stat } from "node:fs/promises";
+import { basename, dirname } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import {
+	defaultCreateTempFile,
 	type NodeEditorRuntime,
 	openNodeEditor,
 	parseEditorCommand,
@@ -148,5 +151,20 @@ describe("node editor", () => {
 			kind: "failure",
 		});
 		expect(runtime.cleanupCalls).toEqual(["/tmp/bage-edit.env"]);
+	});
+
+	it("creates default plaintext temp files with private modes and random names", async () => {
+		const firstPath = await defaultCreateTempFile("A=1\n");
+		const secondPath = await defaultCreateTempFile("A=1\n");
+
+		try {
+			expect(basename(firstPath)).not.toBe(basename(secondPath));
+			expect((await stat(firstPath)).mode & 0o777).toBe(0o600);
+			expect((await stat(secondPath)).mode & 0o777).toBe(0o600);
+			expect((await stat(dirname(firstPath))).mode & 0o777).toBe(0o700);
+		} finally {
+			await rm(dirname(firstPath), { force: true, recursive: true });
+			await rm(dirname(secondPath), { force: true, recursive: true });
+		}
 	});
 });

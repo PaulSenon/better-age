@@ -1,4 +1,11 @@
-import { chmod, mkdtemp, readFile, rm, stat } from "node:fs/promises";
+import {
+	chmod,
+	mkdtemp,
+	readFile,
+	rm,
+	stat,
+	writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -154,6 +161,65 @@ describe("real core adapters", () => {
 		await expect(permissionBits(keyPath)).resolves.toBe(0o600);
 	});
 
+	it("recovers an unfinished key transaction before reading local keys", async () => {
+		const homeDir = await makeTempDir();
+		const core = createBetterAgeCore({
+			clock: { now: async () => "2026-04-25T10:00:00.000Z" },
+			homeRepository: createNodeHomeRepository({ homeDir }),
+			identityCrypto: createAgeIdentityCrypto(),
+			randomIds: {
+				nextOwnerId: async () => "owner_real",
+				nextPayloadId: async () => "payload_real",
+			},
+		});
+
+		await core.commands.createSelfIdentity({
+			displayName: "Isaac",
+			passphrase: "old passphrase",
+		});
+		const homeState = JSON.parse(
+			await readFile(join(homeDir, "home-state.json"), "utf8"),
+		) as {
+			readonly currentKey: { readonly encryptedPrivateKeyRef: string };
+		};
+		const keyPath = join(homeDir, homeState.currentKey.encryptedPrivateKeyRef);
+		const backupPath = `${keyPath}.bak`;
+		const newPath = `${keyPath}.new`;
+		const markerPath = join(homeDir, "keys", ".passphrase-change.json");
+		const originalKey = await readFile(keyPath, "utf8");
+
+		await writeFile(backupPath, originalKey, { encoding: "utf8", mode: 0o600 });
+		await writeFile(keyPath, "broken migrated key", {
+			encoding: "utf8",
+			mode: 0o600,
+		});
+		await writeFile(newPath, "leftover new key", {
+			encoding: "utf8",
+			mode: 0o600,
+		});
+		await writeFile(
+			markerPath,
+			JSON.stringify({
+				kind: "better-age/key-transaction",
+				version: 1,
+				entries: [{ ref: homeState.currentKey.encryptedPrivateKeyRef }],
+			}),
+			{ encoding: "utf8", mode: 0o600 },
+		);
+
+		await expect(
+			core.queries.verifySelfIdentityPassphrase({
+				passphrase: "old passphrase",
+			}),
+		).resolves.toMatchObject({
+			result: { kind: "success", code: "PASSPHRASE_VERIFIED" },
+		});
+		await expect(readFile(keyPath, "utf8")).resolves.toBe(originalKey);
+		await expect(stat(markerPath)).rejects.toMatchObject({ code: "ENOENT" });
+		await expect(stat(backupPath)).rejects.toMatchObject({ code: "ENOENT" });
+		await expect(stat(newPath)).rejects.toMatchObject({ code: "ENOENT" });
+	});
+
 	it("proves passphrase change and rotation with real encrypted key blobs", async () => {
 		const homeDir = await makeTempDir();
 		const payloadPath = join(homeDir, "payload.env.age");
@@ -232,6 +298,30 @@ describe("real core adapters", () => {
 				value: [{ fingerprint: expect.any(String) }],
 			},
 		});
+		const homeState = JSON.parse(
+			await readFile(join(homeDir, "home-state.json"), "utf8"),
+		) as {
+			readonly currentKey: { readonly encryptedPrivateKeyRef: string };
+			readonly retiredKeys: ReadonlyArray<{
+				readonly encryptedPrivateKeyRef: string;
+			}>;
+		};
+		const keyRefs = [
+			homeState.currentKey.encryptedPrivateKeyRef,
+			...homeState.retiredKeys.map((key) => key.encryptedPrivateKeyRef),
+		];
+
+		await expect(
+			stat(join(homeDir, "keys", ".passphrase-change.json")),
+		).rejects.toMatchObject({ code: "ENOENT" });
+		for (const ref of keyRefs) {
+			await expect(stat(join(homeDir, `${ref}.bak`))).rejects.toMatchObject({
+				code: "ENOENT",
+			});
+			await expect(stat(join(homeDir, `${ref}.new`))).rejects.toMatchObject({
+				code: "ENOENT",
+			});
+		}
 	});
 
 	it("proves grant and revoke with real age recipients", async () => {

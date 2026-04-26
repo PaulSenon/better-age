@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
+import { chmod, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
@@ -136,11 +137,19 @@ export const openNodeEditor = async (
 	}
 };
 
-const defaultCreateTempFile = async (initialText: string) => {
-	const directory = await mkdtemp(join(tmpdir(), "better-age-edit-"));
-	const path = join(directory, "payload.env");
+const privateDirectoryMode = 0o700;
+const privateFileMode = 0o600;
 
-	await writeFile(path, initialText, "utf8");
+export const defaultCreateTempFile = async (initialText: string) => {
+	const directory = await mkdtemp(join(tmpdir(), "better-age-edit-"));
+	await chmod(directory, privateDirectoryMode);
+	const path = join(directory, `payload-${randomUUID()}.env`);
+
+	await writeFile(path, initialText, {
+		encoding: "utf8",
+		mode: privateFileMode,
+	});
+	await chmod(path, privateFileMode);
 
 	return path;
 };

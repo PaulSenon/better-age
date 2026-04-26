@@ -64,15 +64,15 @@ Replace one-by-one key rewriting with the accepted bounded backup/restore transa
 
 ### Acceptance Criteria
 
-- [ ] Passphrase change decrypts all old keys before writing anything.
-- [ ] Passphrase change re-encrypts and verifies all new key blobs before moving stable files.
-- [ ] Passphrase change writes a transaction marker before replacing stable files.
-- [ ] Ordinary write/rename failure rolls back backups and leaves old passphrase usable.
-- [ ] Crash-marker recovery runs before future key reads.
-- [ ] Recovery restores backups over partial migrated files and removes leftover new files.
-- [ ] Successful passphrase change removes backups and marker synchronously.
-- [ ] Unrecoverable transaction state returns `KEY_TRANSACTION_INCOMPLETE`.
-- [ ] Individual key files remain age-protected and final paths remain stable.
+- [x] Passphrase change decrypts all old keys before writing anything.
+- [x] Passphrase change re-encrypts and verifies all new key blobs before moving stable files.
+- [x] Passphrase change writes a transaction marker before replacing stable files.
+- [x] Ordinary write/rename failure rolls back backups and leaves old passphrase usable.
+- [x] Crash-marker recovery runs before future key reads.
+- [x] Recovery restores backups over partial migrated files and removes leftover new files.
+- [x] Successful passphrase change removes backups and marker synchronously.
+- [x] Unrecoverable transaction state returns `KEY_TRANSACTION_INCOMPLETE`.
+- [x] Individual key files remain age-protected and final paths remain stable.
 
 ---
 
@@ -86,14 +86,14 @@ Improve payload mutation and read safety without adding project-local temp/stagi
 
 ### Acceptance Criteria
 
-- [ ] Payload create/edit/grant/revoke/update encrypt next state in memory.
-- [ ] Mutations decrypt and parse the encrypted result in memory before final write.
-- [ ] Verification failure writes nothing and returns a typed failure.
-- [ ] No `.env.enc.tmp`, `.better-age-tmp`, or project-local staging files are introduced.
-- [ ] Payload decrypt tries current key before retired keys.
-- [ ] Retired keys are tried lazily only when needed.
-- [ ] Corrupt/missing retired keys warn but do not cause false `PASSPHRASE_INCORRECT`.
-- [ ] If no key decrypts payload, the normal decrypt failure is returned.
+- [x] Payload create/edit/grant/revoke/update encrypt next state in memory.
+- [x] Mutations decrypt and parse the encrypted result in memory before final write.
+- [x] Verification failure writes nothing and returns a typed failure.
+- [x] No `.env.enc.tmp`, `.better-age-tmp`, or project-local staging files are introduced.
+- [x] Payload decrypt tries current key before retired keys.
+- [x] Retired keys are tried lazily only when needed.
+- [x] Corrupt/missing retired keys warn but do not cause false `PASSPHRASE_INCORRECT`.
+- [x] If no key decrypts payload, the normal decrypt failure is returned.
 
 ---
 
@@ -107,13 +107,13 @@ Add a small trust gate for unsigned V1 identity updates without starting the sig
 
 ### Acceptance Criteria
 
-- [ ] Same owner id + unchanged public key imports as today.
-- [ ] Same owner id + changed public key fails without explicit trust.
-- [ ] Alias-only changes do not require key-update trust.
-- [ ] Interactive import shows old/new key fingerprints and asks for confirmation.
-- [ ] Exact/headless import requires an explicit trust option.
-- [ ] Guided grant custom identity-string path handles the trust gate cleanly or fails with a clear import-first remediation.
-- [ ] Signed Identity V2 remains documented as a separate project.
+- [x] Same owner id + unchanged public key imports as today.
+- [x] Same owner id + changed public key fails without explicit trust.
+- [x] Alias-only changes do not require key-update trust.
+- [x] Interactive import shows old/new key fingerprints and asks for confirmation.
+- [x] Exact/headless import requires an explicit trust option.
+- [x] Guided grant custom identity-string path handles the trust gate cleanly or fails with a clear import-first remediation.
+- [x] Signed Identity V2 remains documented as a separate project.
 
 ---
 
@@ -127,15 +127,15 @@ Harden display/editor/varlock runtime edges that can leak, confuse, or poison la
 
 ### Acceptance Criteria
 
-- [ ] Secure viewer escapes ANSI/OSC/control characters visibly.
-- [ ] Viewer sanitization is display-only and never mutates payload content.
-- [ ] Editor temp dir uses private permissions.
-- [ ] Editor temp file uses private permissions and random name.
-- [ ] Editor temp file is deleted after editor exit.
-- [ ] Docs describe editor swap/backup/plugin residual risk.
-- [ ] Varlock failed `bage load` promise is not cached forever.
-- [ ] Load protocol docs still state plaintext stdout is intentional and stderr-only for warnings/errors.
-- [ ] Varlock custom command docs state trusted-local config for MVP.
+- [x] Secure viewer escapes ANSI/OSC/control characters visibly.
+- [x] Viewer sanitization is display-only and never mutates payload content.
+- [x] Editor temp dir uses private permissions.
+- [x] Editor temp file uses private permissions and random name.
+- [x] Editor temp file is deleted after editor exit.
+- [x] Docs describe editor swap/backup/plugin residual risk.
+- [x] Varlock failed `bage load` promise is not cached forever.
+- [x] Load protocol docs still state plaintext stdout is intentional and stderr-only for warnings/errors.
+- [x] Varlock custom command docs state trusted-local config for MVP.
 
 ---
 
@@ -149,11 +149,11 @@ Close the hardening pass with docs, manual QA guidance, backlog cleanup, and ful
 
 ### Acceptance Criteria
 
-- [ ] Security hardening docs match implemented behavior.
-- [ ] Deferred items are persisted in backlog/project docs.
-- [ ] Manual QA checklist covers prompt, editor, viewer, passphrase change, and varlock retry behavior.
-- [ ] Relevant package tests pass.
-- [ ] Full `pnpm test` passes.
-- [ ] Full `pnpm check` passes.
-- [ ] `git diff --check` passes.
-- [ ] Release readiness is not claimed until user QA passes.
+- [x] Security hardening docs match implemented behavior.
+- [x] Deferred items are persisted in backlog/project docs.
+- [x] Manual QA checklist covers prompt, editor, viewer, passphrase change, and varlock retry behavior.
+- [x] Relevant package tests pass.
+- [x] Full `pnpm test` passes.
+- [x] Full `pnpm check` passes.
+- [x] `git diff --check` passes.
+- [x] Release readiness is not claimed until user QA passes.

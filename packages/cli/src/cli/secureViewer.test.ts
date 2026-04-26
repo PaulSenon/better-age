@@ -68,6 +68,22 @@ describe("secure viewer state", () => {
 		expect(frame).toContain("2/4");
 	});
 
+	it("renders control characters visibly instead of interpreting them", () => {
+		const state = createViewerState({
+			envText: "TOKEN=\u001B]52;c;secret\u0007\nCR=left\rright",
+			path: "secrets.env.enc",
+			rows: 8,
+		});
+
+		const frame = renderViewerFrame(state);
+
+		expect(frame).not.toContain("\u001B]52");
+		expect(frame).not.toContain("\u0007");
+		expect(frame).not.toContain("\r");
+		expect(frame).toContain("\\x1b]52;c;secret\\x07");
+		expect(frame).toContain("CR=left\\rright");
+	});
+
 	it("scrolls and clamps long payloads", () => {
 		const state = createViewerState({
 			envText: "A\nB\nC\nD",

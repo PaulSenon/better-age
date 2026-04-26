@@ -455,6 +455,21 @@ describe("runCli command contracts", () => {
 			},
 		]);
 
+		const trusted = makeCore();
+		await expect(
+			runCli({
+				argv: ["identity", "import", "bage-id-v1:sarah", "--trust-key-update"],
+				core: trusted.core,
+				terminal: { mode: "headless" },
+			}),
+		).resolves.toMatchObject({ exitCode: 0, stdout: "" });
+		expect(trusted.calls).toEqual([
+			{
+				name: "importKnownIdentity",
+				input: { identityString: "bage-id-v1:sarah", trustKeyUpdate: true },
+			},
+		]);
+
 		let promptCount = 0;
 		const interactive = makeCore({
 			commands: {
@@ -533,6 +548,67 @@ describe("runCli command contracts", () => {
 			{
 				name: "importKnownIdentity",
 				input: { identityString: "bage-id-v1:sarah" },
+			},
+		]);
+	});
+
+	it("confirms interactive identity key updates before trusting them", async () => {
+		let confirmedLabel = "";
+		const interactive = makeCore({
+			commands: {
+				importKnownIdentity: async (input) => {
+					interactive.calls.push({ name: "importKnownIdentity", input });
+					return input.trustKeyUpdate === true
+						? success("KNOWN_IDENTITY_IMPORTED", {
+								ownerId: "owner_sarah",
+								handle: "Sarah#age1new",
+								outcome: "updated",
+							})
+						: {
+								result: {
+									kind: "failure" as const,
+									code: "IDENTITY_KEY_UPDATE_REQUIRES_TRUST",
+									details: {
+										ownerId: "owner_sarah",
+										oldFingerprint: "age1old",
+										newFingerprint: "age1new",
+									},
+								},
+								notices: [],
+							};
+				},
+			},
+		});
+
+		await expect(
+			runCli({
+				argv: ["identity", "import", "bage-id-v1:sarah"],
+				core: interactive.core,
+				terminal: {
+					mode: "interactive",
+					confirm: async (label) => {
+						confirmedLabel = label;
+						return true;
+					},
+					promptText: async () => "",
+				},
+			}),
+		).resolves.toMatchObject({
+			exitCode: 0,
+			stderr: "[OK] Identity imported: Sarah#age1new\n",
+		});
+		expect(confirmedLabel).toContain("age1old -> age1new");
+		expect(interactive.calls).toEqual([
+			{
+				name: "importKnownIdentity",
+				input: { identityString: "bage-id-v1:sarah" },
+			},
+			{
+				name: "importKnownIdentity",
+				input: {
+					identityString: "bage-id-v1:sarah",
+					trustKeyUpdate: true,
+				},
 			},
 		]);
 	});

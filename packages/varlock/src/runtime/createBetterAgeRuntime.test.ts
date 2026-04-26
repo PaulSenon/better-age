@@ -130,6 +130,34 @@ describe("createBetterAgeRuntime", () => {
 		await expect(secondLoad).resolves.toBe("A=1\n");
 	});
 
+	it("does not memoize a failed load forever", async () => {
+		let spawnCount = 0;
+		const children: Array<SpawnedProcessStub> = [];
+		const runtime = createBetterAgeRuntime({
+			spawnProcess: () => {
+				spawnCount += 1;
+				const child = new SpawnedProcessStub();
+				children.push(child);
+				return child;
+			},
+		});
+
+		runtime.init({ path: "./.env.enc" });
+
+		const firstLoad = runtime.loadEnvText();
+		children[0]?.close(2);
+		await expect(firstLoad).rejects.toThrow(
+			"bage load failed with exit code 2",
+		);
+
+		const secondLoad = runtime.loadEnvText();
+		children[1]?.pushStdout("A=1\n");
+		children[1]?.close(0);
+
+		await expect(secondLoad).resolves.toBe("A=1\n");
+		expect(spawnCount).toBe(2);
+	});
+
 	it("fails when betterAgeLoad() is used before initBetterAge(...)", async () => {
 		const runtime = createBetterAgeRuntime();
 

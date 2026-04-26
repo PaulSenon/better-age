@@ -47,7 +47,7 @@ bage view [payload]
 
 bage identity export
 bage identity forget [identity-ref]
-bage identity import [identity-string] [--alias <alias>]
+bage identity import [identity-string] [--alias <alias>] [--trust-key-update]
 bage identity list
 bage identity passphrase
 bage identity pass
@@ -74,6 +74,7 @@ bage setup --name Isaac
 bage create .env.prod.enc
 bage edit .env.prod.enc
 bage identity import 'bage-id-v1:...' --alias ops
+bage identity import 'bage-id-v1:...' --trust-key-update
 bage grant .env.prod.enc ops
 bage inspect .env.prod.enc
 bage view .env.prod.enc
@@ -115,9 +116,15 @@ bage interactive
   being buffered until the command returns to the menu.
 - `edit` resolves `$VISUAL`, then `$EDITOR`, then remembered editor preference,
   then interactive editor picker.
+- External editor mode necessarily writes plaintext to a private temp file while
+  the editor runs. Better Age uses a private temp directory, a random temp file
+  name, `0600` file permissions, and deletes the file afterward, but editor
+  swap files, backups, crash recovery, plugins, or shell tooling can still leave
+  residual plaintext outside Better Age's control.
 - Invalid edited `.env` content logs the validation failure, then offers Reopen
   Editor or Cancel while preserving the edited text for retry.
 - `view` uses an in-process secure viewer with keyboard scrolling and quit.
+  Control characters are rendered visibly, not interpreted by the terminal.
 - `interactive` opens a setup-aware menu loop. It excludes `load` and
   `interactive` from menus.
 

@@ -11,6 +11,7 @@ const optionalIdentityReference = Args.optional(
 const protocolVersion = Options.text("protocol-version");
 const optionalAlias = Options.optional(Options.text("alias"));
 const optionalName = Options.optional(Options.text("name"));
+const trustKeyUpdate = Options.boolean("trust-key-update");
 
 const noOp = () => Effect.void;
 
@@ -51,6 +52,7 @@ const identityCommand = Command.make("identity").pipe(
 			{
 				identityString: Args.optional(Args.text({ name: "identity-string" })),
 				alias: optionalAlias,
+				trustKeyUpdate,
 			},
 			noOp,
 		).pipe(Command.withDescription("Import a public identity string.")),

@@ -79,13 +79,38 @@ export type SecureViewerRuntime = {
 	readonly stdin: ViewerStdin;
 };
 
+const renderControlCharacter = (character: string) => {
+	switch (character) {
+		case "\t":
+			return "\\t";
+		case "\r":
+			return "\\r";
+		default:
+			return `\\x${character.charCodeAt(0).toString(16).padStart(2, "0")}`;
+	}
+};
+
+export const sanitizeViewerText = (text: string) =>
+	Array.from(text)
+		.map((character) => {
+			const code = character.charCodeAt(0);
+
+			return code < 0x20 || code === 0x7f || (code >= 0x80 && code <= 0x9f)
+				? renderControlCharacter(character)
+				: character;
+		})
+		.join("");
+
 export const createViewerState = (input: {
 	readonly envText: string;
 	readonly path: string;
 	readonly rows: number;
 }): ViewerState => ({
-	lines: input.envText.length === 0 ? [""] : input.envText.split("\n"),
-	path: input.path,
+	lines:
+		input.envText.length === 0
+			? [""]
+			: input.envText.split("\n").map(sanitizeViewerText),
+	path: sanitizeViewerText(input.path),
 	rows: input.rows,
 	scrollTop: 0,
 });

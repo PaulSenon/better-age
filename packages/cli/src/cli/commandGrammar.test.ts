@@ -232,7 +232,7 @@ describe("release command grammar", () => {
 	});
 
 	it("delegates grammar-accepted commands to existing flows", async () => {
-		const { core } = makeCore();
+		const { calls, core } = makeCore();
 
 		const result = await runCliWithGrammar({
 			argv: ["identity", "export"],
@@ -245,6 +245,20 @@ describe("release command grammar", () => {
 			stdout: "bage-id-v1:abc123\n",
 			stderr: "",
 		});
+
+		await expect(
+			runCliWithGrammar({
+				argv: ["identity", "import", "bage-id-v1:sarah", "--trust-key-update"],
+				core,
+				terminal: { mode: "headless" },
+			}),
+		).resolves.toMatchObject({ exitCode: 0 });
+		expect(calls).toEqual([
+			{
+				name: "importKnownIdentity",
+				input: { identityString: "bage-id-v1:sarah", trustKeyUpdate: true },
+			},
+		]);
 	});
 
 	it("keeps promptable operands optional but protocol operands strict", async () => {

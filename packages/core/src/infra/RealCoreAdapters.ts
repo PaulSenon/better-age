@@ -4,6 +4,7 @@ import {
 	mkdir,
 	readFile,
 	rename,
+	rm,
 	stat,
 	writeFile,
 } from "node:fs/promises";
@@ -27,10 +28,21 @@ import {
 
 const privateDirectoryMode = 0o700;
 const privateFileMode = 0o600;
+const keyTransactionMarkerRef = "keys/.passphrase-change.json";
 
 const throwPermissionRepairFailure = (cause: unknown): never => {
 	throw new Error("LOCAL_PERMISSION_REPAIR_FAILED", { cause });
 };
+
+const throwKeyTransactionIncomplete = (cause: unknown): never => {
+	throw new Error("KEY_TRANSACTION_INCOMPLETE", { cause });
+};
+
+const isNotFoundError = (error: unknown) =>
+	typeof error === "object" &&
+	error !== null &&
+	"code" in error &&
+	error.code === "ENOENT";
 
 const modeBits = (mode: number) => mode & 0o777;
 
@@ -57,12 +69,7 @@ const ensurePrivateDirectory = async (
 	try {
 		await stat(path);
 	} catch (error) {
-		if (
-			typeof error === "object" &&
-			error !== null &&
-			"code" in error &&
-			error.code === "ENOENT"
-		) {
+		if (isNotFoundError(error)) {
 			existed = false;
 		} else {
 			throw error;
@@ -95,12 +102,7 @@ const repairExistingPrivateDirectory = async (
 	try {
 		directoryMode = (await stat(path)).mode;
 	} catch (error) {
-		if (
-			typeof error === "object" &&
-			error !== null &&
-			"code" in error &&
-			error.code === "ENOENT"
-		) {
+		if (isNotFoundError(error)) {
 			return;
 		}
 
@@ -182,6 +184,94 @@ const parseJson = (contents: string): unknown =>
 const fingerprintFromPublicKey = (publicKey: string): string =>
 	`fp_${createHash("sha256").update(publicKey).digest("hex").slice(0, 16)}`;
 
+type KeyTransactionMarker = {
+	readonly kind: "better-age/key-transaction";
+	readonly version: 1;
+	readonly entries: ReadonlyArray<{ readonly ref: string }>;
+};
+
+const parseKeyTransactionMarker = (contents: string): KeyTransactionMarker => {
+	const parsed = parseJson(contents);
+
+	if (
+		typeof parsed !== "object" ||
+		parsed === null ||
+		!("kind" in parsed) ||
+		parsed.kind !== "better-age/key-transaction" ||
+		!("version" in parsed) ||
+		parsed.version !== 1 ||
+		!("entries" in parsed) ||
+		!Array.isArray(parsed.entries) ||
+		!parsed.entries.every(
+			(entry) =>
+				typeof entry === "object" &&
+				entry !== null &&
+				"ref" in entry &&
+				typeof entry.ref === "string",
+		)
+	) {
+		throw new Error("Invalid key transaction marker");
+	}
+
+	return parsed as KeyTransactionMarker;
+};
+
+const transactionPaths = (homeDir: string, ref: string) => {
+	const stablePath = join(homeDir, ref);
+
+	return {
+		backupPath: `${stablePath}.bak`,
+		newPath: `${stablePath}.new`,
+		stablePath,
+	};
+};
+
+const recoverKeyTransaction = async (input: {
+	readonly homeDir: string;
+	readonly recordRepair: (path: string) => void;
+}) => {
+	const markerPath = join(input.homeDir, keyTransactionMarkerRef);
+	let markerContents: string;
+
+	try {
+		markerContents = await readFile(markerPath, "utf8");
+	} catch (error) {
+		if (isNotFoundError(error)) {
+			return;
+		}
+
+		throw error;
+	}
+
+	try {
+		const marker = parseKeyTransactionMarker(markerContents);
+
+		for (const entry of marker.entries) {
+			const { backupPath, newPath, stablePath } = transactionPaths(
+				input.homeDir,
+				entry.ref,
+			);
+
+			try {
+				await rename(backupPath, stablePath);
+				await chmod(stablePath, privateFileMode);
+			} catch (error) {
+				if (!isNotFoundError(error)) {
+					throw error;
+				}
+			}
+
+			await rm(newPath, { force: true });
+		}
+
+		await rm(markerPath, { force: true });
+	} catch (error) {
+		throwKeyTransactionIncomplete(error);
+	}
+
+	await repairExistingPrivateDirectory(input.homeDir, input.recordRepair);
+};
+
 export const createNodeHomeRepository = (input: {
 	readonly homeDir: string;
 }): HomeRepositoryPort => {
@@ -199,6 +289,10 @@ export const createNodeHomeRepository = (input: {
 
 	return {
 		loadHomeStateDocument: async () => {
+			await recoverKeyTransaction({
+				homeDir: input.homeDir,
+				recordRepair: recordPermissionRepair,
+			});
 			await repairExistingPrivateDirectory(
 				input.homeDir,
 				recordPermissionRepair,
@@ -209,12 +303,7 @@ export const createNodeHomeRepository = (input: {
 			try {
 				contents = await readFile(stateFile, "utf8");
 			} catch (error) {
-				if (
-					typeof error === "object" &&
-					error !== null &&
-					"code" in error &&
-					error.code === "ENOENT"
-				) {
+				if (isNotFoundError(error)) {
 					return null;
 				}
 
@@ -235,6 +324,10 @@ export const createNodeHomeRepository = (input: {
 			});
 		},
 		readEncryptedPrivateKey: async (ref) => {
+			await recoverKeyTransaction({
+				homeDir: input.homeDir,
+				recordRepair: recordPermissionRepair,
+			});
 			await repairExistingPrivateDirectory(
 				input.homeDir,
 				recordPermissionRepair,
@@ -250,6 +343,75 @@ export const createNodeHomeRepository = (input: {
 				fileMode: "private",
 				recordRepair: recordPermissionRepair,
 			});
+		},
+		replaceEncryptedPrivateKeys: async ({ keys }) => {
+			await recoverKeyTransaction({
+				homeDir: input.homeDir,
+				recordRepair: recordPermissionRepair,
+			});
+			const markerPath = join(input.homeDir, keyTransactionMarkerRef);
+
+			try {
+				await ensurePrivateDirectory(
+					dirname(markerPath),
+					recordPermissionRepair,
+				);
+
+				for (const key of keys) {
+					const { newPath } = transactionPaths(input.homeDir, key.ref);
+					await writeFileAtomically(newPath, key.encryptedKey, {
+						directoryMode: "private",
+						fileMode: "private",
+						recordRepair: recordPermissionRepair,
+					});
+				}
+
+				await writeFile(
+					markerPath,
+					JSON.stringify({
+						entries: keys.map((key) => ({ ref: key.ref })),
+						kind: "better-age/key-transaction",
+						version: 1,
+					}),
+					{ encoding: "utf8", mode: privateFileMode },
+				);
+				await chmod(markerPath, privateFileMode);
+
+				for (const key of keys) {
+					const { backupPath, newPath, stablePath } = transactionPaths(
+						input.homeDir,
+						key.ref,
+					);
+
+					await rename(stablePath, backupPath);
+					await rename(newPath, stablePath);
+					await chmod(stablePath, privateFileMode);
+				}
+
+				for (const key of keys) {
+					const { backupPath } = transactionPaths(input.homeDir, key.ref);
+					await rm(backupPath, { force: true });
+				}
+
+				await rm(markerPath, { force: true });
+			} catch (error) {
+				try {
+					await recoverKeyTransaction({
+						homeDir: input.homeDir,
+						recordRepair: recordPermissionRepair,
+					});
+					await Promise.all(
+						keys.map(async (key) => {
+							const { newPath } = transactionPaths(input.homeDir, key.ref);
+							await rm(newPath, { force: true });
+						}),
+					);
+				} catch (recoveryError) {
+					throwKeyTransactionIncomplete(recoveryError);
+				}
+
+				throw error;
+			}
 		},
 		consumeSecurityNotices,
 	};
@@ -275,7 +437,8 @@ export const createNodePayloadRepository = (): PayloadRepositoryPort => ({
 	},
 	readPayloadFile: async (path) => await readFile(path, "utf8"),
 	writePayloadFile: async (path, contents) => {
-		await writeFileAtomically(path, contents);
+		await mkdir(dirname(path), { recursive: true });
+		await writeFile(path, contents, "utf8");
 	},
 });
 
