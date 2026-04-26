@@ -1,5 +1,6 @@
 import type {
 	HomeStateDocumentV1,
+	HomeStateDocumentV2,
 	PayloadDocumentV1,
 	PayloadPlaintextV1,
 	PrivateKeyPlaintextV1,
@@ -33,6 +34,15 @@ export const validHomeStateDocumentV1 = {
 		rotationTtl: "3m",
 	},
 } satisfies HomeStateDocumentV1;
+
+export const validHomeStateDocumentV2 = {
+	...validHomeStateDocumentV1,
+	version: 2,
+	preferences: {
+		rotationTtl: "3m",
+		editorCommand: null,
+	},
+} satisfies HomeStateDocumentV2;
 
 export const validPrivateKeyPlaintextV1 = {
 	kind: "better-age/private-key",

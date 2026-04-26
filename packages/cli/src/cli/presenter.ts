@@ -93,6 +93,15 @@ export const presentFailure = (code: string, exitCode = 1): RunCliResult => ({
 	stderr: `[ERROR] ${code}: ${failureMessage(code)}\n`,
 });
 
+export const presentParseFailure = (
+	code: string,
+	message: string,
+): RunCliResult => ({
+	exitCode: 2,
+	stdout: "",
+	stderr: `[ERROR] ${code}: ${message}\n`,
+});
+
 export const presentIdentityString = (
 	identityString: string,
 ): RunCliResult => ({

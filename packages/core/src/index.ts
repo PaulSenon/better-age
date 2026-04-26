@@ -2,6 +2,7 @@ export type {
 	BetterAgeCorePorts,
 	ClockPort,
 	HomeRepositoryPort,
+	HomeStatus,
 	IdentityCryptoPort,
 	KnownIdentitySummary,
 	RandomIdsPort,

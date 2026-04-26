@@ -25,7 +25,7 @@ afterEach(async () => {
 });
 
 describe("real core adapters", () => {
-	it("stores v1 home/key/payload files and round-trips through real age crypto", async () => {
+	it("stores current home/key/payload files and round-trips through real age crypto", async () => {
 		const homeDir = await makeTempDir();
 		const payloadPath = join(homeDir, "payload.env.age");
 		const core = createBetterAgeCore({

@@ -42,13 +42,20 @@ type KnownIdentity = {
 type SelfIdentity = {
 	readonly ownerId: string;
 	readonly publicIdentity: {
+		readonly ownerId?: string;
 		readonly displayName: string;
+		readonly publicKey?: string;
+		readonly identityUpdatedAt?: string;
 	};
 	readonly handle: string;
 	readonly fingerprint: string;
 	readonly keyMode: string;
 	readonly rotationTtl: string;
 };
+
+type HomeStatus =
+	| { readonly status: "not-setup" }
+	| { readonly status: "setup"; readonly self: SelfIdentity };
 
 type RetiredKey = {
 	readonly fingerprint: string;
@@ -184,6 +191,7 @@ export type CliCore = {
 		readonly verifySelfIdentityPassphrase: (input: {
 			readonly passphrase: string;
 		}) => Promise<CoreResponse<{ readonly ownerId: string }>>;
+		readonly getHomeStatus: () => Promise<CoreResponse<HomeStatus>>;
 		readonly getSelfIdentity: () => Promise<CoreResponse<SelfIdentity>>;
 		readonly listKnownIdentities: () => Promise<
 			CoreResponse<ReadonlyArray<KnownIdentity>>

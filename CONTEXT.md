@@ -10,6 +10,10 @@ CLI context for local identity state, encrypted payloads, and compatibility boun
 The local persisted state under the tool home directory.
 _Avoid_: Config, cache, metadata db
 
+**Home Status**:
+The command-facing setup state of local home data, either not setup or setup with self identity summary.
+_Avoid_: Home state document, setup error, storage probe
+
 **Identity String**:
 The shareable string encoding of an **Identity Snapshot** used for import/export.
 _Avoid_: Generic identity model, whole identity entity
@@ -47,6 +51,30 @@ _Avoid_: Canonical stored field, duplicated key identity
 **Load Protocol**:
 The versioned stdout/stderr/exit-code contract used by external tools to invoke `load`.
 _Avoid_: Machine interface, API, machine mode
+
+**Command Grammar**:
+The release-facing CLI command tree, operands, flags, aliases, help, and parse-error contract.
+_Avoid_: Flow logic, business logic, command implementation
+
+**Standalone CLI Bundle**:
+The release artifact for `bage`, built as one executable JavaScript file containing the CLI runtime and internal dependencies.
+_Avoid_: Library package, source export, monorepo workspace command
+
+**Human Output Styling**:
+Capability-detected minimal color and emphasis applied only to human-facing terminal output.
+_Avoid_: TUI, theme, machine output formatting
+
+**Secure Viewer**:
+The isolated in-process readonly terminal surface used by `view` to render plaintext without writing it to stdout.
+_Avoid_: Pager, less, cat view
+
+**Secret Prompt**:
+The TTY-only hidden-input prompt used to acquire a **Passphrase** without exposing it through argv, env, stdout, or piped stdin.
+_Avoid_: Text prompt, readline question, password flag
+
+**Editor Preference**:
+The home-local preferred external editor used by `edit` when no environment editor override is set.
+_Avoid_: Global config, payload setting, editor command argument
 
 ### Compatibility concepts
 
@@ -149,6 +177,7 @@ _Avoid_: Canonical display name, embedded identity field
 ## Relationships
 
 - A **Home State**, **Identity String**, and **Payload Envelope** each carry their own **Artifact Schema Version**.
+- **Home Status** is the CLI-facing setup gate derived from **Home State**.
 - An **Identity Snapshot** may appear in multiple serialized containers, including **Identity String**, home records, and payload recipients.
 - Identity evolution is centered on one canonical **Identity Snapshot** schema.
 - The shared canonical identity shape is the **Public Identity Snapshot**.
@@ -162,6 +191,19 @@ _Avoid_: Canonical display name, embedded identity field
 - **Fingerprint** is a **Derived Fingerprint**, not a stored field of the **Public Identity Snapshot**.
 - The current target persisted fields of **Public Identity Snapshot** are `ownerId`, `publicKey`, `displayName`, and `identityUpdatedAt`.
 - A **Load Protocol** is a **Compatibility Gate**, not a persisted artifact schema.
+- A **Command Grammar** owns command shape and parse-time behavior, but delegates execution to command flows.
+- A **Standalone CLI Bundle** is the primary MVP release artifact.
+- `@better-age/core` may remain an internal dependency bundled into the **Standalone CLI Bundle** for MVP.
+- **Human Output Styling** is presentation-only and never applies to machine stdout.
+- A **Secure Viewer** belongs to the human `view` path and is distinct from the machine-output **Load Protocol**.
+- A **Secure Viewer** is a release requirement and stays behind the terminal/viewer adapter boundary.
+- An **Interactive Session** is state-aware: before setup it offers setup/quit only; after setup it offers files/identities/quit.
+- An **Interactive Session** does not expose **Load** because **Load** belongs to the machine-output path.
+- A **Secret Prompt** is required for **Passphrase** acquisition in release-ready CLI runtime adapters.
+- A **Secret Prompt** must fail before prompting when no interactive TTY is available.
+- An **Editor Preference** is overridden by `$VISUAL` / `$EDITOR`.
+- An **Editor Preference** belongs to **Home State**, not to a **Payload**.
+- **Home State** v2 persists **Editor Preference** as nullable `preferences.editorCommand`.
 - A **Migration** may be executed as an **In-Memory Migration** or a **Persistent Migration**.
 - A **Migration Pipeline** normalizes a versioned artifact into the **Current Runtime Shape** before domain logic runs.
 - A **Migration Pipeline** does not target arbitrary schema versions.

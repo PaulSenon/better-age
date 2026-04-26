@@ -2,6 +2,7 @@ import { Either } from "effect";
 import { describe, expect, it } from "vitest";
 import {
 	validHomeStateDocumentV1,
+	validHomeStateDocumentV2,
 	validPayloadDocumentV1,
 	validPayloadPlaintextV1,
 	validPrivateKeyPlaintextV1,
@@ -52,13 +53,26 @@ type ParserCase = {
 describe("ArtifactDocument", () => {
 	it("parses and no-op migrates a current home-state document", () => {
 		const parsed = Either.getOrThrow(
+			parseHomeStateDocument(validHomeStateDocumentV2),
+		);
+
+		expect(parsed).toEqual(validHomeStateDocumentV2);
+		expect(migrateHomeStateDocument(parsed)).toEqual({
+			kind: "already-current",
+			document: validHomeStateDocumentV2,
+		});
+	});
+
+	it("migrates home-state v1 to v2 with no editor preference", () => {
+		const parsed = Either.getOrThrow(
 			parseHomeStateDocument(validHomeStateDocumentV1),
 		);
 
-		expect(parsed).toEqual(validHomeStateDocumentV1);
 		expect(migrateHomeStateDocument(parsed)).toEqual({
-			kind: "already-current",
-			document: validHomeStateDocumentV1,
+			kind: "migrated",
+			fromVersion: 1,
+			toVersion: 2,
+			document: validHomeStateDocumentV2,
 		});
 	});
 
@@ -96,20 +110,20 @@ describe("ArtifactDocument", () => {
 
 	it("classifies wrong kind, malformed version, missing fields, and future version", () => {
 		const wrongKind = parseHomeStateDocument({
-			...validHomeStateDocumentV1,
+			...validHomeStateDocumentV2,
 			kind: "better-age/payload",
 		});
 		const malformedVersion = parseHomeStateDocument({
-			...validHomeStateDocumentV1,
+			...validHomeStateDocumentV2,
 			version: "1",
 		});
 		const missingField = parseHomeStateDocument({
-			...validHomeStateDocumentV1,
+			...validHomeStateDocumentV2,
 			currentKey: undefined,
 		});
 		const futureVersion = parseHomeStateDocument({
-			...validHomeStateDocumentV1,
-			version: 2,
+			...validHomeStateDocumentV2,
+			version: 3,
 		});
 
 		expect(getLeft(wrongKind)).toBeInstanceOf(
@@ -126,7 +140,7 @@ describe("ArtifactDocument", () => {
 
 	it("does not accept prototype schema versions without an explicit migration path", () => {
 		const prototypeDocument = {
-			...validHomeStateDocumentV1,
+			...validHomeStateDocumentV2,
 			version: 0,
 		};
 
@@ -134,7 +148,7 @@ describe("ArtifactDocument", () => {
 			new ArtifactDocumentMigrationPathMissingError({
 				artifact: "home-state",
 				fromVersion: 0,
-				toVersion: 1,
+				toVersion: 2,
 				message: "Artifact migration path is missing",
 			}),
 		);
@@ -144,7 +158,7 @@ describe("ArtifactDocument", () => {
 		const parserCases: ReadonlyArray<ParserCase> = [
 			{
 				artifact: "home-state",
-				valid: validHomeStateDocumentV1,
+				valid: validHomeStateDocumentV2,
 				parse: parseHomeStateDocument,
 				missingField: "currentKey",
 			},
@@ -190,7 +204,12 @@ describe("ArtifactDocument", () => {
 				),
 			).toBeInstanceOf(ArtifactDocumentInvalidError);
 			expect(
-				getLeft(parserCase.parse({ ...parserCase.valid, version: 2 })),
+				getLeft(
+					parserCase.parse({
+						...parserCase.valid,
+						version: parserCase.artifact === "home-state" ? 3 : 2,
+					}),
+				),
 			).toBeInstanceOf(ArtifactDocumentUnsupportedVersionError);
 			expect(
 				getLeft(parserCase.parse({ ...parserCase.valid, version: 0 })),
@@ -198,7 +217,7 @@ describe("ArtifactDocument", () => {
 				new ArtifactDocumentMigrationPathMissingError({
 					artifact: parserCase.artifact,
 					fromVersion: 0,
-					toVersion: 1,
+					toVersion: parserCase.artifact === "home-state" ? 2 : 1,
 					message: "Artifact migration path is missing",
 				}),
 			);
@@ -209,10 +228,10 @@ describe("ArtifactDocument", () => {
 		expect(
 			Either.getOrThrow(
 				parseHomeStateDocument(
-					JSON.parse(encodeHomeStateDocument(validHomeStateDocumentV1)),
+					JSON.parse(encodeHomeStateDocument(validHomeStateDocumentV2)),
 				),
 			),
-		).toEqual(validHomeStateDocumentV1);
+		).toEqual(validHomeStateDocumentV2);
 		expect(
 			Either.getOrThrow(
 				parsePrivateKeyPlaintext(

@@ -1,6 +1,10 @@
 import { Either } from "effect";
 import { describe, expect, it } from "vitest";
 import {
+	validHomeStateDocumentV1,
+	validHomeStateDocumentV2,
+} from "../../test/fixtures/artifacts/v1.js";
+import {
 	encodePublicIdentityString,
 	parsePublicIdentityString,
 } from "../persistence/ArtifactDocument.js";
@@ -34,11 +38,13 @@ const rotatedPrivateKey = {
 const makeHarness = (
 	options: {
 		readonly generatedPrivateKeys?: ReadonlyArray<PrivateKeyPlaintext>;
+		readonly initialHomeState?: unknown;
 		readonly nowValues?: ReadonlyArray<string>;
 	} = {},
 ) => {
-	let homeState: unknown | null = null;
+	let homeState: unknown | null = options.initialHomeState ?? null;
 	const encryptedKeys = new Map<string, string>();
+	const savedHomeStates: Array<unknown> = [];
 	const generatedPrivateKeys = options.generatedPrivateKeys ?? [privateKey];
 	let generatedPrivateKeyIndex = 0;
 	const nowValues = options.nowValues ?? ["2026-04-25T10:00:00.000Z"];
@@ -48,6 +54,7 @@ const makeHarness = (
 		loadHomeStateDocument: async () => homeState,
 		saveCurrentHomeStateDocument: async (document) => {
 			homeState = document;
+			savedHomeStates.push(document);
 		},
 		readEncryptedPrivateKey: async (ref) => encryptedKeys.get(ref) ?? "",
 		writeEncryptedPrivateKey: async ({ ref, encryptedKey }) => {
@@ -89,7 +96,12 @@ const makeHarness = (
 		randomIds: { nextOwnerId: async () => "owner_123" },
 	});
 
-	return { core, encryptedKeys, getHomeState: () => homeState };
+	return {
+		core,
+		encryptedKeys,
+		getHomeState: () => homeState,
+		getSavedHomeStates: () => savedHomeStates,
+	};
 };
 
 describe("BetterAgeCore identity lifecycle", () => {
@@ -115,7 +127,7 @@ describe("BetterAgeCore identity lifecycle", () => {
 
 		expect(getHomeState()).toEqual({
 			kind: "better-age/home-state",
-			version: 1,
+			version: 2,
 			ownerId: "owner_123",
 			displayName: "Isaac",
 			identityUpdatedAt: "2026-04-25T10:00:00.000Z",
@@ -127,7 +139,7 @@ describe("BetterAgeCore identity lifecycle", () => {
 			},
 			retiredKeys: [],
 			knownIdentities: [],
-			preferences: { rotationTtl: "3m" },
+			preferences: { rotationTtl: "3m", editorCommand: null },
 		});
 		expect(encryptedKeys.get("keys/fp_self.age")).toBe(
 			"protected:correct horse:AGE-SECRET-KEY-SELF",
@@ -181,6 +193,62 @@ describe("BetterAgeCore identity lifecycle", () => {
 			},
 			notices: [],
 		});
+	});
+
+	it("reports home status without treating missing setup as a failure", async () => {
+		const notSetup = makeHarness();
+
+		await expect(notSetup.core.queries.getHomeStatus()).resolves.toEqual({
+			result: {
+				kind: "success",
+				code: "HOME_STATUS_QUERIED",
+				value: { status: "not-setup" },
+			},
+			notices: [],
+		});
+
+		const setup = makeHarness();
+		await setup.core.commands.createSelfIdentity({
+			displayName: "Isaac",
+			passphrase: "correct horse",
+		});
+
+		await expect(setup.core.queries.getHomeStatus()).resolves.toMatchObject({
+			result: {
+				kind: "success",
+				code: "HOME_STATUS_QUERIED",
+				value: {
+					status: "setup",
+					self: {
+						ownerId: "owner_123",
+						publicIdentity: {
+							ownerId: "owner_123",
+							displayName: "Isaac",
+							publicKey: "age1self",
+						},
+						handle: "Isaac#fp_self",
+						fingerprint: "fp_self",
+						rotationTtl: "3m",
+					},
+				},
+			},
+		});
+	});
+
+	it("persists migrated home-state v1 before returning current state", async () => {
+		const { core, getHomeState, getSavedHomeStates } = makeHarness({
+			initialHomeState: validHomeStateDocumentV1,
+		});
+
+		await expect(core.queries.getHomeStatus()).resolves.toMatchObject({
+			result: {
+				kind: "success",
+				value: { status: "setup" },
+			},
+		});
+
+		expect(getHomeState()).toEqual(validHomeStateDocumentV2);
+		expect(getSavedHomeStates()).toEqual([validHomeStateDocumentV2]);
 	});
 
 	it("imports a known identity with alias and lists it without private material", async () => {

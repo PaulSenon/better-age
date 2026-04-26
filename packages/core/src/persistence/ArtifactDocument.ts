@@ -11,7 +11,8 @@ const PayloadId = Schema.String;
 const EnvText = Schema.String;
 const RotationTtl = Schema.String;
 
-const CurrentVersion = Schema.Literal(1);
+const ArtifactVersionV1 = Schema.Literal(1);
+const HomeStateVersionV2 = Schema.Literal(2);
 
 const KeyMetadataV1 = Schema.Struct({
 	publicKey: PublicKey,
@@ -38,7 +39,7 @@ const KnownIdentityV1 = Schema.Struct({
 
 export const HomeStateDocumentV1 = Schema.Struct({
 	kind: Schema.Literal("better-age/home-state"),
-	version: CurrentVersion,
+	version: ArtifactVersionV1,
 	ownerId: OwnerId,
 	displayName: DisplayName,
 	identityUpdatedAt: IsoUtcTimestamp,
@@ -54,9 +55,28 @@ export type HomeStateDocumentV1 = Schema.Schema.Type<
 	typeof HomeStateDocumentV1
 >;
 
+export const HomeStateDocumentV2 = Schema.Struct({
+	kind: Schema.Literal("better-age/home-state"),
+	version: HomeStateVersionV2,
+	ownerId: OwnerId,
+	displayName: DisplayName,
+	identityUpdatedAt: IsoUtcTimestamp,
+	currentKey: KeyMetadataV1,
+	retiredKeys: Schema.Array(RetiredKeyMetadataV1),
+	knownIdentities: Schema.Array(KnownIdentityV1),
+	preferences: Schema.Struct({
+		rotationTtl: RotationTtl,
+		editorCommand: Schema.NullOr(Schema.String),
+	}),
+});
+
+export type HomeStateDocumentV2 = Schema.Schema.Type<
+	typeof HomeStateDocumentV2
+>;
+
 export const PrivateKeyPlaintextV1 = Schema.Struct({
 	kind: Schema.Literal("better-age/private-key"),
-	version: CurrentVersion,
+	version: ArtifactVersionV1,
 	ownerId: OwnerId,
 	publicKey: PublicKey,
 	privateKey: Schema.String,
@@ -70,7 +90,7 @@ export type PrivateKeyPlaintextV1 = Schema.Schema.Type<
 
 export const PublicIdentityDocumentV1 = Schema.Struct({
 	kind: Schema.Literal("better-age/public-identity"),
-	version: CurrentVersion,
+	version: ArtifactVersionV1,
 	ownerId: OwnerId,
 	displayName: DisplayName,
 	publicKey: PublicKey,
@@ -90,7 +110,7 @@ const PayloadRecipientV1 = Schema.Struct({
 
 export const PayloadPlaintextV1 = Schema.Struct({
 	kind: Schema.Literal("better-age/payload"),
-	version: CurrentVersion,
+	version: ArtifactVersionV1,
 	payloadId: PayloadId,
 	createdAt: IsoUtcTimestamp,
 	lastRewrittenAt: IsoUtcTimestamp,
@@ -102,7 +122,7 @@ export type PayloadPlaintextV1 = Schema.Schema.Type<typeof PayloadPlaintextV1>;
 
 export const PayloadDocumentV1 = Schema.Struct({
 	kind: Schema.Literal("better-age/payload"),
-	version: CurrentVersion,
+	version: ArtifactVersionV1,
 	encryptedPayload: Schema.String,
 });
 
@@ -251,14 +271,109 @@ const parseCurrentDocument = <A, I>(
 	);
 };
 
+const parseVersionedDocument = <A>(
+	input: unknown,
+	schemas: Readonly<Record<number, Schema.Schema.AnyNoContext>>,
+	artifact: string,
+	expectedKind: string,
+	currentVersion: number,
+): Either.Either<A, ArtifactDocumentParseError> => {
+	if (typeof input !== "object" || input === null) {
+		return Either.left(
+			new ArtifactDocumentInvalidError({
+				artifact,
+				message: "Artifact document must be an object",
+			}),
+		);
+	}
+
+	const candidate = input as {
+		readonly kind?: unknown;
+		readonly version?: unknown;
+	};
+
+	if (typeof candidate.kind !== "string") {
+		return Either.left(
+			new ArtifactDocumentInvalidError({
+				artifact,
+				message: "Artifact kind is missing or malformed",
+			}),
+		);
+	}
+
+	if (candidate.kind !== expectedKind) {
+		return Either.left(
+			new ArtifactDocumentKindMismatchError({
+				artifact,
+				expectedKind,
+				actualKind: candidate.kind,
+				message: "Artifact kind does not match parser",
+			}),
+		);
+	}
+
+	const version = candidate.version;
+
+	if (typeof version !== "number" || !Number.isInteger(version)) {
+		return Either.left(
+			new ArtifactDocumentInvalidError({
+				artifact,
+				message: "Artifact version is missing or malformed",
+			}),
+		);
+	}
+
+	if (version > currentVersion) {
+		return Either.left(
+			new ArtifactDocumentUnsupportedVersionError({
+				artifact,
+				artifactVersion: version,
+				currentVersion,
+				message: "CLI is too old for this artifact version",
+			}),
+		);
+	}
+
+	const schema = schemas[version];
+
+	if (schema === undefined) {
+		return Either.left(
+			new ArtifactDocumentMigrationPathMissingError({
+				artifact,
+				fromVersion: version,
+				toVersion: currentVersion,
+				message: "Artifact migration path is missing",
+			}),
+		);
+	}
+
+	return Schema.decodeUnknownEither(schema)(input).pipe(
+		Either.map((document) => document as A),
+		Either.mapLeft(
+			() =>
+				new ArtifactDocumentInvalidError({
+					artifact,
+					message: "Invalid artifact document",
+				}),
+		),
+	);
+};
+
 export const parseHomeStateDocument = (
 	input: unknown,
-): Either.Either<HomeStateDocumentV1, ArtifactDocumentParseError> =>
-	parseCurrentDocument(
+): Either.Either<
+	HomeStateDocumentV1 | HomeStateDocumentV2,
+	ArtifactDocumentParseError
+> =>
+	parseVersionedDocument<HomeStateDocumentV1 | HomeStateDocumentV2>(
 		input,
-		HomeStateDocumentV1,
+		{
+			1: HomeStateDocumentV1,
+			2: HomeStateDocumentV2,
+		},
 		"home-state",
 		"better-age/home-state",
+		2,
 	);
 
 export const parsePrivateKeyPlaintext = (
@@ -302,7 +417,7 @@ export const parsePublicIdentityDocument = (
 	);
 
 export const encodeHomeStateDocument = (
-	document: HomeStateDocumentV1,
+	document: HomeStateDocumentV2,
 ): string => encodeJsonDocument(document);
 
 export const encodePrivateKeyPlaintext = (
@@ -382,11 +497,29 @@ export const parsePublicIdentityString = (
 };
 
 export const migrateHomeStateDocument = (
-	document: HomeStateDocumentV1,
-): MigrationResult<HomeStateDocumentV1> => ({
-	kind: "already-current",
-	document,
-});
+	document: HomeStateDocumentV1 | HomeStateDocumentV2,
+): MigrationResult<HomeStateDocumentV2> => {
+	if (document.version === 2) {
+		return {
+			kind: "already-current",
+			document,
+		};
+	}
+
+	return {
+		kind: "migrated",
+		fromVersion: 1,
+		toVersion: 2,
+		document: {
+			...document,
+			version: 2,
+			preferences: {
+				...document.preferences,
+				editorCommand: null,
+			},
+		},
+	};
+};
 
 export const migratePrivateKeyPlaintext = (
 	document: PrivateKeyPlaintextV1,

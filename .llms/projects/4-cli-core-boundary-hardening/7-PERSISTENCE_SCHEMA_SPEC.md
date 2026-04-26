@@ -24,7 +24,7 @@ better-age/public-identity
 ## Version Policy
 
 ```txt
-current home state version: 1
+current home state version: 2
 current private key plaintext version: 1
 current payload version: 1
 current public identity string version: 1
@@ -38,14 +38,14 @@ Rules:
 - older version without migration path => `*_MIGRATION_PATH_MISSING`.
 - malformed version/kind/body => `*_INVALID`.
 
-## HomeStateDocument v1
+## HomeStateDocument v2
 
 Shape:
 
 ```ts
-type HomeStateDocumentV1 = {
+type HomeStateDocumentV2 = {
   kind: "better-age/home-state";
-  version: 1;
+  version: 2;
   ownerId: OwnerId;
   displayName: DisplayName;
   identityUpdatedAt: IsoUtcTimestamp;
@@ -71,6 +71,7 @@ type HomeStateDocumentV1 = {
   }>;
   preferences: {
     rotationTtl: RotationTtl;
+    editorCommand: string | null;
   };
 };
 ```
@@ -82,6 +83,28 @@ Rules:
 - known identities are home-local address book entries.
 - local aliases are stored only in home state.
 - retired keys are local decryptability state, not exportable public identity.
+- `editorCommand` stores a remembered editor preference, or `null` when none is configured.
+
+## HomeStateDocument v1
+
+Status: supported input only, migrated to v2 on load.
+
+Difference from v2:
+
+```ts
+type HomeStateDocumentV1 = Omit<HomeStateDocumentV2, "version" | "preferences"> & {
+  version: 1;
+  preferences: {
+    rotationTtl: RotationTtl;
+  };
+};
+```
+
+Migration:
+
+```ts
+v1.preferences.editorCommand = null
+```
 
 ## Encrypted Private Key Storage
 

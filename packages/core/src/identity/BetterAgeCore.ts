@@ -2,7 +2,8 @@ import { Either } from "effect";
 import {
 	encodePayloadDocument,
 	encodePublicIdentityString,
-	type HomeStateDocumentV1,
+	type HomeStateDocumentV2,
+	migrateHomeStateDocument,
 	type PayloadDocumentV1,
 	type PayloadPlaintextV1,
 	type PrivateKeyPlaintextV1,
@@ -24,7 +25,7 @@ export type PayloadPath = string;
 export type PayloadId = string;
 export type EnvText = string;
 
-export type HomeStateDocument = HomeStateDocumentV1;
+export type HomeStateDocument = HomeStateDocumentV2;
 export type PrivateKeyPlaintext = PrivateKeyPlaintextV1;
 export type PayloadPlaintext = PayloadPlaintextV1;
 export type PayloadDocument = PayloadDocumentV1;
@@ -53,6 +54,13 @@ export type SelfIdentitySummary = {
 	readonly createdAt: IsoUtcTimestamp;
 	readonly rotationTtl: string;
 };
+
+export type HomeStatus =
+	| { readonly status: "not-setup" }
+	| {
+			readonly status: "setup";
+			readonly self: SelfIdentitySummary;
+	  };
 
 export type RetiredKeySummary = {
 	readonly fingerprint: KeyFingerprint;
@@ -278,7 +286,13 @@ const loadCurrentHomeState = async (
 		throw new Error("HOME_STATE_INVALID");
 	}
 
-	return parsed.right;
+	const migrated = migrateHomeStateDocument(parsed.right);
+
+	if (migrated.kind === "migrated") {
+		await homeRepository.saveCurrentHomeStateDocument(migrated.document);
+	}
+
+	return migrated.document;
 };
 
 const isValidLocalAlias = (alias: LocalAlias): boolean =>
@@ -926,7 +940,7 @@ export const createBetterAgeCore = (ports: BetterAgeCorePorts) => {
 
 		const homeState: HomeStateDocument = {
 			kind: "better-age/home-state",
-			version: 1,
+			version: 2,
 			ownerId,
 			displayName: input.displayName,
 			identityUpdatedAt: createdAt,
@@ -938,7 +952,7 @@ export const createBetterAgeCore = (ports: BetterAgeCorePorts) => {
 			},
 			retiredKeys: [],
 			knownIdentities: [],
-			preferences: { rotationTtl: "3m" },
+			preferences: { rotationTtl: "3m", editorCommand: null },
 		};
 
 		await ports.homeRepository.writeEncryptedPrivateKey({
@@ -1112,6 +1126,19 @@ export const createBetterAgeCore = (ports: BetterAgeCorePorts) => {
 		}
 
 		return success("SELF_IDENTITY_FOUND", toSelfIdentitySummary(homeState));
+	};
+
+	const getHomeStatus = async () => {
+		const homeState = await loadCurrentHomeState(ports.homeRepository);
+
+		if (homeState === null) {
+			return success("HOME_STATUS_QUERIED", { status: "not-setup" } as const);
+		}
+
+		return success("HOME_STATUS_QUERIED", {
+			status: "setup",
+			self: toSelfIdentitySummary(homeState),
+		} as const);
 	};
 
 	const listRetiredKeys = async () => {
@@ -1315,6 +1342,7 @@ export const createBetterAgeCore = (ports: BetterAgeCorePorts) => {
 		queries: {
 			decryptPayload,
 			exportSelfIdentityString,
+			getHomeStatus,
 			getSelfIdentity,
 			listKnownIdentities,
 			listRetiredKeys,

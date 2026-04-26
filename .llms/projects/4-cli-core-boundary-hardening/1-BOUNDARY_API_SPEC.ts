@@ -554,6 +554,10 @@ export interface SelfIdentitySummary {
 	readonly rotationIsOverdue: boolean;
 }
 
+export type HomeStatus =
+	| { readonly status: "not-setup" }
+	| { readonly status: "setup"; readonly self: SelfIdentitySummary };
+
 export interface RetiredKeySummary {
 	readonly fingerprint: KeyFingerprint;
 	readonly retiredAt: IsoUtcTimestamp;
@@ -591,7 +595,7 @@ export type BetterAgeArtifactKind =
 	| "better-age/payload"
 	| "better-age/public-identity";
 
-export type ArtifactVersion = 1;
+export type ArtifactVersion = 1 | 2;
 
 export interface HomeStateDocumentV1 {
 	readonly kind: "better-age/home-state";
@@ -624,7 +628,22 @@ export interface HomeStateDocumentV1 {
 	};
 }
 
-export type HomeStateDocument = HomeStateDocumentV1;
+export interface HomeStateDocumentV2 {
+	readonly kind: "better-age/home-state";
+	readonly version: 2;
+	readonly ownerId: OwnerId;
+	readonly displayName: DisplayName;
+	readonly identityUpdatedAt: IsoUtcTimestamp;
+	readonly currentKey: HomeStateDocumentV1["currentKey"];
+	readonly retiredKeys: HomeStateDocumentV1["retiredKeys"];
+	readonly knownIdentities: HomeStateDocumentV1["knownIdentities"];
+	readonly preferences: {
+		readonly rotationTtl: RotationTtl;
+		readonly editorCommand: string | null;
+	};
+}
+
+export type HomeStateDocument = HomeStateDocumentV2;
 
 export interface PrivateKeyPlaintextV1 {
 	readonly kind: "better-age/private-key";
@@ -989,6 +1008,11 @@ export type DecryptPayloadErrorCode =
 	| HomeWriteErrorCode;
 
 export interface BetterAgeCoreQueries {
+	getHomeStatus(): CoreMethodResult<
+		CoreResult<"HOME_STATUS_QUERIED", HomeStatus, never>,
+		BetterAgeCoreNotice
+	>;
+
 	getSelfIdentity(): CoreMethodResult<
 		CoreResult<
 			"SELF_IDENTITY_FOUND",

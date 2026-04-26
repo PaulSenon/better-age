@@ -8,7 +8,8 @@ import {
 	createNodeHomeRepository,
 	createNodePayloadRepository,
 } from "@better-age/core";
-import { type CliTerminal, runCli } from "./runCli.js";
+import { runCliWithGrammar } from "./commandGrammar.js";
+import type { CliTerminal } from "./runCli.js";
 
 export type NodeCliOptions = {
 	readonly homeDir?: string;
@@ -32,7 +33,7 @@ export const createNodeCli = (options: NodeCliOptions) => {
 
 	return {
 		run: async (argv: ReadonlyArray<string>) =>
-			await runCli({
+			await runCliWithGrammar({
 				argv,
 				core,
 				parseIdentityString: async (identityString) => {

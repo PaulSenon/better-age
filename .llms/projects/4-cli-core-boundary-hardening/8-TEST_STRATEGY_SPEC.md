@@ -95,7 +95,8 @@ Rules:
 Required immediately:
 
 ```txt
-v1 home no-op migration
+v2 home no-op migration
+v1 home -> v2 migration with `editorCommand: null`
 v1 payload no-op migration
 v1 public identity no-op migration
 wrong kind failures
@@ -104,10 +105,10 @@ malformed version failures
 missing required field failures
 ```
 
-Required when v2 exists:
+Required for future home versions:
 
 ```txt
-synthetic v1 -> v2 fixtures
+synthetic v2 -> next-version fixtures
 migration path missing fixture
 hard-broken migration fixture
 ```

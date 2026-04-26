@@ -62,3 +62,35 @@
 - Added core `queries.parseIdentityString` and wired node CLI grant identity-string parsing through it.
 - Updated `packages/cli/README.md` with command surface and stdout/stderr policy.
 - Verification passed: `pnpm -F @better-age/cli test:unit`, `pnpm -F @better-age/cli check`, `pnpm -F @better-age/core test:unit`, `pnpm test`, `pnpm check`, `git diff --check`.
+
+2026-04-26 Runtime CLI release readiness Phase 1 start:
+- Plan source: `.llms/projects/4-cli-core-boundary-hardening/plans/runtime-cli-release-readiness.md`.
+- Current phase: Grammar Tracer Bullet.
+- Scope: introduce release-facing command grammar/help/parse-error seam using `@effect/cli` concepts while delegating command execution into existing `runCli` flows.
+- Must preserve guided behavior: promptable operands optional, protocol operands strict.
+- Progress target: add grammar tests, implement minimal grammar parser/help layer, keep `runCli` flow tests passing, then full `pnpm test`, `pnpm check`, `git diff --check`.
+
+2026-04-26 Runtime CLI release readiness Phase 1 complete:
+- Added `packages/cli/src/cli/commandGrammar.ts` with release command tree metadata, help rendering, parse-error presentation, and delegation to existing `runCli` flows.
+- Added `packages/cli/src/cli/commandGrammar.test.ts` covering root help, command help, aliases, load protocol help, parse errors, flow delegation, optional promptable operands, and strict load protocol behavior.
+- Wired `createNodeCli().run` through `runCliWithGrammar`; `runCli` remains the business flow seam and existing flow tests still cover it.
+- Added `presentParseFailure` for stderr-only grammar failures with exit 2.
+- Aligned `@better-age/core` `effect` dependency to `^3.21.2` via pnpm so CLI imports of `@effect/cli` do not create duplicate Effect package warnings.
+- Verification passed: `pnpm test`, `pnpm check`, `git diff --check`.
+- Next phase: Phase 2 Home State v2 + Home Status.
+
+2026-04-26 Runtime CLI release readiness Phase 2 start:
+- Plan source: `.llms/projects/4-cli-core-boundary-hardening/plans/runtime-cli-release-readiness.md`.
+- Current phase: Home State v2 + Home Status.
+- Scope: add nullable `preferences.editorCommand`, migrate v1 to v2, expose core home status query for future interactive setup gating.
+- TDD target: artifact parse/encode/migration tests, core query tests, CLI boundary type support if needed, then `pnpm test`, `pnpm check`, `git diff --check`.
+
+2026-04-26 Runtime CLI release readiness Phase 2 complete:
+- Added `HomeStateDocumentV2` with `preferences.editorCommand: string | null`; core now creates/saves home state version 2.
+- `parseHomeStateDocument` accepts v1 and v2; `migrateHomeStateDocument` upgrades v1 to v2 with `editorCommand: null`.
+- Core `loadCurrentHomeState` persists migrated v1 docs before returning current state.
+- Added `queries.getHomeStatus()` returning success `not-setup` or `setup` with self identity summary, avoiding missing-home failure control flow for future interactive menu gating.
+- CLI `CliCore` boundary type now includes `getHomeStatus`; test fakes updated.
+- Specs updated in persistence/test strategy/boundary docs; Phase 2 checklist marked complete.
+- Verification passed: `pnpm test`, `pnpm check`, `git diff --check`.
+- Next phase: Phase 3 Hidden Secret Prompt.

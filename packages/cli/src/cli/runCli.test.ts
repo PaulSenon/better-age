@@ -187,6 +187,24 @@ const makeCore = (overrides: CoreOverrides = {}) => {
 				calls.push({ name: "verifySelfIdentityPassphrase", input });
 				return success("PASSPHRASE_VERIFIED", { ownerId: "owner_self" });
 			},
+			getHomeStatus: async () =>
+				success("HOME_STATUS_QUERIED", {
+					status: "setup" as const,
+					self: {
+						ownerId: "owner_self",
+						publicIdentity: {
+							ownerId: "owner_self",
+							displayName: "Isaac",
+							publicKey: "age1self",
+							identityUpdatedAt: "2026-04-25T10:00:00.000Z",
+						},
+						handle: "Isaac#fp_self",
+						fingerprint: "fp_self",
+						keyMode: "pq-hybrid",
+						createdAt: "2026-04-25T10:00:00.000Z",
+						rotationTtl: "3m",
+					},
+				}),
 			decryptPayload: async (input) => {
 				calls.push({ name: "decryptPayload", input });
 				return success("PAYLOAD_DECRYPTED", decryptedPayload);
