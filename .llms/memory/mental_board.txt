@@ -1,4 +1,4 @@
-Current goal: Better Age MVP reimplementation, Phase 11 complete.
+Current goal: recover release readiness after user QA found CLI UX regressions.
 
 Active state:
 - Phase 1 workspace split done: legacy CLI is `packages/cli-legacy`, private, no `bage` bin.
@@ -13,25 +13,28 @@ Active state:
 - Phase 10 varlock/load protocol slice done.
 - Phase 11 final contract hardening done.
 - Append-only implementation log: `.llms/projects/4-cli-core-boundary-hardening/11-IMPLEMENTATION_LOG.md`.
+- Runtime CLI release-readiness phases 1-9 complete.
+- Old MVP reimplementation plan phases 1-5 stale checkboxes corrected.
+- Release UX parity hardening Phase 1 complete.
+- Release UX parity hardening Phase 2 complete.
+- Release UX parity hardening Phase 3 complete.
+- Release UX parity hardening Phase 4 complete.
+- Release UX parity hardening Phase 5 complete.
+- Release UX parity hardening Phase 6 complete.
+- Release UX parity hardening Phase 7 complete.
+- CLI IO stack realignment phases 1-6 complete: `@effect/cli` grammar/help, `@inquirer/prompts` normal IO, custom raw terminal only for secure viewer/output.
 
-Phase 11 notes:
-- New CLI now has `interactive` / `i` thin session router.
-- New CLI package now publishes `bage` from `./dist/bin/bage.js`.
-- Added basic Node terminal adapter for prompts/selects over stdin/stderr.
-- Core now exposes `queries.parseIdentityString`; node CLI wires it for grant identity strings.
-- CLI README documents MVP command surface and stdout/stderr policy.
-- `@effect/cli` dependency exists, but command tree/parser integration remains deferred.
+Audit notes:
+- Previous static/spec audit was insufficient; user QA found release-blocking UX regressions.
+- Not release ready.
+- Main suspect: new CLI runtime and interactive/guided UX regressed from legacy prototype despite core structure/tests.
+- Need parity matrix against legacy prototype + active specs + user QA.
 
 Latest verification:
-- `pnpm -F @better-age/cli test:unit` passed.
-- `pnpm -F @better-age/cli check` passed.
-- `pnpm -F @better-age/core test:unit` passed.
-- `pnpm test` passed.
-- `pnpm check` passed.
-- `git diff --check` passed.
+- QA follow-up fixes passed: `pnpm test`, `pnpm check`, `git diff --check`.
 
 Next:
-- Review Phase 11 output and decide whether to run a separate build/release hardening pass.
+- Continue user manual QA against built CLI.
 
 Blockers:
-- None currently.
+- Release blocked until manual QA passes.

@@ -1,18 +1,30 @@
-import { stderr, stdin } from "node:process";
+import { stderr, stdin, stdout } from "node:process";
 import { emitKeypressEvents } from "node:readline";
-import { createInterface } from "node:readline/promises";
+import {
+	createNodePromptAdapter,
+	type NodePromptFunctions,
+} from "./nodePromptAdapter.js";
 import type { CliTerminal } from "./runCli.js";
-import { readHiddenSecret, type SecretPromptRuntime } from "./secretPrompt.js";
 import { openSecureViewer, type SecureViewerRuntime } from "./secureViewer.js";
 
-type NodeTerminalRuntime = SecretPromptRuntime &
-	Partial<Pick<SecureViewerRuntime, "emitKeypressEvents">> & {
-		readonly env?: Readonly<Record<string, string | undefined>>;
-		readonly stderr: SecretPromptRuntime["stderr"] &
-			Partial<SecureViewerRuntime["stderr"]>;
-		readonly stdin: SecretPromptRuntime["stdin"] &
-			Partial<SecureViewerRuntime["stdin"]>;
-	};
+type NodeTerminalStdin = Partial<SecureViewerRuntime["stdin"]> & {
+	readonly isTTY?: boolean;
+};
+
+type NodeTerminalStderr = Partial<SecureViewerRuntime["stderr"]> & {
+	readonly isTTY?: boolean;
+	write(chunk: string): void;
+};
+
+type NodeTerminalRuntime = Partial<
+	Pick<SecureViewerRuntime, "emitKeypressEvents">
+> & {
+	readonly env?: Readonly<Record<string, string | undefined>>;
+	readonly promptFns?: NodePromptFunctions;
+	readonly stderr: NodeTerminalStderr;
+	readonly stdin: NodeTerminalStdin;
+	readonly stdout?: Pick<typeof stdout, "write">;
+};
 
 const defaultRuntime: NodeTerminalRuntime = {
 	emitKeypressEvents: (stream) => {
@@ -21,22 +33,7 @@ const defaultRuntime: NodeTerminalRuntime = {
 	env: process.env,
 	stderr,
 	stdin,
-};
-
-const question = async (
-	runtime: NodeTerminalRuntime,
-	label: string,
-): Promise<string> => {
-	const readline = createInterface(
-		runtime.stdin as NodeJS.ReadStream,
-		runtime.stderr as NodeJS.WriteStream,
-	);
-
-	try {
-		return await readline.question(`${label}: `);
-	} finally {
-		readline.close();
-	}
+	stdout,
 };
 
 const hasSecureViewerRuntime = (
@@ -60,8 +57,17 @@ export const createNodeTerminal = (
 		return { mode: "headless", presentation: { color: false } };
 	}
 
+	const promptAdapter = createNodePromptAdapter({
+		...(runtime.promptFns === undefined
+			? {}
+			: { promptFns: runtime.promptFns }),
+		stderr: runtime.stderr as NodeJS.WritableStream,
+		stdin: runtime.stdin as unknown as NodeJS.ReadableStream,
+	});
+
 	return {
 		mode: "interactive",
+		confirm: promptAdapter.confirm,
 		presentation: { color: runtime.env?.NO_COLOR === undefined },
 		...(hasSecureViewerRuntime(runtime)
 			? {
@@ -70,33 +76,13 @@ export const createNodeTerminal = (
 					},
 				}
 			: {}),
-		promptSecret: async (label) => await readHiddenSecret(runtime, label),
-		promptText: async (label) => await question(runtime, label),
-		selectOne: async (label, choices) => {
-			const enabledChoices = choices.filter((choice) => !choice.disabled);
-
-			runtime.stderr.write(`${label}\n`);
-
-			for (const [index, choice] of choices.entries()) {
-				const marker = choice.disabled ? " -" : `${index + 1}.`;
-				runtime.stderr.write(`${marker} ${choice.label}\n`);
-			}
-
-			while (true) {
-				const answer = await question(runtime, "Select");
-				const selectedIndex = Number.parseInt(answer, 10) - 1;
-				const selected = choices[selectedIndex];
-
-				if (selected !== undefined && !selected.disabled) {
-					return selected.value;
-				}
-
-				if (enabledChoices.length === 0) {
-					return "";
-				}
-
-				runtime.stderr.write("Invalid selection\n");
-			}
+		waitForEnter: promptAdapter.waitForEnter,
+		writeResult: (result) => {
+			runtime.stdout?.write(result.stdout);
+			runtime.stderr.write(result.stderr);
 		},
+		promptSecret: promptAdapter.promptSecret,
+		promptText: promptAdapter.promptText,
+		selectOne: promptAdapter.selectOne,
 	};
 };

@@ -205,3 +205,109 @@
 - Added `packages/cli/src/cli/releaseDocs.test.ts` to keep release docs and manual QA checklist from regressing.
 - Phase 9 checklist marked complete in runtime CLI release readiness plan; all phases in that plan are now complete.
 - Verification passed: `pnpm -F @better-age/cli test:unit`, `pnpm -F @better-age/cli check`, `pnpm test`, `pnpm check`, `git diff --check`.
+
+2026-04-26 Final MVP release-readiness audit:
+- Checked project plans, release readiness plan, command grammar, command/core implementation surface, tests, docs, and known TODO/deferred markers.
+- Found only stale unchecked boxes in older MVP reimplementation plan phases 1-5; code/tests/docs already evidenced completion, so marked those acceptance criteria complete.
+- Runtime CLI release readiness plan remains fully complete.
+- No missing MVP command or accepted release-readiness feature found in static/spec audit.
+- Known accepted gaps remain non-MVP/deferred: Docker/pseudo-TTY E2E, headless passphrase injection, prototype schema compatibility, future payload identity import flow.
+- Final verification after doc cleanup passed: `pnpm test`, `pnpm check`, `git diff --check`.
+
+2026-04-26 User QA overturned release-readiness result:
+- User reports severe release-blocking CLI UX regressions vs legacy prototype.
+- Examples: menus are numbered readline prompts instead of keyboard-navigable selects; help is custom/manual instead of proper `@effect/cli` behavior; interactive session buffers command output until quit; invalid identity import appears silent during session; Ctrl-C navigates/backtracks instead of exiting; guided path/identity suggestions regressed; payload file should likely be human/comment envelope plus BEGIN/END armored block.
+- Current conclusion: not release ready. Core may be structurally OK, but CLI runtime/parity/polish needs a dedicated release UX parity hardening track.
+
+2026-04-26 CLI IO stack realignment phases 1-6 complete:
+- New normal prompt stack is `@effect/cli` for command grammar/help/parser and `@inquirer/prompts` behind `nodePromptAdapter` for select/text/password/confirm/pause.
+- Removed normal prompt dependency on custom raw-key select/readline code; raw terminal handling is isolated to secure viewer and strict stdout/stderr output.
+- Editor picker uses shared select; remember decision uses shared confirm. Inquirer `editor` prompt intentionally not adopted because Better Age needs explicit editor discovery plus saved preference behavior.
+- Release UX parity plan now gates Phase 4 Payload File Envelope behind this IO realignment; manual QA covers redraw-in-place, keyboard navigation, disabled rows, Ctrl-C/cancellation, password hiding, immediate output, and raw stdout.
+- No markdown/spec tests added; prior docs test remains deleted.
+- Verification passed: `pnpm test`, `pnpm check`, `git diff --check`.
+- Next: resume Release UX Parity Hardening Phase 4, Payload File Envelope.
+
+2026-04-26 Release UX Parity Phase 4 complete:
+- Added `packages/core/src/persistence/PayloadFileEnvelope.ts` for Better Age file envelope formatting/parsing.
+- Core payload create/edit/grant/revoke/update now persist comments + one `BETTER AGE PAYLOAD` block around inner age armor.
+- Core payload reads extract the inner age armor and reject missing/duplicate/malformed/non-age-armored envelopes as `PAYLOAD_INVALID`.
+- Real adapter integration now asserts outer Better Age wrapper plus inner age armor.
+- Verification passed after one stale integration assertion fix: `pnpm test`, `pnpm check`, `git diff --check`.
+- Next: Release UX Parity Phase 5, Guided Payload UX.
+
+2026-04-26 Release UX Parity Phase 5 complete:
+- Existing payload guided flows now discover `.env.*.enc` in cwd via Node CLI adapter.
+- Missing existing payload path behavior: zero candidates prompts path; one/many candidates use Inquirer select with candidates, Enter Path, Cancel.
+- Create flow now defaults empty interactive input to `.env.enc`.
+- Create collisions in interactive mode show Override, Change Name, Cancel; override calls core create with `overwrite: true`.
+- Core create supports explicit `overwrite: true` while preserving duplicate guard by default.
+- Verification passed: `pnpm test`, `pnpm check`, `git diff --check`.
+- Next: Release UX Parity Phase 6, Guided Identity UX.
+
+2026-04-26 Release UX Parity Phase 6 complete:
+- Identity picker rows now render compactly as alias/name + handle + contextual tag, without full public-key dumping.
+- Guided grant picker keeps self/already-granted disabled and supports custom identity string.
+- Custom guided grant string now retries invalid input, imports the identity, then grants it.
+- Guided `identity import` now retries invalid identity strings in interactive mode; duplicate alias retry remains covered.
+- Guided `identity forget` now uses a picker over known identities only, with Cancel; it does not show self or payload identities.
+- Revoke picker remains payload-recipient-only and has no arbitrary identity-string entry.
+- Verification passed: `pnpm test`, `pnpm check`, `git diff --check`.
+- Next: Release UX Parity Phase 7 docs/final QA.
+
+2026-04-26 Release UX Parity Phase 7 complete:
+- `packages/cli/README.md` now documents `@effect/cli` grammar, Inquirer prompt stack, guided payload UX, guided identity UX, payload envelope, and machine stdout policy.
+- `packages/core/README.md` now documents core ownership of Better Age payload envelope parsing/formatting.
+- `docs/manual-qa.md` remains the release QA gate and records current human result as pending.
+- Automated verification passed: `pnpm test`, `pnpm check`, `git diff --check`.
+- Release readiness is not claimed until the user runs and passes manual QA.
+
+2026-04-26 QA follow-up fixes:
+- Fixed Node payload discovery: `.env.enc` now matches alongside `.env.*.enc`.
+- Compact identity output now avoids key/fingerprint fields in normal list, inspect, grant/revoke/forget picker rows; rows use display/alias + owner id + contextual tags.
+- Invalid edit save now logs `PAYLOAD_ENV_INVALID`, then shows Reopen Editor / Cancel while preserving edited text for reopen.
+- Specs/docs updated to clarify `.env.enc` discovery and invalid edit recovery.
+- Verification passed: `pnpm test`, `pnpm check`, `git diff --check`.
+- Suggested next: use `domain-model` to re-grill target as "legacy feature parity unless explicitly deprecated", build parity matrix from legacy tests/specs/user QA, then implement with TDD plus real terminal/manual or PTY coverage.
+
+2026-04-26 Release UX parity hardening PRD:
+- Created `.llms/projects/4-cli-core-boundary-hardening/0-GRILL-ME-release-ux-parity-hardening.md`.
+- Created `.llms/projects/4-cli-core-boundary-hardening/13-PRD_RELEASE_UX_PARITY_HARDENING.md`.
+- Updated `CONTEXT.md` with terms for UX Parity Floor, Parity Matrix, Keyboard Select, Interactive Result Pause, Abort Signal, Payload Path Picker, Payload Creation Target, Identity Picker, Compact Identity Line, Guided Retry, Payload File Envelope.
+- Locked key release blockers: real `@effect/cli`; keyboard select everywhere; immediate interactive output; Ctrl-C abort 130; guided payload/identity pickers; visible guided retries; Better Age payload file envelope wrapping untouched age armor; manual QA as primary E2E gate.
+
+2026-04-26 Release UX parity hardening Phase 1 complete:
+- Created approved tracer plan at `.llms/projects/4-cli-core-boundary-hardening/plans/release-ux-parity-hardening.md`.
+- Added release UX parity matrix at `.llms/projects/4-cli-core-boundary-hardening/14-RELEASE_UX_PARITY_MATRIX.md`.
+- Expanded `docs/manual-qa.md` with release-blocking UX QA gate: keyboard navigation, Ctrl-C abort, immediate interactive feedback, guided suggestions, guided identity flows, payload envelope, machine stdout.
+- Removed markdown/docs contract testing after user correction; specs, PRDs, plans, and manual QA are review artifacts, not code-test targets.
+- Phase 1 acceptance criteria marked complete.
+
+2026-04-26 Release UX parity hardening Phase 2 complete:
+- Replaced the new CLI hand-rendered command/help/parser gate with a real `@effect/cli` command tree in `packages/cli/src/cli/commandGrammar.ts`.
+- `runCliWithGrammar` now lets `@effect/cli` own root/command help and parse validation, captures its stdout/stderr through `Console.withConsole`, provides `NodeContext.layer`, maps parser failures through the presenter, and delegates grammar-accepted commands to existing flow routing.
+- Promptable operands remain optional in the grammar for guided flows; strict `load --protocol-version` still fails before prompts.
+- Added explicit CLI dependencies on `@effect/platform` and `@effect/platform-node` through `pnpm`.
+- Updated command grammar and bundle smoke tests; removed the duplicate custom command-spec renderer.
+- Phase 2 acceptance criteria marked complete.
+
+2026-04-26 Release UX parity hardening Phase 3 complete:
+- Added `writeResult` and `waitForEnter` hooks to `CliTerminal`; interactive sessions now flush each command result immediately when a terminal writer exists instead of buffering until quit.
+- Interactive sessions pause only after primary stdout screens (for example guided identity export/list-style output), not after simple success/status stderr messages.
+- Interactive menu Ctrl-C is caught as `CliPromptCancelledError` and returns `[ERROR] CANCELLED` with exit code 130; it is not treated as Back.
+- Replaced `createNodeTerminal.selectOne` numbered readline UX with raw keypress selection using up/down/j/k, Enter to select, Escape/Ctrl-C to cancel, and raw-mode cleanup.
+- Node terminal now writes interactive command results directly to stdout/stderr; final CLI result remains empty for already-written interactive output to avoid delayed/duplicate messages.
+- Editor picker and update-required choices already flow through the same `selectOne` adapter, so they inherit keyboard navigation.
+- Phase 3 acceptance criteria marked complete.
+
+2026-04-26 CLI IO stack realignment PRD:
+- User caught that the custom raw-key select from Phase 3 redraws by appending frames instead of clearing/redrawing in place.
+- Research showed legacy used `@effect/cli/Prompt.select`; official `@inquirer/prompts` also provides polished prompt primitives and runtime context/cancel support.
+- Decision: stop before Phase 4 and write a new PRD to clean CLI implementation structure around `@effect/cli` for grammar, `@effect/platform/Terminal` for Effect terminal integration, and `@inquirer/prompts` for normal interactive IO.
+- Added `.llms/projects/4-cli-core-boundary-hardening/15-PRD_CLI_IO_STACK_REALIGNMENT.md`.
+- Direction: delete custom select renderer, centralize prompt adapter, keep raw stdout policies and isolated secure viewer, avoid fighting tools.
+
+2026-04-26 CLI IO stack realignment plan:
+- Added `.llms/projects/4-cli-core-boundary-hardening/plans/cli-io-stack-realignment.md`.
+- Six phases: Prompt Boundary And Dependency Spine; Inquirer Select As The Only Normal Picker; Inquirer Text/Password/Pause; Editor Flow Realignment; Secure Viewer And Machine Output Isolation; Release Plan Rebase And Cleanup.
+- This plan blocks returning to release UX parity Phase 4 Payload File Envelope.

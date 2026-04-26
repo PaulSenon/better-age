@@ -22,6 +22,10 @@ _Avoid_: Generic identity model, whole identity entity
 The decrypted structured payload body containing metadata plus `envText`.
 _Avoid_: Payload json, inner blob, container
 
+**Payload File Envelope**:
+The human-readable outer file format around an age-armored encrypted payload, using `BETTER AGE PAYLOAD` begin/end markers plus explanatory comments.
+_Avoid_: Raw JSON payload file, opaque binary file, replacing age armor
+
 **Identity Snapshot**:
 The canonical versioned representation of one identity state that may be serialized in different containers such as home records, payload recipient entries, or identity strings.
 _Avoid_: Identity string, contact row, recipient row
@@ -64,6 +68,14 @@ _Avoid_: Library package, source export, monorepo workspace command
 Capability-detected minimal color and emphasis applied only to human-facing terminal output.
 _Avoid_: TUI, theme, machine output formatting
 
+**UX Parity Floor**:
+The new CLI must preserve useful end-user capabilities from the legacy prototype unless an intentional change is explicitly documented.
+_Avoid_: 1:1 implementation parity, exact transcript parity, preserving rough prototype output
+
+**Parity Matrix**:
+The audit table that classifies each legacy user-visible behavior as keep, change, drop, defer, or unknown.
+_Avoid_: Raw test copy list, implementation migration checklist
+
 **Secure Viewer**:
 The isolated in-process readonly terminal surface used by `view` to render plaintext without writing it to stdout.
 _Avoid_: Pager, less, cat view
@@ -71,6 +83,38 @@ _Avoid_: Pager, less, cat view
 **Secret Prompt**:
 The TTY-only hidden-input prompt used to acquire a **Passphrase** without exposing it through argv, env, stdout, or piped stdin.
 _Avoid_: Text prompt, readline question, password flag
+
+**Keyboard Select**:
+A keyboard-navigable terminal choice prompt used for interactive menus and guided pickers.
+_Avoid_: Numbered readline choice prompt, typed index selection
+
+**Interactive Result Pause**:
+A short wait-for-Enter step after an interactive-session command displays primary human-readable output that would otherwise be hidden by menu redraw.
+_Avoid_: Buffering all output until session exit, pausing after every success log
+
+**Abort Signal**:
+Ctrl-C in any interactive CLI surface; it means abort immediately with terminal cleanup.
+_Avoid_: Back navigation, menu cancel, silent return
+
+**Payload Path Picker**:
+The guided interactive flow for selecting an existing encrypted payload path from discovered current-directory candidates or custom input.
+_Avoid_: Blind text-only prompt, exact-only path input
+
+**Payload Creation Target**:
+The guided interactive flow for choosing where to create a new encrypted payload, including default name and collision decision.
+_Avoid_: Existing-payload picker, silent overwrite, unconditional collision failure
+
+**Identity Picker**:
+The guided interactive flow for selecting an identity from merged self, local known identities, payload recipients, and custom identity-string input.
+_Avoid_: Text-only identity prompt, public-key-heavy list, local-only picker
+
+**Compact Identity Line**:
+The normal human rendering for identities in lists and pickers: alias/display name, derived handle, and contextual tags without full public key noise.
+_Avoid_: Full public key row, raw JSON, untagged owner id only
+
+**Guided Retry**:
+The interactive behavior where invalid guided input is shown immediately and the user can correct or cancel within the same flow.
+_Avoid_: Silent acceptance, delayed error after menu exit, hard exit on recoverable guided input
 
 **Editor Preference**:
 The home-local preferred external editor used by `edit` when no environment editor override is set.
@@ -177,6 +221,7 @@ _Avoid_: Canonical display name, embedded identity field
 ## Relationships
 
 - A **Home State**, **Identity String**, and **Payload Envelope** each carry their own **Artifact Schema Version**.
+- A **Payload File Envelope** wraps, but does not replace, the inner age armored encrypted file.
 - **Home Status** is the CLI-facing setup gate derived from **Home State**.
 - An **Identity Snapshot** may appear in multiple serialized containers, including **Identity String**, home records, and payload recipients.
 - Identity evolution is centered on one canonical **Identity Snapshot** schema.
@@ -191,7 +236,7 @@ _Avoid_: Canonical display name, embedded identity field
 - **Fingerprint** is a **Derived Fingerprint**, not a stored field of the **Public Identity Snapshot**.
 - The current target persisted fields of **Public Identity Snapshot** are `ownerId`, `publicKey`, `displayName`, and `identityUpdatedAt`.
 - A **Load Protocol** is a **Compatibility Gate**, not a persisted artifact schema.
-- A **Command Grammar** owns command shape and parse-time behavior, but delegates execution to command flows.
+- A **Command Grammar** owns command shape and parse-time behavior through `@effect/cli`, and delegates execution to command flows.
 - A **Standalone CLI Bundle** is the primary MVP release artifact.
 - `@better-age/core` may remain an internal dependency bundled into the **Standalone CLI Bundle** for MVP.
 - **Human Output Styling** is presentation-only and never applies to machine stdout.
@@ -199,6 +244,16 @@ _Avoid_: Canonical display name, embedded identity field
 - A **Secure Viewer** is a release requirement and stays behind the terminal/viewer adapter boundary.
 - An **Interactive Session** is state-aware: before setup it offers setup/quit only; after setup it offers files/identities/quit.
 - An **Interactive Session** does not expose **Load** because **Load** belongs to the machine-output path.
+- The **UX Parity Floor** is user-visible capability parity, not source-code reuse or exact textual output parity.
+- A **Parity Matrix** is required before declaring release readiness when replacing prototype CLI UX.
+- A **Keyboard Select** is required for release-facing interactive menus and guided pickers.
+- An **Interactive Result Pause** is used for primary output screens such as identity export, but not for simple success/status logs.
+- An **Abort Signal** is never interpreted as Back.
+- A **Payload Path Picker** discovers current-directory `.env.*.enc` candidates and always allows custom path entry.
+- A **Payload Creation Target** defaults to `.env.enc` and resolves collisions through explicit interactive choice.
+- An **Identity Picker** merges relevant identity sources and overlays local aliases.
+- A **Compact Identity Line** is used for normal identity display; full public keys are not shown by default.
+- A **Guided Retry** is required for recoverable invalid guided input.
 - A **Secret Prompt** is required for **Passphrase** acquisition in release-ready CLI runtime adapters.
 - A **Secret Prompt** must fail before prompting when no interactive TTY is available.
 - An **Editor Preference** is overridden by `$VISUAL` / `$EDITOR`.

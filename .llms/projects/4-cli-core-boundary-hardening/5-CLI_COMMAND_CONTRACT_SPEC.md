@@ -288,7 +288,9 @@ if editor cancel:
 if edited text identical:
   success unchanged
 if invalid .env:
-  show validation error and reopen editor with edited text
+  show validation error
+  ask Reopen Editor / Cancel
+  if reopen, reopen editor with edited text
 if valid changed:
   call editPayload
   success edited

@@ -18,6 +18,7 @@ export type NodeEditorChoice = {
 
 export type NodeEditorRuntime = {
 	readonly commandExists: (command: string) => Promise<boolean>;
+	readonly confirm?: (label: string) => Promise<boolean>;
 	readonly createTempFile: (initialText: string) => Promise<string>;
 	readonly env: Partial<Record<"EDITOR" | "VISUAL", string | undefined>>;
 	readonly getSavedEditorCommand: () => Promise<string | null>;
@@ -99,12 +100,7 @@ const resolveEditorCommand = async (
 		return null;
 	}
 
-	const persistence = await runtime.selectOne("Remember editor?", [
-		{ value: "once", label: "Just once", disabled: false },
-		{ value: "remember", label: "Remember", disabled: false },
-	]);
-
-	if (persistence === "remember") {
+	if ((await runtime.confirm?.("Remember editor?")) === true) {
 		await runtime.setSavedEditorCommand(selected);
 	}
 
@@ -150,11 +146,13 @@ const defaultCreateTempFile = async (initialText: string) => {
 };
 
 export const createDefaultNodeEditorRuntime = (input: {
+	readonly confirm?: NodeEditorRuntime["confirm"];
 	readonly getSavedEditorCommand: () => Promise<string | null>;
 	readonly isInteractive: boolean;
 	readonly selectOne?: NodeEditorRuntime["selectOne"];
 	readonly setSavedEditorCommand: (command: string) => Promise<void>;
 }): NodeEditorRuntime => ({
+	...(input.confirm === undefined ? {} : { confirm: input.confirm }),
 	...(input.selectOne === undefined ? {} : { selectOne: input.selectOne }),
 	commandExists: async (command) =>
 		await new Promise<boolean>((resolve) => {

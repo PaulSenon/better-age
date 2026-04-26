@@ -620,7 +620,8 @@ if edited text is identical:
 
 if edited text is invalid .env:
   show validation error
-  reopen editor with previous edited text
+  ask Reopen Editor / Cancel
+  if reopen, reopen editor with previous edited text
   allow user to fix or cancel
 
 if edited text is valid and changed:

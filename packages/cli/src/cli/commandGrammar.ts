@@ -1,16 +1,8 @@
 import { Args, Command, Options } from "@effect/cli";
-import { Effect } from "effect";
+import { NodeContext } from "@effect/platform-node";
+import { Console, Effect } from "effect";
 import { presentParseFailure, styleRunCliResult } from "./presenter.js";
 import { type RunCliInput, type RunCliResult, runCli } from "./runCli.js";
-
-type CommandSpec = {
-	readonly path: readonly [string] | readonly [string, string];
-	readonly aliases?: ReadonlyArray<string>;
-	readonly usage: string;
-	readonly purpose: string;
-	readonly operands?: ReadonlyArray<string>;
-	readonly flags?: ReadonlyArray<string>;
-};
 
 const optionalPayload = Args.optional(Args.text({ name: "payload" }));
 const optionalIdentityReference = Args.optional(
@@ -43,7 +35,7 @@ const revokeCommand = Command.make(
 	noOp,
 ).pipe(Command.withDescription("Revoke payload access from an identity."));
 
-const identityCommand = Command.make("identity", {}, noOp).pipe(
+const identityCommand = Command.make("identity").pipe(
 	Command.withDescription("Manage local identities."),
 	Command.withSubcommands([
 		Command.make("export", {}, noOp).pipe(
@@ -80,7 +72,7 @@ const identityCommand = Command.make("identity", {}, noOp).pipe(
 	]),
 );
 
-export const releaseCommandGrammar = Command.make("bage", {}, noOp).pipe(
+export const releaseCommandGrammar = Command.make("bage").pipe(
 	Command.withDescription(
 		"Small CLI wrapper around age-encrypted env payloads.",
 	),
@@ -106,252 +98,143 @@ export const releaseCommandGrammar = Command.make("bage", {}, noOp).pipe(
 	]),
 );
 
-const commandSpecs: ReadonlyArray<CommandSpec> = [
-	{
-		path: ["create"],
-		usage: "Usage: bage create [payload]",
-		purpose: "Create an encrypted payload.",
-		operands: ["[payload]"],
-	},
-	{
-		path: ["edit"],
-		usage: "Usage: bage edit [payload]",
-		purpose: "Edit encrypted payload env text.",
-		operands: ["[payload]"],
-	},
-	{
-		path: ["grant"],
-		usage: "Usage: bage grant [payload] [identity-ref]",
-		purpose: "Grant payload access to an identity.",
-		operands: ["[payload]", "[identity-ref]"],
-	},
-	{
-		path: ["inspect"],
-		usage: "Usage: bage inspect [payload]",
-		purpose: "Inspect encrypted payload metadata.",
-		operands: ["[payload]"],
-	},
-	{
-		path: ["load"],
-		usage: "Usage: bage load [payload] --protocol-version=1",
-		purpose: "Decrypt payload for varlock.",
-		operands: ["[payload]"],
-		flags: ["--protocol-version=1"],
-	},
-	{
-		path: ["revoke"],
-		usage: "Usage: bage revoke [payload] [identity-ref]",
-		purpose: "Revoke payload access from an identity.",
-		operands: ["[payload]", "[identity-ref]"],
-	},
-	{
-		path: ["update"],
-		usage: "Usage: bage update [payload]",
-		purpose: "Rewrite payload with current metadata.",
-		operands: ["[payload]"],
-	},
-	{
-		path: ["view"],
-		usage: "Usage: bage view [payload]",
-		purpose: "View encrypted payload env text safely.",
-		operands: ["[payload]"],
-	},
-	{
-		path: ["setup"],
-		usage: "Usage: bage setup [--name <display-name>]",
-		purpose: "Create the local identity.",
-		flags: ["--name <display-name>"],
-	},
-	{
-		path: ["interactive"],
-		aliases: ["i"],
-		usage: "Usage: bage interactive",
-		purpose: "Open the interactive command picker.",
-	},
-	{
-		path: ["identity", "export"],
-		usage: "Usage: bage identity export",
-		purpose: "Print current public identity string.",
-	},
-	{
-		path: ["identity", "forget"],
-		usage: "Usage: bage identity forget [identity-ref]",
-		purpose: "Forget a known identity.",
-		operands: ["[identity-ref]"],
-	},
-	{
-		path: ["identity", "import"],
-		usage: "Usage: bage identity import [identity-string] [--alias <alias>]",
-		purpose: "Import a public identity string.",
-		operands: ["[identity-string]"],
-		flags: ["--alias <alias>"],
-	},
-	{
-		path: ["identity", "list"],
-		usage: "Usage: bage identity list",
-		purpose: "List self, known identities, and retired keys.",
-	},
-	{
-		path: ["identity", "passphrase"],
-		aliases: ["pass", "pw"],
-		usage: "Usage: bage identity passphrase",
-		purpose: "Change the identity key passphrase.",
-	},
-	{
-		path: ["identity", "rotate"],
-		usage: "Usage: bage identity rotate",
-		purpose: "Rotate the current public identity.",
-	},
-];
-
-const rootCommands = [
-	"create",
-	"edit",
-	"grant",
-	"inspect",
-	"load",
-	"revoke",
-	"update",
-	"view",
-	"identity",
-	"setup",
-	"interactive",
-	"i",
-] as const;
-
-const identityCommands = [
-	"export",
-	"forget",
-	"import",
-	"list",
-	"passphrase",
-	"pass",
-	"pw",
-	"rotate",
-] as const;
-
-const renderList = (entries: ReadonlyArray<string>): string =>
-	entries.map((entry) => `  ${entry}\n`).join("");
-
-const rootHelp = (): RunCliResult => ({
-	exitCode: 0,
-	stdout: [
-		"Usage: bage <command>\n",
-		"\nCommands:\n",
-		renderList(rootCommands),
-	].join(""),
-	stderr: "",
-});
-
-const identityHelp = (): RunCliResult => ({
-	exitCode: 0,
-	stdout: [
-		"Usage: bage identity <command>\n",
-		"\nCommands:\n",
-		renderList(identityCommands),
-	].join(""),
-	stderr: "",
-});
-
-const commandHelp = (spec: CommandSpec): RunCliResult => {
-	const lines = [spec.usage, "", spec.purpose];
-
-	if (spec.aliases !== undefined && spec.aliases.length > 0) {
-		lines.push("", `Aliases: ${spec.aliases.join(", ")}`);
-	}
-
-	if (spec.operands !== undefined && spec.operands.length > 0) {
-		lines.push("", "Operands:", renderList(spec.operands).trimEnd());
-	}
-
-	if (spec.flags !== undefined && spec.flags.length > 0) {
-		lines.push("", "Flags:", renderList(spec.flags).trimEnd());
-	}
-
-	return { exitCode: 0, stdout: `${lines.join("\n")}\n`, stderr: "" };
-};
-
-const firstNonOption = (argv: ReadonlyArray<string>) =>
-	argv.find((token) => !token.startsWith("-"));
-
-const hasHelpFlag = (argv: ReadonlyArray<string>) =>
-	argv.includes("--help") || argv.includes("-h");
-
-const findCommandSpec = (argv: ReadonlyArray<string>) =>
-	commandSpecs.find((spec) =>
-		spec.path.every((part, index) => argv[index] === part),
-	);
-
-const stripHelpFlags = (argv: ReadonlyArray<string>) =>
-	argv.filter((token) => token !== "--help" && token !== "-h");
-
 const styleResult = (input: RunCliInput, result: RunCliResult) =>
 	styleRunCliResult(result, {
 		color: input.terminal.presentation?.color ?? false,
 	});
 
-const validateCommandPath = (
+const toConsoleLine = (args: ReadonlyArray<unknown>) =>
+	`${args.map(String).join(" ")}\n`;
+
+const makeCaptureConsole = () => {
+	let stdout = "";
+	let stderr = "";
+	const appendStdout = (...args: ReadonlyArray<unknown>) =>
+		Effect.sync(() => {
+			stdout += toConsoleLine(args);
+		});
+	const appendStderr = (...args: ReadonlyArray<unknown>) =>
+		Effect.sync(() => {
+			stderr += toConsoleLine(args);
+		});
+	const noop = () => Effect.void;
+	const unsafeNoop = () => {};
+
+	return {
+		get stderr() {
+			return stderr;
+		},
+		get stdout() {
+			return stdout;
+		},
+		console: {
+			[Console.TypeId]: Console.TypeId,
+			assert: (condition: boolean, ...args: ReadonlyArray<unknown>) =>
+				condition ? Effect.void : appendStderr(...args),
+			clear: Effect.sync(() => {
+				stdout = "";
+				stderr = "";
+			}),
+			count: noop,
+			countReset: noop,
+			debug: appendStderr,
+			dir: appendStdout,
+			dirxml: appendStdout,
+			error: appendStderr,
+			group: noop,
+			groupEnd: Effect.void,
+			info: appendStdout,
+			log: appendStdout,
+			table: appendStdout,
+			time: noop,
+			timeEnd: noop,
+			timeLog: appendStdout,
+			trace: appendStderr,
+			warn: appendStderr,
+			unsafe: {
+				assert: unsafeNoop,
+				clear: unsafeNoop,
+				count: unsafeNoop,
+				countReset: unsafeNoop,
+				debug: unsafeNoop,
+				dir: unsafeNoop,
+				dirxml: unsafeNoop,
+				error: unsafeNoop,
+				group: unsafeNoop,
+				groupCollapsed: unsafeNoop,
+				groupEnd: unsafeNoop,
+				info: unsafeNoop,
+				log: unsafeNoop,
+				table: unsafeNoop,
+				time: unsafeNoop,
+				timeEnd: unsafeNoop,
+				timeLog: unsafeNoop,
+				trace: unsafeNoop,
+				warn: unsafeNoop,
+			},
+		} satisfies Console.Console,
+	};
+};
+
+const grammarRunner = Command.run(releaseCommandGrammar, {
+	name: "bage",
+	version: "0.0.1",
+});
+
+const runGrammar = async (
 	argv: ReadonlyArray<string>,
-): RunCliResult | null => {
-	const command = firstNonOption(argv);
+): Promise<
+	| {
+			readonly kind: "accepted";
+			readonly stdout: string;
+			readonly stderr: string;
+	  }
+	| {
+			readonly kind: "rejected";
+			readonly stdout: string;
+			readonly stderr: string;
+	  }
+> => {
+	const capture = makeCaptureConsole();
 
-	if (command === undefined) {
-		return presentParseFailure("COMMAND_MISSING", "pass a command");
-	}
-
-	if (!rootCommands.includes(command as (typeof rootCommands)[number])) {
-		return presentParseFailure(
-			"COMMAND_UNKNOWN",
-			`unknown command "${command}"`,
+	try {
+		await Effect.runPromise(
+			grammarRunner(["node", "bage", ...argv]).pipe(
+				Console.withConsole(capture.console),
+				Effect.provide(NodeContext.layer),
+			),
 		);
+		return {
+			kind: "accepted",
+			stdout: capture.stdout,
+			stderr: capture.stderr,
+		};
+	} catch {
+		return {
+			kind: "rejected",
+			stdout: capture.stdout,
+			stderr: capture.stderr,
+		};
 	}
-
-	if (command !== "identity") {
-		return null;
-	}
-
-	const subcommand = argv[1];
-
-	if (
-		subcommand === undefined ||
-		!identityCommands.includes(subcommand as (typeof identityCommands)[number])
-	) {
-		return presentParseFailure(
-			"COMMAND_UNKNOWN",
-			subcommand === undefined
-				? 'unknown command "identity"'
-				: `unknown command "identity ${subcommand}"`,
-		);
-	}
-
-	return null;
 };
 
 export const runCliWithGrammar = async (
 	input: RunCliInput,
 ): Promise<RunCliResult> => {
-	if (hasHelpFlag(input.argv)) {
-		const helpArgv = stripHelpFlags(input.argv);
+	const grammarResult = await runGrammar(input.argv);
 
-		if (helpArgv.length === 0) {
-			return rootHelp();
-		}
-
-		if (helpArgv[0] === "identity" && helpArgv.length === 1) {
-			return identityHelp();
-		}
-
-		const spec = findCommandSpec(helpArgv);
-
-		if (spec !== undefined) {
-			return commandHelp(spec);
-		}
+	if (grammarResult.kind === "rejected") {
+		const message =
+			grammarResult.stderr.trim().replace(/\s+/g, " ") || "invalid command";
+		return styleResult(input, presentParseFailure("COMMAND_PARSE", message));
 	}
 
-	const parseFailure = validateCommandPath(input.argv);
-
-	if (parseFailure !== null) {
-		return styleResult(input, parseFailure);
+	if (grammarResult.stdout.length > 0 || grammarResult.stderr.length > 0) {
+		return {
+			exitCode: 0,
+			stdout: grammarResult.stdout,
+			stderr: grammarResult.stderr,
+		};
 	}
 
 	return await runCli(input);

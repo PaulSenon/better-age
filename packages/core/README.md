@@ -10,9 +10,12 @@ Responsibilities:
 - core ports/adapters contracts
 - typed semantic errors, notices, and success outcomes
 
+Payload files use a human-readable `BETTER AGE PAYLOAD` wrapper around untouched
+age armor. Core owns formatting, extraction, validation, and the explicit
+overwrite/update behavior used by the CLI.
+
 This package should not depend on the CLI or varlock packages.
 
 Implementation plan source:
 
 - `../../.llms/projects/4-cli-core-boundary-hardening/plans/better-age-mvp-reimplementation.md`
-

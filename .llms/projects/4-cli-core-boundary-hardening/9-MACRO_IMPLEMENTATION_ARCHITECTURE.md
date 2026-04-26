@@ -135,7 +135,7 @@ Rules:
 Decision:
 
 ```txt
-do not use commander/yargs/inquirer for MVP unless @effect/cli prompt UX proves insufficient
+use @effect/cli for command grammar/help and @inquirer/prompts for normal interactive IO
 ```
 
 ## Core Deep Modules

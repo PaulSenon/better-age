@@ -63,6 +63,10 @@ Promptable operands are optional in the grammar. In an interactive terminal,
 missing payloads, identities, and setup names can be requested by the command
 flow. Protocol inputs stay strict; `load` requires `--protocol-version=1`.
 
+Command grammar, help, and parser errors are owned by `@effect/cli`. Normal
+interactive prompts are backed by `@inquirer/prompts`; custom terminal handling
+is limited to the secure viewer and final stdout/stderr writing.
+
 ## Examples
 
 ```sh
@@ -96,11 +100,44 @@ bage interactive
 - Passphrases are prompted only in interactive terminals.
 - Headless payload reads fail fast because MVP has no passphrase injection
   mechanism.
+- Missing existing payload paths discover `.env.enc` and `.env.*.enc` in the current directory.
+- Payload creation suggests `.env.enc`; collisions offer Override, Change Name,
+  and Cancel in interactive mode.
+- Grant merges payload recipients, known identities, aliases, and self into one
+  picker. Self and already granted identities are visible but disabled.
+- Grant can import a pasted identity string before granting it.
+- Revoke lists only actual payload recipients and never offers arbitrary identity
+  string entry.
+- `identity forget` lists known identities only and never changes payload files.
+- Guided identity import retries invalid strings and duplicate aliases.
 - `edit` resolves `$VISUAL`, then `$EDITOR`, then remembered editor preference,
   then interactive editor picker.
+- Invalid edited `.env` content logs the validation failure, then offers Reopen
+  Editor or Cancel while preserving the edited text for retry.
 - `view` uses an in-process secure viewer with keyboard scrolling and quit.
 - `interactive` opens a setup-aware menu loop. It excludes `load` and
   `interactive` from menus.
+
+## Payload File Format
+
+Payload files are readable wrapper files around untouched age armor:
+
+```txt
+# better-age encrypted env payload
+# Docs: https://github.com/better-age/better-age
+# This file is safe to commit only if your policy allows encrypted secrets.
+# Do not edit the armored block manually.
+
+-----BEGIN BETTER AGE PAYLOAD-----
+-----BEGIN AGE ENCRYPTED FILE-----
+...
+-----END AGE ENCRYPTED FILE-----
+-----END BETTER AGE PAYLOAD-----
+```
+
+`load`, `view`, `inspect`, and write commands extract the inner age armor before
+decrypting. Missing, duplicated, malformed, or non-age-armored Better Age blocks
+fail clearly.
 
 ## Known Limitations
 

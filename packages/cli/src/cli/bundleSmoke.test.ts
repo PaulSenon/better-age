@@ -76,10 +76,9 @@ describe("standalone cli bundle", () => {
 
 		const failure = await runProcess(process.execPath, [bundlePath, "wat"]);
 
-		expect(failure).toEqual({
-			exitCode: 2,
-			stdout: "",
-			stderr: '[ERROR] COMMAND_UNKNOWN: unknown command "wat"\n',
-		});
+		expect(failure.exitCode).toBe(2);
+		expect(failure.stdout).toBe("");
+		expect(failure.stderr).toContain("COMMAND_PARSE");
+		expect(failure.stderr).toContain("Invalid subcommand");
 	});
 });

@@ -80,8 +80,11 @@ describe("real core adapters", () => {
 			/^keys\/.+\.age$/,
 		);
 		expect(keyBlob).toContain("BEGIN AGE ENCRYPTED FILE");
-		expect(payloadFile).toContain('"kind":"better-age/payload"');
+		expect(payloadFile).toContain("# better-age encrypted env payload");
+		expect(payloadFile).toContain("BEGIN BETTER AGE PAYLOAD");
 		expect(payloadFile).toContain("BEGIN AGE ENCRYPTED FILE");
+		expect(payloadFile).toContain("END AGE ENCRYPTED FILE");
+		expect(payloadFile).toContain("END BETTER AGE PAYLOAD");
 
 		await expect(
 			core.commands.editPayload({

@@ -8,12 +8,10 @@ export type IdentityListView = {
 	readonly self: {
 		readonly ownerId: string;
 		readonly publicIdentity: { readonly displayName: string };
-		readonly fingerprint: string;
 	};
 	readonly known: ReadonlyArray<{
 		readonly ownerId: string;
 		readonly publicIdentity: { readonly displayName: string };
-		readonly fingerprint: string;
 		readonly localAlias: string | null;
 	}>;
 	readonly retired: ReadonlyArray<{
@@ -31,11 +29,25 @@ export type PayloadInspectView = {
 	readonly recipients: ReadonlyArray<{
 		readonly ownerId: string;
 		readonly displayName: string;
-		readonly fingerprint: string;
 		readonly localAlias: string | null;
 		readonly isSelf: boolean;
 		readonly isStaleSelf: boolean;
 	}>;
+};
+
+const renderIdentityLabel = (input: {
+	readonly displayName: string;
+	readonly ownerId: string;
+	readonly localAlias: string | null;
+	readonly tag?: string;
+}) => {
+	const name =
+		input.localAlias === null
+			? input.displayName
+			: `${input.localAlias} (${input.displayName})`;
+	const tag = input.tag === undefined ? "" : ` ${input.tag}`;
+
+	return `${name} ${input.ownerId}${tag}`;
 };
 
 const failureMessage = (code: string) => {
@@ -50,6 +62,8 @@ const failureMessage = (code: string) => {
 			return "run bage setup first";
 		case "IDENTITY_REFERENCE_NOT_FOUND":
 			return "identity reference not found";
+		case "IDENTITY_STRING_INVALID":
+			return "identity string is invalid";
 		case "INTERACTIVE_UNAVAILABLE":
 			return "interactive terminal is unavailable";
 		case "LOCAL_ALIAS_DUPLICATE":
@@ -121,11 +135,14 @@ export const presentIdentityList = (input: IdentityListView): RunCliResult => {
 		input.known.length === 0
 			? "  none\n"
 			: input.known
-					.map((identity) => {
-						const name =
-							identity.localAlias ?? identity.publicIdentity.displayName;
-						return `  ${name} ${identity.ownerId} ${identity.fingerprint}\n`;
-					})
+					.map(
+						(identity) =>
+							`  ${renderIdentityLabel({
+								displayName: identity.publicIdentity.displayName,
+								ownerId: identity.ownerId,
+								localAlias: identity.localAlias,
+							})}\n`,
+					)
 					.join("");
 	const retiredLines =
 		input.retired.length === 0
@@ -138,7 +155,12 @@ export const presentIdentityList = (input: IdentityListView): RunCliResult => {
 		exitCode: 0,
 		stdout: [
 			"Self\n",
-			`  ${input.self.publicIdentity.displayName} ${input.self.ownerId} ${input.self.fingerprint}\n`,
+			`  ${renderIdentityLabel({
+				displayName: input.self.publicIdentity.displayName,
+				ownerId: input.self.ownerId,
+				localAlias: null,
+				tag: "[you]",
+			})}\n`,
 			"\nKnown identities\n",
 			knownLines,
 			"\nRetired keys\n",
@@ -194,7 +216,6 @@ export const presentPayloadInspect = (
 			? "  none\n"
 			: input.recipients
 					.map((recipient) => {
-						const name = recipient.localAlias ?? recipient.displayName;
 						const tags = [
 							recipient.isSelf ? "[you]" : "",
 							recipient.isStaleSelf ? "[stale]" : "",
@@ -203,7 +224,11 @@ export const presentPayloadInspect = (
 							.join(" ");
 						const suffix = tags.length === 0 ? "" : ` ${tags}`;
 
-						return `  ${name} ${recipient.ownerId} ${recipient.fingerprint}${suffix}\n`;
+						return `  ${renderIdentityLabel({
+							displayName: recipient.displayName,
+							ownerId: recipient.ownerId,
+							localAlias: recipient.localAlias,
+						})}${suffix}\n`;
 					})
 					.join("");
 

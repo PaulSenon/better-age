@@ -432,6 +432,99 @@ describe("runCli command contracts", () => {
 		});
 	});
 
+	it("reprompts invalid guided identity import strings", async () => {
+		let promptCount = 0;
+		const interactive = makeCore({
+			commands: {
+				importKnownIdentity: async (input) => {
+					interactive.calls.push({ name: "importKnownIdentity", input });
+					return input.identityString === "bad-id"
+						? failure("IDENTITY_STRING_INVALID")
+						: success("KNOWN_IDENTITY_IMPORTED", {
+								ownerId: "owner_sarah",
+								handle: "Sarah#age1sarah",
+								outcome: "added",
+							});
+				},
+			},
+		});
+
+		await expect(
+			runCli({
+				argv: ["identity", "import"],
+				core: interactive.core,
+				terminal: {
+					mode: "interactive",
+					promptText: async (label) => {
+						if (label === "Identity string") {
+							return promptCount++ === 0 ? "bad-id" : "bage-id-v1:sarah";
+						}
+
+						return "";
+					},
+				},
+			}),
+		).resolves.toEqual({
+			exitCode: 0,
+			stdout: "",
+			stderr:
+				"[ERROR] IDENTITY_STRING_INVALID: identity string is invalid\n[OK] Identity imported: Sarah#age1sarah\n",
+		});
+		expect(interactive.calls).toEqual([
+			{
+				name: "importKnownIdentity",
+				input: { identityString: "bad-id" },
+			},
+			{
+				name: "importKnownIdentity",
+				input: { identityString: "bage-id-v1:sarah" },
+			},
+		]);
+	});
+
+	it("uses a guided picker for identity forget over known identities only", async () => {
+		const guided = makeCore();
+		let options: ReadonlyArray<{
+			readonly value: string;
+			readonly label: string;
+			readonly disabled: boolean;
+		}> = [];
+
+		await expect(
+			runCli({
+				argv: ["identity", "forget"],
+				core: guided.core,
+				terminal: {
+					mode: "interactive",
+					selectOne: async (_label, choices) => {
+						options = choices;
+						return "owner_sarah";
+					},
+				},
+			}),
+		).resolves.toEqual({
+			exitCode: 0,
+			stdout: "",
+			stderr: "[OK] Identity forgotten: owner_sarah\n",
+		});
+		expect(options).toEqual([
+			{
+				value: "owner_sarah",
+				label: "ops (Sarah) owner_sarah",
+				disabled: false,
+			},
+			{
+				value: "owner_nora",
+				label: "Nora owner_nora",
+				disabled: false,
+			},
+			{ value: "cancel", label: "Cancel", disabled: false },
+		]);
+		expect(options.some((option) => option.label.includes("age1self"))).toBe(
+			false,
+		);
+	});
+
 	it("lists identities for humans and resolves forget refs among known identities", async () => {
 		const { calls, core } = makeCore();
 
@@ -444,7 +537,7 @@ describe("runCli command contracts", () => {
 		).resolves.toMatchObject({
 			exitCode: 0,
 			stdout:
-				"Self\n  Isaac owner_self fp_self\n\nKnown identities\n  ops owner_sarah age1sarah\n  Nora owner_nora age1nora\n\nRetired keys\n  none\n",
+				"Self\n  Isaac owner_self [you]\n\nKnown identities\n  ops (Sarah) owner_sarah\n  Nora owner_nora\n\nRetired keys\n  none\n",
 			stderr: "",
 		});
 
@@ -483,10 +576,8 @@ describe("runCli command contracts", () => {
 		expect(result.stdout).toContain("path: secrets.env.enc");
 		expect(result.stdout).toContain("payload id: payload_123");
 		expect(result.stdout).toContain("Env keys\n  API_KEY\n  DATABASE_URL\n");
-		expect(result.stdout).toContain(
-			"Recipients\n  Isaac owner_self fp_self [you]",
-		);
-		expect(result.stdout).toContain("  ops owner_sarah age1sarah");
+		expect(result.stdout).toContain("Recipients\n  Isaac owner_self [you]");
+		expect(result.stdout).toContain("  ops (Sarah) owner_sarah");
 		expect(result.stdout).not.toContain("secret-value");
 		expect(result.stdout).not.toContain("postgres://secret");
 		expect(calls).toEqual([
@@ -690,6 +781,7 @@ describe("runCli command contracts", () => {
 		const changed = makeCore();
 		let editorInput = "";
 		let editCount = 0;
+		let recoveryChoices: ReadonlyArray<string> = [];
 		await expect(
 			runCli({
 				argv: ["edit", "secrets.env.enc"],
@@ -705,6 +797,10 @@ describe("runCli command contracts", () => {
 							? { kind: "saved", text: "not valid env" }
 							: { kind: "saved", text: "API_KEY=new-value\n" };
 					},
+					selectOne: async (_label, choices) => {
+						recoveryChoices = choices.map((choice) => choice.value);
+						return "reopen-editor";
+					},
 				},
 			}),
 		).resolves.toEqual({
@@ -714,6 +810,7 @@ describe("runCli command contracts", () => {
 				"[ERROR] PAYLOAD_ENV_INVALID: invalid .env content\n[OK] Payload edited: secrets.env.enc\n",
 		});
 		expect(editorInput).toBe("not valid env");
+		expect(recoveryChoices).toEqual(["reopen-editor", "cancel"]);
 		expect(changed.calls).toEqual([
 			{
 				name: "decryptPayload",
@@ -728,6 +825,26 @@ describe("runCli command contracts", () => {
 				},
 			},
 		]);
+
+		const invalidCancelled = makeCore();
+		await expect(
+			runCli({
+				argv: ["edit", "secrets.env.enc"],
+				core: invalidCancelled.core,
+				payloadPathExists: async () => true,
+				terminal: {
+					mode: "interactive",
+					promptSecret: async () => "correct horse",
+					openEditor: async () => ({ kind: "saved", text: "bad env" }),
+					selectOne: async () => "cancel",
+				},
+			}),
+		).resolves.toEqual({
+			exitCode: 130,
+			stdout: "",
+			stderr:
+				"[ERROR] PAYLOAD_ENV_INVALID: invalid .env content\n[ERROR] CANCELLED: command cancelled\n",
+		});
 	});
 
 	it("applies payload command mode rules and passphrase retry", async () => {
@@ -896,7 +1013,7 @@ describe("runCli command contracts", () => {
 			},
 			{
 				value: "owner_sarah",
-				label: "ops owner_sarah [granted]",
+				label: "ops (Sarah) owner_sarah [granted]",
 				disabled: true,
 			},
 			{
@@ -910,6 +1027,48 @@ describe("runCli command contracts", () => {
 				disabled: false,
 			},
 		]);
+	});
+
+	it("imports a custom guided grant identity string before granting", async () => {
+		let identityPromptCount = 0;
+		const guided = makeCore();
+
+		await expect(
+			runCli({
+				argv: ["grant", "secrets.env.enc"],
+				core: guided.core,
+				parseIdentityString: async (identityString) =>
+					identityString === "bad-id" ? null : knownNora.publicIdentity,
+				payloadPathExists: async () => true,
+				terminal: {
+					mode: "interactive",
+					promptSecret: async () => "correct horse",
+					promptText: async () =>
+						identityPromptCount++ === 0 ? "bad-id" : "bage-id-v1:nora",
+					selectOne: async (_label, choices) =>
+						choices.find(
+							(choice) => choice.value === "__custom_identity_string__",
+						)?.value ?? "",
+				},
+			}),
+		).resolves.toEqual({
+			exitCode: 0,
+			stdout: "",
+			stderr:
+				"[ERROR] IDENTITY_STRING_INVALID: identity string is invalid\n[OK] Recipient granted: Nora#age1nora\n",
+		});
+		expect(guided.calls).toContainEqual({
+			name: "importKnownIdentity",
+			input: { identityString: "bage-id-v1:nora" },
+		});
+		expect(guided.calls).toContainEqual({
+			name: "grantPayloadRecipient",
+			input: {
+				path: "secrets.env.enc",
+				passphrase: "correct horse",
+				recipient: knownNora.publicIdentity,
+			},
+		});
 	});
 
 	it("revokes exact and guided recipients while disabling self", async () => {
@@ -966,7 +1125,7 @@ describe("runCli command contracts", () => {
 			},
 			{
 				value: "owner_sarah",
-				label: "ops owner_sarah",
+				label: "ops (Sarah) owner_sarah",
 				disabled: false,
 			},
 		]);
@@ -1392,7 +1551,7 @@ describe("runCli command contracts", () => {
 		).resolves.toEqual({
 			exitCode: 0,
 			stdout:
-				"Self\n  Isaac owner_self fp_self\n\nKnown identities\n  ops owner_sarah age1sarah\n  Nora owner_nora age1nora\n\nRetired keys\n  none\n",
+				"Self\n  Isaac owner_self [you]\n\nKnown identities\n  ops (Sarah) owner_sarah\n  Nora owner_nora\n\nRetired keys\n  none\n",
 			stderr: "[OK] Viewer closed\n",
 		});
 
@@ -1459,9 +1618,142 @@ describe("runCli command contracts", () => {
 				"[ERROR] INTERACTIVE_UNAVAILABLE: interactive terminal is unavailable\n",
 		});
 	});
+
+	it("flushes interactive command results immediately and pauses only for primary stdout screens", async () => {
+		const routed = makeCore();
+		const writes: Array<{ readonly stderr: string; readonly stdout: string }> =
+			[];
+		const pausedAfter: Array<string> = [];
+		const selections = [
+			"identities",
+			"identity export",
+			"identity import",
+			"quit",
+		];
+
+		await expect(
+			runCli({
+				argv: ["interactive"],
+				core: routed.core,
+				terminal: {
+					mode: "interactive",
+					promptText: async (label) =>
+						label === "Identity string" ? "bage-id-v1:sarah" : "ops",
+					selectOne: async () => selections.shift() ?? "quit",
+					waitForEnter: async (label) => {
+						pausedAfter.push(label);
+					},
+					writeResult: (result) => {
+						writes.push({
+							stdout: result.stdout,
+							stderr: result.stderr,
+						});
+					},
+				},
+			}),
+		).resolves.toEqual({ exitCode: 0, stdout: "", stderr: "" });
+
+		expect(writes).toEqual([
+			{ stdout: "bage-id-v1:abc123\n", stderr: "" },
+			{ stdout: "", stderr: "[OK] Identity imported: ops#age1sarah\n" },
+		]);
+		expect(pausedAfter).toEqual(["Press Enter"]);
+	});
+
+	it("treats Ctrl-C from interactive selection as abort, never back", async () => {
+		const routed = makeCore();
+
+		await expect(
+			runCli({
+				argv: ["interactive"],
+				core: routed.core,
+				terminal: {
+					mode: "interactive",
+					selectOne: async () => {
+						throw new CliPromptCancelledError();
+					},
+				},
+			}),
+		).resolves.toEqual({
+			exitCode: 130,
+			stdout: "",
+			stderr: "[ERROR] CANCELLED: command cancelled\n",
+		});
+	});
 });
 
 describe("runCli payload read/edit commands", () => {
+	it("guides missing existing payload paths from discovered cwd candidates", async () => {
+		const selected = makeCore();
+		let selectChoices:
+			| ReadonlyArray<{
+					readonly value: string;
+					readonly label: string;
+					readonly disabled: boolean;
+			  }>
+			| undefined;
+
+		await expect(
+			runCli({
+				argv: ["inspect"],
+				core: selected.core,
+				discoverPayloadPaths: async () => [
+					".env.local.enc",
+					".env.production.enc",
+				],
+				payloadPathExists: async () => true,
+				terminal: {
+					mode: "interactive",
+					promptSecret: async () => "correct horse",
+					selectOne: async (_label, choices) => {
+						selectChoices = choices;
+						return ".env.production.enc";
+					},
+				},
+			}),
+		).resolves.toMatchObject({ exitCode: 0 });
+		expect(selectChoices).toEqual([
+			{
+				value: ".env.local.enc",
+				label: ".env.local.enc",
+				disabled: false,
+			},
+			{
+				value: ".env.production.enc",
+				label: ".env.production.enc",
+				disabled: false,
+			},
+			{ value: "enter-path", label: "Enter Path", disabled: false },
+			{ value: "cancel", label: "Cancel", disabled: false },
+		]);
+		expect(selected.calls).toContainEqual({
+			name: "decryptPayload",
+			input: {
+				path: ".env.production.enc",
+				passphrase: "correct horse",
+			},
+		});
+
+		const prompted = makeCore();
+		await expect(
+			runCli({
+				argv: ["inspect"],
+				core: prompted.core,
+				discoverPayloadPaths: async () => [],
+				payloadPathExists: async () => true,
+				terminal: {
+					mode: "interactive",
+					promptText: async () => "custom.env.enc",
+					promptSecret: async () => "correct horse",
+				},
+			}),
+		).resolves.toMatchObject({ exitCode: 0 });
+		expect(prompted.calls).toContainEqual({
+			name: "decryptPayload",
+			input: { path: "custom.env.enc", passphrase: "correct horse" },
+		});
+	});
+
 	it("creates a payload after checking target existence before passphrase prompt", async () => {
 		let prompted = false;
 		const exists = makeCore();
@@ -1522,7 +1814,69 @@ describe("runCli payload read/edit commands", () => {
 		expect(created.calls).toEqual([
 			{
 				name: "createPayload",
-				input: { path: "secrets.env.enc", passphrase: "correct horse" },
+				input: {
+					path: "secrets.env.enc",
+					passphrase: "correct horse",
+					overwrite: false,
+				},
+			},
+		]);
+	});
+
+	it("guides create path default and collision recovery", async () => {
+		const defaulted = makeCore();
+		await expect(
+			runCli({
+				argv: ["create"],
+				core: defaulted.core,
+				payloadPathExists: async () => false,
+				terminal: {
+					mode: "interactive",
+					promptText: async () => "",
+					promptSecret: async () => "correct horse",
+				},
+			}),
+		).resolves.toEqual({
+			exitCode: 0,
+			stdout: "",
+			stderr: "[OK] Payload created: .env.enc\n",
+		});
+		expect(defaulted.calls).toEqual([
+			{
+				name: "createPayload",
+				input: {
+					path: ".env.enc",
+					passphrase: "correct horse",
+					overwrite: false,
+				},
+			},
+		]);
+
+		const overridden = makeCore();
+		await expect(
+			runCli({
+				argv: ["create", "secrets.env.enc"],
+				core: overridden.core,
+				payloadPathExists: async () => true,
+				terminal: {
+					mode: "interactive",
+					promptSecret: async () => "correct horse",
+					selectOne: async () => "override",
+				},
+			}),
+		).resolves.toEqual({
+			exitCode: 0,
+			stdout: "",
+			stderr: "[OK] Payload created: secrets.env.enc\n",
+		});
+		expect(overridden.calls).toEqual([
+			{
+				name: "createPayload",
+				input: {
+					path: "secrets.env.enc",
+					passphrase: "correct horse",
+					overwrite: true,
+				},
 			},
 		]);
 	});

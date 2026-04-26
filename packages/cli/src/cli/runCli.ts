@@ -105,6 +105,7 @@ export type CliCore = {
 		readonly createPayload: (input: {
 			readonly path: string;
 			readonly passphrase: string;
+			readonly overwrite?: boolean;
 		}) => Promise<
 			CoreResponse<{
 				readonly path: string;
@@ -213,6 +214,7 @@ export type CliCore = {
 
 export type CliTerminal = {
 	readonly mode: CliTerminalMode;
+	readonly confirm?: (label: string) => Promise<boolean>;
 	readonly openEditor?: (initialText: string) => Promise<
 		| { readonly kind: "cancel" }
 		| {
@@ -233,6 +235,8 @@ export type CliTerminal = {
 			readonly disabled: boolean;
 		}>,
 	) => Promise<string>;
+	readonly waitForEnter?: (label: string) => Promise<void>;
+	readonly writeResult?: (result: RunCliResult) => Promise<void> | void;
 };
 
 export type RunCliInput = {
@@ -241,6 +245,7 @@ export type RunCliInput = {
 	readonly parseIdentityString?: (
 		identityString: string,
 	) => Promise<PublicIdentity | null>;
+	readonly discoverPayloadPaths?: () => Promise<ReadonlyArray<string>>;
 	readonly payloadPathExists?: (path: string) => Promise<boolean>;
 	readonly terminal: CliTerminal;
 };
@@ -479,8 +484,27 @@ const recipientToPublicIdentity = (
 	identityUpdatedAt: recipient.identityUpdatedAt,
 });
 
+const renderIdentityRow = (input: {
+	readonly displayName: string;
+	readonly ownerId: string;
+	readonly localAlias: string | null;
+	readonly tag?: string;
+}) => {
+	const name =
+		input.localAlias === null
+			? input.displayName
+			: `${input.localAlias} (${input.displayName})`;
+	const tag = input.tag === undefined ? "" : ` ${input.tag}`;
+
+	return `${name} ${input.ownerId}${tag}`;
+};
+
 const exactCommandHasAllOperands = (args: ParsedArgs) =>
 	args.positionals[1] !== undefined && args.positionals[2] !== undefined;
+
+const DEFAULT_PAYLOAD_PATH = ".env.enc";
+const ENTER_PATH_CHOICE = "enter-path";
+const CANCEL_CHOICE = "cancel";
 
 const promptSelectOne = async (
 	terminal: CliTerminal,
@@ -498,6 +522,18 @@ const promptSelectOne = async (
 	}
 
 	return await selectOne(label, choices);
+};
+
+const promptPayloadPath = async (
+	input: RunCliInput,
+	label: string,
+	defaultPath?: string,
+) => {
+	const rawPath = await ensurePromptText(input.terminal)(label);
+
+	return rawPath.length === 0 && defaultPath !== undefined
+		? defaultPath
+		: rawPath;
 };
 
 const runSetup = async (
@@ -533,27 +569,117 @@ const runSetup = async (
 	return presentSuccess(`Identity created: ${response.result.value.handle}`);
 };
 
-const resolvePayloadPath = async (
+const resolveExistingPayloadPath = async (
 	args: ParsedArgs,
 	input: RunCliInput,
-): Promise<string | null> =>
-	args.positionals[1] ??
-	(input.terminal.mode === "interactive"
-		? await ensurePromptText(input.terminal)("Payload path")
-		: null);
+): Promise<string | null> => {
+	const exactPath = args.positionals[1];
+
+	if (exactPath !== undefined) {
+		return exactPath;
+	}
+
+	if (input.terminal.mode !== "interactive") {
+		return null;
+	}
+
+	const candidates = [...((await input.discoverPayloadPaths?.()) ?? [])].sort();
+
+	if (candidates.length === 0) {
+		return await promptPayloadPath(input, "Payload path");
+	}
+
+	const selected = await promptSelectOne(input.terminal, "Payload", [
+		...candidates.map((path) => ({
+			value: path,
+			label: path,
+			disabled: false,
+		})),
+		{ value: ENTER_PATH_CHOICE, label: "Enter Path", disabled: false },
+		{ value: CANCEL_CHOICE, label: "Cancel", disabled: false },
+	]);
+
+	if (selected === CANCEL_CHOICE) {
+		throw new CliPromptCancelledError();
+	}
+
+	if (selected === ENTER_PATH_CHOICE || selected === null) {
+		return await promptPayloadPath(input, "Payload path");
+	}
+
+	return selected;
+};
+
+const resolveNewPayloadPath = async (
+	args: ParsedArgs,
+	input: RunCliInput,
+): Promise<
+	| { readonly path: string; readonly overwrite: boolean }
+	| { readonly failure: RunCliResult }
+> => {
+	let path =
+		args.positionals[1] ??
+		(input.terminal.mode === "interactive"
+			? await promptPayloadPath(
+					input,
+					`Payload path (${DEFAULT_PAYLOAD_PATH})`,
+					DEFAULT_PAYLOAD_PATH,
+				)
+			: null);
+
+	if (path === null || path.length === 0) {
+		return { failure: presentFailure("PAYLOAD_PATH_MISSING", 2) };
+	}
+
+	while ((await input.payloadPathExists?.(path)) === true) {
+		if (input.terminal.mode !== "interactive") {
+			return { failure: presentFailure("PAYLOAD_ALREADY_EXISTS") };
+		}
+
+		const selected = await promptSelectOne(
+			input.terminal,
+			"Payload already exists",
+			[
+				{ value: "override", label: "Override", disabled: false },
+				{ value: "change-name", label: "Change Name", disabled: false },
+				{ value: CANCEL_CHOICE, label: "Cancel", disabled: false },
+			],
+		);
+
+		if (selected === CANCEL_CHOICE) {
+			throw new CliPromptCancelledError();
+		}
+
+		if (selected === "override") {
+			return { path, overwrite: true };
+		}
+
+		if (selected !== "change-name") {
+			return { failure: presentFailure("PAYLOAD_ALREADY_EXISTS") };
+		}
+
+		path = await promptPayloadPath(
+			input,
+			`Payload path (${DEFAULT_PAYLOAD_PATH})`,
+			DEFAULT_PAYLOAD_PATH,
+		);
+
+		if (path.length === 0) {
+			return { failure: presentFailure("PAYLOAD_PATH_MISSING", 2) };
+		}
+	}
+
+	return { path, overwrite: false };
+};
 
 const runCreatePayload = async (
 	args: ParsedArgs,
 	input: RunCliInput,
 ): Promise<RunCliResult> => {
-	const path = await resolvePayloadPath(args, input);
+	const target = await resolveNewPayloadPath(args, input);
 
-	if (path === null || path.length === 0) {
-		return presentFailure("PAYLOAD_PATH_MISSING", 2);
-	}
-
-	if ((await input.payloadPathExists?.(path)) === true) {
-		return presentFailure("PAYLOAD_ALREADY_EXISTS");
+	if ("failure" in target) {
+		return target.failure;
 	}
 
 	const passphrase = await acquirePassphrase(input.terminal);
@@ -563,8 +689,9 @@ const runCreatePayload = async (
 	}
 
 	const response = await input.core.commands.createPayload({
-		path,
+		path: target.path,
 		passphrase: passphrase.passphrase,
+		overwrite: target.overwrite,
 	});
 
 	if (response.result.kind === "failure") {
@@ -585,7 +712,7 @@ const openPayloadContext = async (
 	  }
 	| { readonly failure: RunCliResult }
 > => {
-	const path = await resolvePayloadPath(args, input);
+	const path = await resolveExistingPayloadPath(args, input);
 
 	if (path === null || path.length === 0) {
 		return { failure: presentFailure("PAYLOAD_PATH_MISSING", 2) };
@@ -769,7 +896,30 @@ const runEditPayload = async (
 
 		if (!isValidEnvText(editorText)) {
 			stderr += presentFailure("PAYLOAD_ENV_INVALID").stderr;
-			continue;
+			const selected = await promptSelectOne(
+				input.terminal,
+				"Invalid .env content",
+				[
+					{ value: "reopen-editor", label: "Reopen editor", disabled: false },
+					{ value: CANCEL_CHOICE, label: "Cancel", disabled: false },
+				],
+			);
+
+			if (selected === CANCEL_CHOICE) {
+				return {
+					...presentFailure("CANCELLED", 130),
+					stderr: `${stderr}${presentFailure("CANCELLED", 130).stderr}`,
+				};
+			}
+
+			if (selected === "reopen-editor" || selected === null) {
+				continue;
+			}
+
+			return {
+				...presentFailure("CANCELLED", 130),
+				stderr: `${stderr}${presentFailure("CANCELLED", 130).stderr}`,
+			};
 		}
 
 		const response = await input.core.commands.editPayload({
@@ -835,9 +985,12 @@ const grantPickerChoices = async (
 	);
 	const choices = payload.recipients.map((recipient) => ({
 		value: recipient.ownerId,
-		label: `${recipient.localAlias ?? recipient.displayName} ${recipient.ownerId} ${
-			recipient.isSelf ? "[you]" : "[granted]"
-		}`,
+		label: renderIdentityRow({
+			displayName: recipient.displayName,
+			ownerId: recipient.ownerId,
+			localAlias: recipient.localAlias,
+			tag: recipient.isSelf ? "[you]" : "[granted]",
+		}),
 		disabled: true,
 	}));
 
@@ -845,7 +998,11 @@ const grantPickerChoices = async (
 		if (!payloadOwnerIds.has(identity.ownerId)) {
 			choices.push({
 				value: identity.ownerId,
-				label: `${identity.localAlias ?? identity.publicIdentity.displayName} ${identity.ownerId}`,
+				label: renderIdentityRow({
+					displayName: identity.publicIdentity.displayName,
+					ownerId: identity.ownerId,
+					localAlias: identity.localAlias,
+				}),
 				disabled: false,
 			});
 		}
@@ -858,6 +1015,50 @@ const grantPickerChoices = async (
 	});
 
 	return choices;
+};
+
+const promptCustomGrantIdentity = async (
+	input: RunCliInput,
+): Promise<
+	| { readonly recipient: PublicIdentity; readonly stderr: string }
+	| { readonly failure: RunCliResult }
+> => {
+	let stderr = "";
+
+	for (let attempt = 0; attempt < 3; attempt++) {
+		const identityString = await ensurePromptText(input.terminal)(
+			"Identity string",
+		);
+		const recipient = await input.parseIdentityString?.(identityString);
+
+		if (recipient !== null && recipient !== undefined) {
+			const response = await input.core.commands.importKnownIdentity({
+				identityString,
+			});
+
+			if (response.result.kind === "failure") {
+				return {
+					failure: {
+						...presentFailure(response.result.code),
+						stderr: `${stderr}${presentFailure(response.result.code).stderr}`,
+					},
+				};
+			}
+
+			return { recipient, stderr };
+		}
+
+		if (attempt < 2) {
+			stderr += presentFailure("IDENTITY_STRING_INVALID").stderr;
+		}
+	}
+
+	return {
+		failure: {
+			...presentFailure("IDENTITY_STRING_INVALID"),
+			stderr: `${stderr}${presentFailure("IDENTITY_STRING_INVALID").stderr}`,
+		},
+	};
 };
 
 const runUpdateGateIfNeeded = async (
@@ -936,15 +1137,26 @@ const runGrantPayloadRecipient = async (
 		return presentFailure("RECIPIENT_REFERENCE_NOT_FOUND", 2);
 	}
 
-	const identityReference =
+	const resolved =
 		reference === "__custom_identity_string__"
-			? await ensurePromptText(input.terminal)("Identity string")
-			: reference;
-	const recipient = await resolveGrantRecipient(
-		input,
-		opened.payload,
-		identityReference,
-	);
+			? await promptCustomGrantIdentity(input)
+			: {
+					recipient: await resolveGrantRecipient(
+						input,
+						opened.payload,
+						reference,
+					),
+					stderr: "",
+				};
+
+	if ("failure" in resolved) {
+		return {
+			...resolved.failure,
+			stderr: `${gate.stderr}${resolved.failure.stderr}`,
+		};
+	}
+
+	const recipient = resolved.recipient;
 
 	if (recipient === null) {
 		return presentFailure("RECIPIENT_REFERENCE_NOT_FOUND");
@@ -967,7 +1179,7 @@ const runGrantPayloadRecipient = async (
 	if (response.result.kind === "failure") {
 		return {
 			...presentFailure(response.result.code),
-			stderr: `${gate.stderr}${presentFailure(response.result.code).stderr}`,
+			stderr: `${gate.stderr}${resolved.stderr}${presentFailure(response.result.code).stderr}`,
 		};
 	}
 
@@ -981,7 +1193,7 @@ const runGrantPayloadRecipient = async (
 
 	return {
 		...successResult,
-		stderr: `${gate.stderr}${successResult.stderr}`,
+		stderr: `${gate.stderr}${resolved.stderr}${successResult.stderr}`,
 	};
 };
 
@@ -996,9 +1208,12 @@ const resolvePayloadRecipient = (
 const revokePickerChoices = (payload: DecryptedPayload) =>
 	payload.recipients.map((recipient) => ({
 		value: recipient.ownerId,
-		label: `${recipient.localAlias ?? recipient.displayName} ${recipient.ownerId}${
-			recipient.isSelf ? " [you]" : ""
-		}`,
+		label: renderIdentityRow({
+			displayName: recipient.displayName,
+			ownerId: recipient.ownerId,
+			localAlias: recipient.localAlias,
+			...(recipient.isSelf ? { tag: "[you]" } : {}),
+		}),
 		disabled: recipient.isSelf,
 	}));
 
@@ -1106,13 +1321,13 @@ const runIdentityImport = async (
 	args: ParsedArgs,
 	input: RunCliInput,
 ): Promise<RunCliResult> => {
-	const identityString =
-		args.positionals[2] ??
-		(input.terminal.mode === "interactive"
-			? await ensurePromptText(input.terminal)("Identity string")
-			: undefined);
+	const identityStringFromArgs = args.positionals[2];
 
-	if (identityString === undefined || identityString.length === 0) {
+	if (
+		input.terminal.mode !== "interactive" &&
+		(identityStringFromArgs === undefined ||
+			identityStringFromArgs.length === 0)
+	) {
 		return presentFailure("IDENTITY_STRING_MISSING", 2);
 	}
 
@@ -1121,6 +1336,17 @@ const runIdentityImport = async (
 	const maxAttempts = input.terminal.mode === "interactive" ? 3 : 1;
 
 	for (let attempt = 0; attempt < maxAttempts; attempt++) {
+		const identityString =
+			identityStringFromArgs ??
+			(await ensurePromptText(input.terminal)("Identity string"));
+
+		if (identityString.length === 0) {
+			return {
+				...presentFailure("IDENTITY_STRING_MISSING", 2),
+				stderr: `${stderr}${presentFailure("IDENTITY_STRING_MISSING", 2).stderr}`,
+			};
+		}
+
 		const promptedAlias =
 			aliasFromOption ??
 			(input.terminal.mode === "interactive"
@@ -1141,6 +1367,15 @@ const runIdentityImport = async (
 			);
 
 			return { ...result, stderr: `${stderr}${result.stderr}` };
+		}
+
+		if (
+			input.terminal.mode === "interactive" &&
+			identityStringFromArgs === undefined &&
+			response.result.code === "IDENTITY_STRING_INVALID"
+		) {
+			stderr += presentFailure(response.result.code).stderr;
+			continue;
 		}
 
 		if (
@@ -1192,20 +1427,35 @@ const runIdentityForget = async (
 	args: ParsedArgs,
 	input: RunCliInput,
 ): Promise<RunCliResult> => {
-	const reference =
-		args.positionals[2] ??
-		(input.terminal.mode === "interactive"
-			? await ensurePromptText(input.terminal)("Identity")
-			: undefined);
-
-	if (reference === undefined || reference.length === 0) {
-		return presentFailure("IDENTITY_REFERENCE_MISSING", 2);
-	}
-
 	const listed = await input.core.queries.listKnownIdentities();
 
 	if (listed.result.kind === "failure") {
 		return presentFailure(listed.result.code);
+	}
+
+	const reference =
+		args.positionals[2] ??
+		(input.terminal.mode === "interactive"
+			? await promptSelectOne(input.terminal, "Identity", [
+					...listed.result.value.map((identity) => ({
+						value: identity.ownerId,
+						label: renderIdentityRow({
+							displayName: identity.publicIdentity.displayName,
+							ownerId: identity.ownerId,
+							localAlias: identity.localAlias,
+						}),
+						disabled: false,
+					})),
+					{ value: CANCEL_CHOICE, label: "Cancel", disabled: false },
+				])
+			: undefined);
+
+	if (reference === undefined || reference === null || reference.length === 0) {
+		return presentFailure("IDENTITY_REFERENCE_MISSING", 2);
+	}
+
+	if (reference === CANCEL_CHOICE) {
+		return presentFailure("CANCELLED", 130);
 	}
 
 	const identity = resolveKnownIdentity(listed.result.value, reference);
@@ -1383,6 +1633,24 @@ const appendSessionResult = (
 	stderr: `${session.stderr}${result.stderr}`,
 });
 
+const publishInteractiveResult = async (
+	input: RunCliInput,
+	session: RunCliResult,
+	result: RunCliResult,
+): Promise<RunCliResult> => {
+	if (input.terminal.writeResult === undefined) {
+		return appendSessionResult(session, result);
+	}
+
+	await input.terminal.writeResult(result);
+
+	if (result.stdout.length > 0) {
+		await input.terminal.waitForEnter?.("Press Enter");
+	}
+
+	return session;
+};
+
 const runInteractiveSession = async (
 	input: RunCliInput,
 ): Promise<RunCliResult> => {
@@ -1421,7 +1689,17 @@ const runInteractiveSession = async (
 						? rootAfterSetupChoices
 						: rootBeforeSetupChoices;
 
-		const selected = await input.terminal.selectOne("Command", choices);
+		let selected: string;
+
+		try {
+			selected = await input.terminal.selectOne("Command", choices);
+		} catch (cause) {
+			if (isPromptCancelledError(cause)) {
+				return appendSessionResult(session, presentFailure("CANCELLED", 130));
+			}
+
+			throw cause;
+		}
 
 		if (selected === "quit") {
 			return { ...session, exitCode: 0 };
@@ -1441,7 +1719,7 @@ const runInteractiveSession = async (
 			...input,
 			argv: selected.split(" "),
 		});
-		session = appendSessionResult(session, result);
+		session = await publishInteractiveResult(input, session, result);
 	}
 };
 
@@ -1521,7 +1799,20 @@ const runCliUnstyled = async (input: RunCliInput): Promise<RunCliResult> => {
 	return presentFailure("COMMAND_UNKNOWN", 2);
 };
 
-export const runCli = async (input: RunCliInput): Promise<RunCliResult> =>
-	styleRunCliResult(await runCliUnstyled(input), {
+export const runCli = async (input: RunCliInput): Promise<RunCliResult> => {
+	let result: RunCliResult;
+
+	try {
+		result = await runCliUnstyled(input);
+	} catch (cause) {
+		if (isPromptCancelledError(cause)) {
+			result = presentFailure("CANCELLED", 130);
+		} else {
+			throw cause;
+		}
+	}
+
+	return styleRunCliResult(result, {
 		color: input.terminal.presentation?.color ?? false,
 	});
+};

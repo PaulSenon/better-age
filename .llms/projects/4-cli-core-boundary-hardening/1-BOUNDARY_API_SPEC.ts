@@ -279,7 +279,7 @@ export interface OutdatedPayloadWriteGatePolicy {
 export interface EditPayloadFlowPolicy {
 	readonly editorCancelBehavior: "cancel-command";
 	readonly identicalTextBehavior: "success-unchanged";
-	readonly invalidEnvBehavior: "show-error-and-reopen-editor-with-edited-text";
+	readonly invalidEnvBehavior: "show-error-then-reopen-or-cancel-with-edited-text";
 	readonly validChangedTextBehavior: "rewrite-payload-and-success-edited";
 }
 

@@ -1,6 +1,5 @@
 import { Either } from "effect";
 import {
-	encodePayloadDocument,
 	encodePublicIdentityString,
 	type HomeStateDocumentV2,
 	migrateHomeStateDocument,
@@ -13,6 +12,10 @@ import {
 	parsePayloadPlaintext,
 	parsePublicIdentityString,
 } from "../persistence/ArtifactDocument.js";
+import {
+	extractPayloadArmor,
+	formatPayloadFileEnvelope,
+} from "../persistence/PayloadFileEnvelope.js";
 
 export type OwnerId = string;
 export type DisplayName = string;
@@ -399,11 +402,17 @@ const toRecipientSummary = (
 };
 
 const parsePayloadFile = (contents: string) => {
-	try {
-		return parsePayloadDocument(JSON.parse(contents));
-	} catch {
+	const encryptedPayload = extractPayloadArmor(contents);
+
+	if (Either.isLeft(encryptedPayload)) {
 		return parsePayloadDocument(undefined);
 	}
+
+	return parsePayloadDocument({
+		kind: "better-age/payload",
+		version: 1,
+		encryptedPayload: encryptedPayload.right,
+	});
 };
 
 export const createBetterAgeCore = (ports: BetterAgeCorePorts) => {
@@ -462,6 +471,7 @@ export const createBetterAgeCore = (ports: BetterAgeCorePorts) => {
 	const createPayload = async (input: {
 		readonly path: PayloadPath;
 		readonly passphrase: Passphrase;
+		readonly overwrite?: boolean;
 	}) => {
 		const { payloadRepository, payloadCrypto } = requirePayloadPorts();
 		const homeState = await loadCurrentHomeState(ports.homeRepository);
@@ -470,7 +480,10 @@ export const createBetterAgeCore = (ports: BetterAgeCorePorts) => {
 			return failure("HOME_STATE_NOT_FOUND", undefined);
 		}
 
-		if (await payloadRepository.payloadExists(input.path)) {
+		if (
+			(await payloadRepository.payloadExists(input.path)) &&
+			input.overwrite !== true
+		) {
 			return failure("PAYLOAD_ALREADY_EXISTS", undefined);
 		}
 
@@ -503,11 +516,7 @@ export const createBetterAgeCore = (ports: BetterAgeCorePorts) => {
 
 		await payloadRepository.writePayloadFile(
 			input.path,
-			encodePayloadDocument({
-				kind: "better-age/payload",
-				version: 1,
-				encryptedPayload,
-			}),
+			formatPayloadFileEnvelope(encryptedPayload),
 		);
 
 		return success("PAYLOAD_CREATED", {
@@ -695,11 +704,7 @@ export const createBetterAgeCore = (ports: BetterAgeCorePorts) => {
 
 		await input.payloadRepository.writePayloadFile(
 			input.path,
-			encodePayloadDocument({
-				kind: "better-age/payload",
-				version: 1,
-				encryptedPayload,
-			}),
+			formatPayloadFileEnvelope(encryptedPayload),
 		);
 	};
 

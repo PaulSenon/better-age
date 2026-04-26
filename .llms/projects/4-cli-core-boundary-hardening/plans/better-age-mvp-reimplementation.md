@@ -25,12 +25,12 @@ Park the current CLI as a private legacy reference and create the empty target w
 
 ### Acceptance Criteria
 
-- [ ] Current CLI is renamed to a private legacy package with no public `bage` bin.
-- [ ] New core package exists with Effect-ready package/test structure.
-- [ ] New CLI package exists with parser/presenter/test structure placeholders.
-- [ ] Varlock package remains separate and is ready to be adapted later.
-- [ ] Workspace scripts can target packages consistently.
-- [ ] No new package imports legacy CLI.
+- [x] Current CLI is renamed to a private legacy package with no public `bage` bin.
+- [x] New core package exists with Effect-ready package/test structure.
+- [x] New CLI package exists with parser/presenter/test structure placeholders.
+- [x] Varlock package remains separate and is ready to be adapted later.
+- [x] Workspace scripts can target packages consistently.
+- [x] No new package imports legacy CLI.
 
 ---
 
@@ -44,12 +44,12 @@ Implement the v1 artifact foundation for home state, payload documents, payload 
 
 ### Acceptance Criteria
 
-- [ ] V1 artifact kind/version parsing exists for every artifact type.
-- [ ] Wrong-kind, future-version, malformed-version, and missing-field fixtures are covered.
-- [ ] V1 no-op migration is tested for each artifact type.
-- [ ] Prototype schema compatibility is intentionally absent.
-- [ ] Migration functions are pure over decoded data.
-- [ ] Fixture layout is documented and usable by later phases.
+- [x] V1 artifact kind/version parsing exists for every artifact type.
+- [x] Wrong-kind, future-version, malformed-version, and missing-field fixtures are covered.
+- [x] V1 no-op migration is tested for each artifact type.
+- [x] Prototype schema compatibility is intentionally absent.
+- [x] Migration functions are pure over decoded data.
+- [x] Fixture layout is documented and usable by later phases.
 
 ---
 
@@ -63,15 +63,15 @@ Build the core identity store and key vault over fake ports first. Cover self id
 
 ### Acceptance Criteria
 
-- [ ] Core can create self identity and protected current key metadata.
-- [ ] Core exports current public identity string only.
-- [ ] Core imports known identities with optional local alias behavior.
-- [ ] Duplicate/invalid alias cases are tested.
-- [ ] Core lists self, known identities, and retired keys without private key material.
-- [ ] Core forgets known identity and alias without payload mutation.
-- [ ] Core rotates identity under same OwnerId and retires the old key.
-- [ ] Core passphrase change reencrypts current and retired key blobs through fake ports.
-- [ ] Identity/key errors and idempotent outcomes match the specs.
+- [x] Core can create self identity and protected current key metadata.
+- [x] Core exports current public identity string only.
+- [x] Core imports known identities with optional local alias behavior.
+- [x] Duplicate/invalid alias cases are tested.
+- [x] Core lists self, known identities, and retired keys without private key material.
+- [x] Core forgets known identity and alias without payload mutation.
+- [x] Core rotates identity under same OwnerId and retires the old key.
+- [x] Core passphrase change reencrypts current and retired key blobs through fake ports.
+- [x] Identity/key errors and idempotent outcomes match the specs.
 
 ---
 
@@ -85,15 +85,15 @@ Build core payload behavior over fake ports. Cover create, decrypt, edit, grant,
 
 ### Acceptance Criteria
 
-- [ ] Core creates an empty payload for the self recipient.
-- [ ] Core decrypts payloads into the target read model.
-- [ ] Core edit validates env text and distinguishes edited vs unchanged.
-- [ ] Core grant adds, updates, or returns unchanged according to recipient state.
-- [ ] Core revoke removes or returns unchanged according to recipient state.
-- [ ] Core update rewrites only for payload migration or self-recipient refresh reasons.
-- [ ] Core returns notices for in-memory read migration and update recommendation.
-- [ ] Core rejects self grant/revoke.
-- [ ] Payload errors, idempotence, and update gates match the specs.
+- [x] Core creates an empty payload for the self recipient.
+- [x] Core decrypts payloads into the target read model.
+- [x] Core edit validates env text and distinguishes edited vs unchanged.
+- [x] Core grant adds, updates, or returns unchanged according to recipient state.
+- [x] Core revoke removes or returns unchanged according to recipient state.
+- [x] Core update rewrites only for payload migration or self-recipient refresh reasons.
+- [x] Core returns notices for in-memory read migration and update recommendation.
+- [x] Core rejects self grant/revoke.
+- [x] Payload errors, idempotence, and update gates match the specs.
 
 ---
 
@@ -107,14 +107,14 @@ Implement the real filesystem and age-backed core adapters. Prove the v1 file la
 
 ### Acceptance Criteria
 
-- [ ] Home state reads/writes real v1 documents.
-- [ ] Encrypted private key blobs are written under the expected key ref layout.
-- [ ] Real age adapter round-trips protected private keys.
-- [ ] Real age adapter round-trips encrypted payloads.
-- [ ] Passphrase change proves new passphrase works and old passphrase no longer works.
-- [ ] Rotation keeps old key decryptability where expected.
-- [ ] Grant/revoke decryptability behavior is proven through real adapter tests.
-- [ ] Integration tests stay focused and do not duplicate every unit branch.
+- [x] Home state reads/writes real v1 documents.
+- [x] Encrypted private key blobs are written under the expected key ref layout.
+- [x] Real age adapter round-trips protected private keys.
+- [x] Real age adapter round-trips encrypted payloads.
+- [x] Passphrase change proves new passphrase works and old passphrase no longer works.
+- [x] Rotation keeps old key decryptability where expected.
+- [x] Grant/revoke decryptability behavior is proven through real adapter tests.
+- [x] Integration tests stay focused and do not duplicate every unit branch.
 
 ---
 

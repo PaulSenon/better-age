@@ -33,6 +33,7 @@ const makeRuntime = (
 		cleanupCalls,
 		commandExists: async (command) =>
 			["code", "nano", "nvim", "vi", "vim"].includes(command),
+		confirm: async () => false,
 		createTempFile: async (initialText) => {
 			tempText = initialText;
 			return "/tmp/bage-edit.env";
@@ -102,11 +103,9 @@ describe("node editor", () => {
 	it("falls back from missing saved editor to picker and persists remember choice", async () => {
 		const runtime = makeRuntime({
 			commandExists: async (command) => command === "vim",
+			confirm: vi.fn(async () => true),
 			getSavedEditorCommand: async () => "missing-editor",
-			selectOne: vi
-				.fn()
-				.mockResolvedValueOnce("vim")
-				.mockResolvedValueOnce("remember"),
+			selectOne: vi.fn().mockResolvedValueOnce("vim"),
 		});
 
 		await openNodeEditor(runtime, "API_KEY=old\n");
@@ -122,20 +121,20 @@ describe("node editor", () => {
 				{ disabled: false, label: "vim", value: "vim" },
 			]),
 		);
+		expect(runtime.confirm).toHaveBeenCalledWith("Remember editor?");
 	});
 
 	it("does not persist one-time picker choice", async () => {
 		const runtime = makeRuntime({
 			commandExists: async (command) => command === "vi",
-			selectOne: vi
-				.fn()
-				.mockResolvedValueOnce("vi")
-				.mockResolvedValueOnce("once"),
+			confirm: vi.fn(async () => false),
+			selectOne: vi.fn().mockResolvedValueOnce("vi"),
 		});
 
 		await openNodeEditor(runtime, "API_KEY=old\n");
 
 		expect(runtime.savedCommands).toEqual([]);
+		expect(runtime.confirm).toHaveBeenCalledWith("Remember editor?");
 	});
 
 	it("fails explicitly and still cleans up when editor exits non-zero", async () => {

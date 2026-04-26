@@ -95,9 +95,18 @@ const makeHarness = (
 	};
 	const payloadCrypto: PayloadCryptoPort = {
 		encryptPayload: async ({ plaintext }) =>
-			`encrypted:${JSON.stringify(plaintext)}`,
+			[
+				"-----BEGIN AGE ENCRYPTED FILE-----",
+				`encrypted:${JSON.stringify(plaintext)}`,
+				"-----END AGE ENCRYPTED FILE-----",
+			].join("\n"),
 		decryptPayload: async ({ armoredPayload }) =>
-			JSON.parse(armoredPayload.slice("encrypted:".length)) as unknown,
+			JSON.parse(
+				armoredPayload
+					.split("\n")
+					.find((line) => line.startsWith("encrypted:"))
+					?.slice("encrypted:".length) ?? "null",
+			) as unknown,
 	};
 	const core = createBetterAgeCore({
 		clock: {
@@ -142,7 +151,12 @@ describe("BetterAgeCore payload lifecycle", () => {
 			},
 			notices: [],
 		});
-		expect(payloadFiles.get(".env.enc")).toContain("encryptedPayload");
+		const writtenPayloadFile = payloadFiles.get(".env.enc");
+		expect(writtenPayloadFile).toContain("# better-age encrypted env payload");
+		expect(writtenPayloadFile).toContain("-----BEGIN BETTER AGE PAYLOAD-----");
+		expect(writtenPayloadFile).toContain("-----BEGIN AGE ENCRYPTED FILE-----");
+		expect(writtenPayloadFile).toContain("-----END AGE ENCRYPTED FILE-----");
+		expect(writtenPayloadFile).toContain("-----END BETTER AGE PAYLOAD-----");
 
 		await expect(
 			core.queries.decryptPayload({
@@ -452,6 +466,15 @@ describe("BetterAgeCore payload lifecycle", () => {
 			result: { kind: "failure", code: "PAYLOAD_ALREADY_EXISTS" },
 		});
 		await expect(
+			core.commands.createPayload({
+				path: ".env.enc",
+				passphrase: "correct horse",
+				overwrite: true,
+			}),
+		).resolves.toMatchObject({
+			result: { kind: "success", code: "PAYLOAD_CREATED" },
+		});
+		await expect(
 			core.queries.decryptPayload({
 				path: "missing.env.enc",
 				passphrase: "correct horse",
@@ -467,5 +490,44 @@ describe("BetterAgeCore payload lifecycle", () => {
 		).resolves.toMatchObject({
 			result: { kind: "failure", code: "PASSPHRASE_INCORRECT" },
 		});
+	});
+
+	it("rejects malformed payload file envelopes before decrypting", async () => {
+		const { core, payloadFiles } = makeHarness();
+		await core.commands.createSelfIdentity({
+			displayName: "Isaac",
+			passphrase: "correct horse",
+		});
+
+		for (const contents of [
+			"not json and not an envelope",
+			[
+				"-----BEGIN BETTER AGE PAYLOAD-----",
+				"not age armor",
+				"-----END BETTER AGE PAYLOAD-----",
+			].join("\n"),
+			[
+				"-----BEGIN BETTER AGE PAYLOAD-----",
+				"-----BEGIN AGE ENCRYPTED FILE-----",
+				"encrypted:{}",
+				"-----END AGE ENCRYPTED FILE-----",
+				"-----END BETTER AGE PAYLOAD-----",
+				"-----BEGIN BETTER AGE PAYLOAD-----",
+				"-----BEGIN AGE ENCRYPTED FILE-----",
+				"encrypted:{}",
+				"-----END AGE ENCRYPTED FILE-----",
+				"-----END BETTER AGE PAYLOAD-----",
+			].join("\n"),
+		]) {
+			payloadFiles.set(".env.enc", contents);
+			await expect(
+				core.queries.decryptPayload({
+					path: ".env.enc",
+					passphrase: "correct horse",
+				}),
+			).resolves.toMatchObject({
+				result: { kind: "failure", code: "PAYLOAD_INVALID" },
+			});
+		}
 	});
 });

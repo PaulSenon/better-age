@@ -159,7 +159,8 @@ describe("release command grammar", () => {
 
 		expect(result.exitCode).toBe(0);
 		expect(result.stderr).toBe("");
-		expect(result.stdout).toContain("Usage: bage <command>");
+		expect(result.stdout).toContain("USAGE");
+		expect(result.stdout).toContain("$ bage");
 		for (const command of [
 			"create",
 			"edit",
@@ -187,8 +188,9 @@ describe("release command grammar", () => {
 			terminal: { mode: "headless" },
 		});
 		expect(loadHelp).toMatchObject({ exitCode: 0, stderr: "" });
-		expect(loadHelp.stdout).toContain("Usage: bage load [payload]");
-		expect(loadHelp.stdout).toContain("--protocol-version=1");
+		expect(loadHelp.stdout).toContain("USAGE");
+		expect(loadHelp.stdout).toContain("load");
+		expect(loadHelp.stdout).toContain("--protocol-version");
 		expect(loadHelp.stdout).toContain("Decrypt payload for varlock");
 
 		const passphraseHelp = await runCliWithGrammar({
@@ -197,8 +199,11 @@ describe("release command grammar", () => {
 			terminal: { mode: "headless" },
 		});
 		expect(passphraseHelp).toMatchObject({ exitCode: 0, stderr: "" });
-		expect(passphraseHelp.stdout).toContain("Usage: bage identity passphrase");
-		expect(passphraseHelp.stdout).toContain("Aliases: pass, pw");
+		expect(passphraseHelp.stdout).toContain("USAGE");
+		expect(passphraseHelp.stdout).toContain("passphrase");
+		expect(passphraseHelp.stdout).toContain(
+			"Change the identity key passphrase",
+		);
 	});
 
 	it("maps parse errors to stderr only and exit 2", async () => {
@@ -210,11 +215,10 @@ describe("release command grammar", () => {
 			terminal: { mode: "headless" },
 		});
 
-		expect(result).toEqual({
-			exitCode: 2,
-			stdout: "",
-			stderr: '[ERROR] COMMAND_UNKNOWN: unknown command "wat"\n',
-		});
+		expect(result.exitCode).toBe(2);
+		expect(result.stdout).toBe("");
+		expect(result.stderr).toContain("COMMAND_PARSE");
+		expect(result.stderr).toContain("Invalid subcommand");
 
 		const styled = await runCliWithGrammar({
 			argv: ["wat"],
@@ -223,9 +227,8 @@ describe("release command grammar", () => {
 		});
 
 		expect(styled.stdout).toBe("");
-		expect(styled.stderr).toBe(
-			'\u001B[31m[ERROR]\u001B[0m \u001B[1mCOMMAND_UNKNOWN:\u001B[0m unknown command "wat"\n',
-		);
+		expect(styled.stderr).toContain("COMMAND_PARSE");
+		expect(styled.stderr).toContain("Invalid subcommand");
 	});
 
 	it("delegates grammar-accepted commands to existing flows", async () => {
@@ -265,11 +268,9 @@ describe("release command grammar", () => {
 			core,
 			terminal: { mode: "interactive", promptSecret: async () => "secret" },
 		});
-		expect(loadWithoutProtocol).toEqual({
-			exitCode: 2,
-			stdout: "",
-			stderr: "[ERROR] LOAD_PROTOCOL_REQUIRED: pass --protocol-version=1\n",
-		});
+		expect(loadWithoutProtocol.exitCode).toBe(2);
+		expect(loadWithoutProtocol.stdout).toBe("");
+		expect(loadWithoutProtocol.stderr).toContain("protocol-version");
 		expect(calls).toEqual([]);
 	});
 });
