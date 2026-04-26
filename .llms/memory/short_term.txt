@@ -318,3 +318,120 @@
 - Added `.llms/projects/4-cli-core-boundary-hardening/plans/cli-io-stack-realignment.md`.
 - Six phases: Prompt Boundary And Dependency Spine; Inquirer Select As The Only Normal Picker; Inquirer Text/Password/Pause; Editor Flow Realignment; Secure Viewer And Machine Output Isolation; Release Plan Rebase And Cleanup.
 - This plan blocks returning to release UX parity Phase 4 Payload File Envelope.
+
+2026-04-26 Security release hardening grill opened:
+- User provided audit covering core/CLI/varlock security and maintainability risks.
+- New append-only log: `.llms/projects/7-security-release-hardening/0-GRILL-ME-security-release-hardening.md`.
+- No implementation yet; goal is deciding release blockers vs hardening vs separate identity signing project.
+- Initial likely release blockers: all-or-nothing passphrase change, typed corrupt-state failures, no-echo/no-length secret prompt, strict key/home permissions, viewer sanitization, editor temp hardening, passphrase policy, varlock rejected-promise retry, precise failure presentation, remove `Date.now()` fallback.
+- Major fork to grill first: whether full signed Identity V2 blocks MVP, or MVP can ship unsigned/TOFU with explicit key-update trust gate.
+
+2026-04-26 Security grill decision:
+- Full signed Identity V2 is out of scope for current release-hardening pass.
+- Current MVP can keep V1 unsigned/TOFU identities.
+- Small explicit trust gate for same-owner identity key/recipient updates is acceptable only if it fits cleanly; otherwise defer to V2 project.
+
+2026-04-26 Security grill constraint:
+- User rejected default generation-dir passphrase change if it needs deferred GC or changes stable key paths.
+- Main key path should be stable; passphrase change should preferably not mutate home state.
+- Need all-or-nothing design without hidden trash. Candidate: single stable encrypted local keyring artifact atomically replaced.
+
+2026-04-26 Security grill constraint update:
+- User also rejects a single keyring wrapper artifact.
+- Each private key must remain an individual age-protected key file for age interoperability.
+- Candidate now becomes bounded passphrase-change transaction/recovery around stable key paths, with temp/new/backup files cleaned synchronously or by explicit recovery before key use.
+
+2026-04-26 Security grill passphrase transaction direction:
+- User proposed naive backup/restore transaction with crash recovery.
+- Accepted concept, with safer ordering: prepare/write/verify all `.new` key files before moving stable files to `.bak`.
+- Recovery before any key read should restore `.bak` over stable paths, delete `.new`, remove marker, or fail closed with explicit transaction-incomplete error.
+
+2026-04-26 Security grill decision:
+- Passphrase change contract accepted: bounded backup/restore transaction.
+- Preserve individual age-encrypted key files and stable final paths.
+- No keyring wrapper, no generation directories, no deferred GC.
+- New files are prepared and verified before stable files move; transaction marker enables rollback before any future key read.
+
+2026-04-26 Security grill clarification:
+- Corrupt-state error topic maps to audit report item 2.
+- Report suggested `HOME_STATE_INVALID`, `PRIVATE_KEY_INVALID`, `ARTIFACT_UNSUPPORTED_VERSION`.
+- `KEY_TRANSACTION_INCOMPLETE` is new only because passphrase-change transaction/recovery now needs a typed fail-closed error when rollback cannot safely complete.
+
+2026-04-26 Security grill decision:
+- Add explicit `KEY_TRANSACTION_INCOMPLETE` typed failure.
+- Hardening corrupt-artifact set: `HOME_STATE_INVALID`, `PRIVATE_KEY_INVALID`, `ARTIFACT_UNSUPPORTED_VERSION`, `KEY_TRANSACTION_INCOMPLETE`.
+
+2026-04-26 Security grill decision:
+- Keep Inquirer for passphrase prompts; do not use custom `readHiddenSecret`.
+- Installed `@inquirer/password` supports `mask?: boolean | string`; `mask: false` gives transparent/no visible length echo.
+- Current CLI adapter type should be widened from `mask: string` to `boolean | string` or hidden behind adapter config.
+
+2026-04-26 Security grill decision:
+- Filesystem permissions auto-repair accepted.
+- Create/chmod home dir `0700`; key/temp files `0600`.
+- Existing loose home/key permissions should auto-chmod and emit warning/notice.
+- If chmod/repair fails, fail closed with typed storage/permission failure.
+
+2026-04-26 Security grill decision:
+- Secure viewer must escape/render control sequences visibly, not interpret or strip them.
+- Payload bytes remain unchanged; sanitization is display-only.
+- Newlines remain line breaks; ANSI/OSC/C0/DEL controls render as visible escapes like `\\x1b`, `\\r`, `\\x07`.
+
+2026-04-26 Security grill decision:
+- MVP editor hardening scope accepted: temp dir `0700`, temp file `0600`, random temp name, delete file on close, best-effort remove dir, document residual editor swap/backup/plugin risk.
+- Strict editor flags/in-process editor/encrypted temp file are deferred.
+
+2026-04-26 Security grill decision:
+- Passphrase policy: hard reject empty and length `< 8`.
+- Applies to setup and identity passphrase new passphrase flows.
+- No strength meter/warning-only path for MVP.
+
+2026-04-26 Security grill payload temp constraint:
+- User does not want `<payload>.tmp` style files living beside encrypted payloads.
+- Payload post-encrypt verification should be in-memory; temp only needed for atomic commit.
+- Candidate commit design: hidden staging dir in target parent, stage encrypted bytes only, rename to final, clean synchronously/best-effort.
+
+2026-04-26 Security grill payload temp constraint update:
+- User rejects any payload temp/staging files in cwd or subdirectories near payload, including hidden `.better-age-tmp`.
+- Portable atomic replace normally requires same-directory/same-filesystem staging; OS temp is not reliably atomic and Linux `O_TMPFILE` is not portable.
+- Likely MVP direction: in-memory post-encrypt verification only; do not add project-local staging for payload commits.
+
+2026-04-26 Security grill decision:
+- Payload writes get in-memory encrypt/decrypt/parse verification only.
+- No payload temp/staging files in user project/cwd/subdirs.
+- No `.better-age-tmp`, no `<payload>.tmp`, no atomic payload replace claim for MVP.
+
+2026-04-26 Security grill decision:
+- Payload decrypt/read should try current key first, then retired keys only if needed.
+- Corrupt/missing retired key should warn, not falsely return `PASSPHRASE_INCORRECT` or block current-key payload access.
+- If no usable key decrypts payload, return normal payload decrypt failure.
+
+2026-04-26 Security grill remaining defaults:
+- Keep load protocol plaintext stdout with required `--protocol-version=1`, stderr only for warnings/errors.
+- Fix varlock rejected-promise memoization now.
+- Document varlock custom `command` as trusted local config; structured command/args later.
+- Fix failure presenter fallback now.
+- Fix `Date.now()` fallback now.
+- Defer branded IDs and core export-path split unless trivial.
+
+2026-04-26 Security PRD/plan:
+- Created `.llms/projects/7-security-release-hardening/1-PRD_SECURITY_RELEASE_HARDENING.md`.
+- Created `.llms/projects/7-security-release-hardening/plans/security-release-hardening.md`.
+- Double-checked V1 identity key-update gate: fits via core `importKnownIdentity` plus CLI interactive retry/exact flag.
+- Updated backlog with deferred signed Identity V2, structured varlock launcher, strict editor mode, in-process editor, branded IDs, core export split, and rejected/deferred payload atomic staging.
+
+2026-04-26 Security Release Hardening Phase 1 complete:
+- Core now maps corrupt home state to `HOME_STATE_INVALID` and unsupported home-state versions to `ARTIFACT_UNSUPPORTED_VERSION` instead of leaking raw exceptions.
+- Core preserves `PRIVATE_KEY_INVALID` from private-key artifact parsing instead of collapsing it into `PASSPHRASE_INCORRECT`.
+- Core command/query boundaries catch known local artifact failures and return typed failures.
+- Payload creation no longer falls back to `Date.now()`; missing payload id port returns `PAYLOAD_ID_UNAVAILABLE`.
+- CLI presenter has explicit messages for new security/storage failures and unknown failure fallback now says `unmapped failure code <CODE>`.
+- Tests added for corrupt home state, unsupported version, invalid private key artifact, missing payload id port, CLI corrupt-state rendering, and unknown presenter fallback.
+
+2026-04-26 Security Release Hardening Phase 2 complete:
+- Inquirer password prompt now uses `mask: false`, preserving the prompt library while avoiding length echo.
+- New passphrases shorter than 8 chars are rejected in setup and identity passphrase flows with interactive retry feedback.
+- Node home repository enforces/repairs private home/key permissions: home/key dirs `0700`, key temp/final files `0600`.
+- Existing loose home/key permissions are auto-repaired and surfaced as `LOCAL_PERMISSIONS_REPAIRED` notices.
+- Permission repair failure is mapped as `LOCAL_PERMISSION_REPAIR_FAILED` and has CLI presenter text.
+- Real adapter integration tests cover strict created modes and loose permission repair before key read.

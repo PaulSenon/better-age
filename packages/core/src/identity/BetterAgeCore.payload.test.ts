@@ -39,6 +39,7 @@ const teammate = {
 const makeHarness = (
 	options: {
 		readonly generatedPrivateKeys?: ReadonlyArray<PrivateKeyPlaintext>;
+		readonly nextPayloadId?: (() => Promise<string>) | null;
 		readonly nowValues?: ReadonlyArray<string>;
 	} = {},
 ) => {
@@ -120,7 +121,11 @@ const makeHarness = (
 		payloadRepository,
 		randomIds: {
 			nextOwnerId: async () => "owner_123",
-			nextPayloadId: async () => "payload_123",
+			...(options.nextPayloadId === null
+				? {}
+				: {
+						nextPayloadId: options.nextPayloadId ?? (async () => "payload_123"),
+					}),
 		},
 	});
 
@@ -192,6 +197,23 @@ describe("BetterAgeCore payload lifecycle", () => {
 				},
 			},
 			notices: [],
+		});
+	});
+
+	it("requires an adapter-provided payload id instead of falling back to wall clock time", async () => {
+		const { core } = makeHarness({ nextPayloadId: null });
+		await core.commands.createSelfIdentity({
+			displayName: "Isaac",
+			passphrase: "correct horse",
+		});
+
+		await expect(
+			core.commands.createPayload({
+				path: ".env.enc",
+				passphrase: "correct horse",
+			}),
+		).resolves.toMatchObject({
+			result: { kind: "failure", code: "PAYLOAD_ID_UNAVAILABLE" },
 		});
 	});
 

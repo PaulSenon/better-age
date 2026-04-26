@@ -1,4 +1,11 @@
 CLI/core boundary spec: design future flow for importing unknown identities discovered in a payload. Candidate: interactive-only flow after opening payload when new recipients exist, or dedicated command later. Should loop through unknown identities, allow import/skip, and optionally prompt local alias on display-name collision.
-Payload update hardening: before replacing a payload file, encrypt updated payload in memory, decrypt/reopen it in memory, and only persist if verification succeeds. Out of MVP.
+Superseded by security release hardening: payload update hardening is now scoped as in-memory verification only, with no project-local temp/staging files.
 Future identity alias commands: `bage identity alias add [<identity-ref>] [<alias>]` to add/edit alias, and `bage identity alias remove [<identity-ref>]` with possible `rm` alias. Out of MVP.
 Consider CLI-only follow-up after interactive `create`: offer or automatically start `edit` for the newly created empty payload. Core create remains empty-payload only.
+Signed Identity V2: dedicated project exists at `.llms/projects/6-identity-signing-continuity/0-IDENTITY_SIGNING_CONTINUITY_SPEC.md`; out of current hardening pass.
+Structured varlock launcher config: later replace trusted string `command` shell fallback with structured `command` + `args`.
+Strict editor mode: later optional editor-specific hardening flags for vim/nvim/etc.; MVP only does temp permissions/random cleanup/docs.
+In-process editor: future high-security edit mode if external editor plaintext temp risk becomes unacceptable.
+Branded domain ids: later introduce stronger branded boundaries for owner id, payload id, key fingerprints, key refs, and age recipients.
+Core export-path split: later consider `@better-age/core` pure API and `@better-age/core/node` adapter exports.
+Payload atomic replace: deferred because user rejects project-local temp/staging files; current hardening only verifies in memory before final write.

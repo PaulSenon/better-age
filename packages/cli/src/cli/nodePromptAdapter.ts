@@ -23,7 +23,7 @@ export type NodePromptFunctions = {
 		context: PromptContext,
 	) => Promise<string>;
 	readonly password: (
-		config: { readonly mask: string; readonly message: string },
+		config: { readonly mask: boolean | string; readonly message: string },
 		context: PromptContext,
 	) => Promise<string>;
 	readonly select: (
@@ -130,7 +130,7 @@ export const createNodePromptAdapter = (
 			),
 		promptSecret: async (label) =>
 			await withCancellation(() =>
-				promptFns.password({ mask: "*", message: label }, context),
+				promptFns.password({ mask: false, message: label }, context),
 			),
 		promptText: async (label, defaultValue) =>
 			await withCancellation(() =>

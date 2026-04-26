@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { chmod, mkdtemp, readFile, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -17,6 +17,8 @@ const makeTempDir = async () => {
 	tempDirs.push(directory);
 	return directory;
 };
+
+const permissionBits = async (path: string) => (await stat(path)).mode & 0o777;
 
 afterEach(async () => {
 	await Promise.all(
@@ -75,6 +77,12 @@ describe("real core adapters", () => {
 		);
 		const payloadFile = await readFile(payloadPath, "utf8");
 
+		expect(await permissionBits(homeDir)).toBe(0o700);
+		expect(
+			await permissionBits(
+				join(homeDir, homeState.currentKey.encryptedPrivateKeyRef),
+			),
+		).toBe(0o600);
 		expect(homeStateJson).toContain('"kind":"better-age/home-state"');
 		expect(homeState.currentKey.encryptedPrivateKeyRef).toMatch(
 			/^keys\/.+\.age$/,
@@ -106,6 +114,44 @@ describe("real core adapters", () => {
 				value: { envText: "API_TOKEN=secret\n", envKeys: ["API_TOKEN"] },
 			},
 		});
+	});
+
+	it("repairs loose home and key permissions before reading local keys", async () => {
+		const homeDir = await makeTempDir();
+		const core = createBetterAgeCore({
+			clock: { now: async () => "2026-04-25T10:00:00.000Z" },
+			homeRepository: createNodeHomeRepository({ homeDir }),
+			identityCrypto: createAgeIdentityCrypto(),
+			randomIds: {
+				nextOwnerId: async () => "owner_real",
+				nextPayloadId: async () => "payload_real",
+			},
+		});
+
+		await core.commands.createSelfIdentity({
+			displayName: "Isaac",
+			passphrase: "old passphrase",
+		});
+		const homeState = JSON.parse(
+			await readFile(join(homeDir, "home-state.json"), "utf8"),
+		) as {
+			readonly currentKey: { readonly encryptedPrivateKeyRef: string };
+		};
+		const keyPath = join(homeDir, homeState.currentKey.encryptedPrivateKeyRef);
+
+		await chmod(homeDir, 0o755);
+		await chmod(keyPath, 0o644);
+
+		await expect(
+			core.queries.verifySelfIdentityPassphrase({
+				passphrase: "old passphrase",
+			}),
+		).resolves.toMatchObject({
+			notices: [{ code: "LOCAL_PERMISSIONS_REPAIRED" }],
+			result: { kind: "success", code: "PASSPHRASE_VERIFIED" },
+		});
+		await expect(permissionBits(homeDir)).resolves.toBe(0o700);
+		await expect(permissionBits(keyPath)).resolves.toBe(0o600);
 	});
 
 	it("proves passphrase change and rotation with real encrypted key blobs", async () => {

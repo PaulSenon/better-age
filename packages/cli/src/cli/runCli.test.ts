@@ -272,6 +272,29 @@ describe("runCli command contracts", () => {
 		]);
 	});
 
+	it("renders corrupt local state failures without stack traces", async () => {
+		const { core } = makeCore({
+			commands: {
+				createSelfIdentity: async () => failure("HOME_STATE_INVALID"),
+			},
+		});
+
+		await expect(
+			runCli({
+				argv: ["setup", "--name", "Isaac"],
+				core,
+				terminal: {
+					mode: "interactive",
+					promptSecret: async () => "correct horse",
+				},
+			}),
+		).resolves.toEqual({
+			exitCode: 1,
+			stdout: "",
+			stderr: "[ERROR] HOME_STATE_INVALID: local home state is invalid\n",
+		});
+	});
+
 	it("runs guided setup interactively and fails setup headless without prompting", async () => {
 		const guided = makeCore();
 
@@ -324,7 +347,12 @@ describe("runCli command contracts", () => {
 
 	it("retries setup passphrase confirmation before creating identity", async () => {
 		const { calls, core } = makeCore();
-		const secrets = ["first", "mismatch", "correct horse", "correct horse"];
+		const secrets = [
+			"first pass",
+			"mismatch",
+			"correct horse",
+			"correct horse",
+		];
 
 		await expect(
 			runCli({
@@ -340,6 +368,33 @@ describe("runCli command contracts", () => {
 			{
 				name: "createSelfIdentity",
 				input: { displayName: "Isaac", passphrase: "correct horse" },
+			},
+		]);
+	});
+
+	it("rejects short setup passphrases before creating identity", async () => {
+		const { calls, core } = makeCore();
+		const secrets = ["short", "long enough", "long enough"];
+
+		await expect(
+			runCli({
+				argv: ["setup", "--name", "Isaac"],
+				core,
+				terminal: {
+					mode: "interactive",
+					promptSecret: async () => secrets.shift() ?? "",
+				},
+			}),
+		).resolves.toEqual({
+			exitCode: 0,
+			stdout: "",
+			stderr:
+				"[ERROR] PASSPHRASE_TOO_SHORT: passphrase must be at least 8 characters\n[OK] Identity created: Isaac#fp_self\n",
+		});
+		expect(calls).toEqual([
+			{
+				name: "createSelfIdentity",
+				input: { displayName: "Isaac", passphrase: "long enough" },
 			},
 		]);
 	});
@@ -1506,6 +1561,48 @@ describe("runCli command contracts", () => {
 				"[ERROR] PASSPHRASE_UNAVAILABLE: cannot prompt in headless mode\n",
 		});
 		expect(headless.calls).toEqual([]);
+	});
+
+	it("rejects short replacement identity passphrases before changing keys", async () => {
+		const changed = makeCore({
+			queries: {
+				verifySelfIdentityPassphrase: async () =>
+					success("PASSPHRASE_VERIFIED", { ownerId: "owner_self" }),
+			},
+		});
+		const secrets = [
+			"old passphrase",
+			"short",
+			"new passphrase",
+			"new passphrase",
+		];
+
+		await expect(
+			runCli({
+				argv: ["identity", "passphrase"],
+				core: changed.core,
+				terminal: {
+					mode: "interactive",
+					promptSecret: async () => secrets.shift() ?? "",
+				},
+			}),
+		).resolves.toEqual({
+			exitCode: 0,
+			stdout: "",
+			stderr:
+				"[ERROR] PASSPHRASE_TOO_SHORT: passphrase must be at least 8 characters\n[OK] Passphrase changed\n",
+		});
+		expect(
+			changed.calls.filter((call) => call.name === "changeIdentityPassphrase"),
+		).toEqual([
+			{
+				name: "changeIdentityPassphrase",
+				input: {
+					currentPassphrase: "old passphrase",
+					nextPassphrase: "new passphrase",
+				},
+			},
+		]);
 	});
 
 	it("gates interactive session setup state and loops into normal menus after setup", async () => {

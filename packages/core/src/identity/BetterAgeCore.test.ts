@@ -70,6 +70,10 @@ const makeHarness = (
 		protectPrivateKey: async ({ privateKey: key, passphrase }) =>
 			`protected:${passphrase}:${key.privateKey}`,
 		decryptPrivateKey: async ({ encryptedKey, passphrase }) => {
+			if (encryptedKey === "invalid-private-key") {
+				throw new Error("PRIVATE_KEY_INVALID");
+			}
+
 			const key = [privateKey, rotatedPrivateKey, ...generatedPrivateKeys].find(
 				(candidate) => encryptedKey.endsWith(candidate.privateKey),
 			);
@@ -232,6 +236,50 @@ describe("BetterAgeCore identity lifecycle", () => {
 					},
 				},
 			},
+		});
+	});
+
+	it("reports invalid home state as a typed failure", async () => {
+		const { core } = makeHarness({
+			initialHomeState: {
+				kind: "better-age/home-state",
+				version: 2,
+			},
+		});
+
+		await expect(core.queries.getHomeStatus()).resolves.toMatchObject({
+			result: { kind: "failure", code: "HOME_STATE_INVALID" },
+		});
+	});
+
+	it("reports unsupported home state version as a typed failure", async () => {
+		const { core } = makeHarness({
+			initialHomeState: {
+				...validHomeStateDocumentV2,
+				version: 999,
+			},
+		});
+
+		await expect(core.queries.getHomeStatus()).resolves.toMatchObject({
+			result: { kind: "failure", code: "ARTIFACT_UNSUPPORTED_VERSION" },
+		});
+	});
+
+	it("reports invalid private key artifacts without blaming the passphrase", async () => {
+		const { core, encryptedKeys } = makeHarness();
+
+		await core.commands.createSelfIdentity({
+			displayName: "Isaac",
+			passphrase: "correct horse",
+		});
+		encryptedKeys.set("keys/fp_self.age", "invalid-private-key");
+
+		await expect(
+			core.queries.verifySelfIdentityPassphrase({
+				passphrase: "correct horse",
+			}),
+		).resolves.toMatchObject({
+			result: { kind: "failure", code: "PRIVATE_KEY_INVALID" },
 		});
 	});
 

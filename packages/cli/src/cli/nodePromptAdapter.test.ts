@@ -51,7 +51,7 @@ describe("node prompt adapter", () => {
 			expectedContext,
 		);
 		expect(promptFns.password).toHaveBeenCalledWith(
-			{ mask: "*", message: "Passphrase" },
+			{ mask: false, message: "Passphrase" },
 			expectedContext,
 		);
 		expect(promptFns.select).toHaveBeenCalledWith(

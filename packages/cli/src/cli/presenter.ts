@@ -60,6 +60,8 @@ const failureMessage = (code: string) => {
 			return "editor exited with a non-zero status";
 		case "HOME_STATE_NOT_FOUND":
 			return "run bage setup first";
+		case "HOME_STATE_INVALID":
+			return "local home state is invalid";
 		case "IDENTITY_REFERENCE_NOT_FOUND":
 			return "identity reference not found";
 		case "IDENTITY_STRING_INVALID":
@@ -70,6 +72,12 @@ const failureMessage = (code: string) => {
 			return "alias already exists";
 		case "LOCAL_ALIAS_INVALID":
 			return "alias is invalid";
+		case "ARTIFACT_UNSUPPORTED_VERSION":
+			return "artifact version is not supported by this Better Age version";
+		case "KEY_TRANSACTION_INCOMPLETE":
+			return "local key transaction could not be recovered automatically";
+		case "LOCAL_PERMISSION_REPAIR_FAILED":
+			return "local file permissions could not be repaired";
 		case "LOAD_PROTOCOL_REQUIRED":
 			return "pass --protocol-version=1";
 		case "LOAD_PROTOCOL_UNSUPPORTED":
@@ -78,10 +86,14 @@ const failureMessage = (code: string) => {
 			return "passphrase confirmation did not match";
 		case "PASSPHRASE_INCORRECT":
 			return "invalid passphrase";
+		case "PASSPHRASE_TOO_SHORT":
+			return "passphrase must be at least 8 characters";
 		case "PASSPHRASE_UNAVAILABLE":
 			return "cannot prompt in headless mode";
 		case "PAYLOAD_ALREADY_EXISTS":
 			return "payload already exists";
+		case "PAYLOAD_ID_UNAVAILABLE":
+			return "payload id generator is unavailable";
 		case "PAYLOAD_NOT_FOUND":
 			return "payload not found";
 		case "PAYLOAD_ENV_INVALID":
@@ -90,6 +102,8 @@ const failureMessage = (code: string) => {
 			return "pass a payload path or run interactively";
 		case "PAYLOAD_UPDATE_REQUIRED":
 			return "run bage update before mutating payload";
+		case "PRIVATE_KEY_INVALID":
+			return "local private key artifact is invalid";
 		case "RECIPIENT_REFERENCE_NOT_FOUND":
 			return "recipient reference not found";
 		case "SETUP_NAME_MISSING":
@@ -97,7 +111,7 @@ const failureMessage = (code: string) => {
 		case "VIEWER_UNAVAILABLE":
 			return "secure viewer is unavailable";
 		default:
-			return "command failed";
+			return `unmapped failure code ${code}`;
 	}
 };
 

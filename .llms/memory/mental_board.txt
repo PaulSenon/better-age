@@ -1,40 +1,13 @@
-Current goal: recover release readiness after user QA found CLI UX regressions.
+Current goal: security release hardening implementation.
 
 Active state:
-- Phase 1 workspace split done: legacy CLI is `packages/cli-legacy`, private, no `bage` bin.
-- Phase 2 artifact/migration foundation done.
-- Phase 3 core identity/key lifecycle done.
-- Phase 4 core payload lifecycle done.
-- Phase 5 real core adapters done.
-- Phase 6 new CLI identity slice done.
-- Phase 7 new CLI payload create/read/edit slice done.
-- Phase 8 new CLI sharing/maintenance slice done.
-- Phase 9 new CLI identity security slice done.
-- Phase 10 varlock/load protocol slice done.
-- Phase 11 final contract hardening done.
-- Append-only implementation log: `.llms/projects/4-cli-core-boundary-hardening/11-IMPLEMENTATION_LOG.md`.
-- Runtime CLI release-readiness phases 1-9 complete.
-- Old MVP reimplementation plan phases 1-5 stale checkboxes corrected.
-- Release UX parity hardening Phase 1 complete.
-- Release UX parity hardening Phase 2 complete.
-- Release UX parity hardening Phase 3 complete.
-- Release UX parity hardening Phase 4 complete.
-- Release UX parity hardening Phase 5 complete.
-- Release UX parity hardening Phase 6 complete.
-- Release UX parity hardening Phase 7 complete.
-- CLI IO stack realignment phases 1-6 complete: `@effect/cli` grammar/help, `@inquirer/prompts` normal IO, custom raw terminal only for secure viewer/output.
-
-Audit notes:
-- Previous static/spec audit was insufficient; user QA found release-blocking UX regressions.
-- Not release ready.
-- Main suspect: new CLI runtime and interactive/guided UX regressed from legacy prototype despite core structure/tests.
-- Need parity matrix against legacy prototype + active specs + user QA.
-
-Latest verification:
-- Immediate feedback QA fix passed: `pnpm test`, `pnpm check`, `git diff --check`.
+- CLI/core rebuild exists but release remains blocked.
+- Latest user input is a security audit, not an implementation request.
+- New grill log: `.llms/projects/7-security-release-hardening/0-GRILL-ME-security-release-hardening.md`.
+- Identity signing continuity spec already exists at `.llms/projects/6-identity-signing-continuity/0-IDENTITY_SIGNING_CONTINUITY_SPEC.md`.
 
 Next:
-- Continue user manual QA against built CLI.
+- Phase 3: Passphrase Change Transaction.
 
 Blockers:
-- Release blocked until manual QA passes.
+- None for Phase 2 yet.

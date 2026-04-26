@@ -357,7 +357,9 @@ const renderNotices = (notices: ReadonlyArray<CoreNotice>): string =>
 		.map((notice) =>
 			notice.code === "PAYLOAD_UPDATE_RECOMMENDED"
 				? presentWarning("Payload update recommended: run bage update")
-				: presentWarning(notice.code),
+				: notice.code === "LOCAL_PERMISSIONS_REPAIRED"
+					? presentWarning("Local file permissions repaired")
+					: presentWarning(notice.code),
 		)
 		.join("");
 
@@ -392,42 +394,10 @@ const isValidEnvText = (envText: string): boolean =>
 				/^[A-Za-z_][A-Za-z0-9_]*=.*/.test(line),
 		);
 
+const isValidNewPassphrase = (passphrase: string): boolean =>
+	passphrase.length >= 8;
+
 const acquireNewPassphrase = async (
-	terminal: CliTerminal,
-): Promise<
-	{ readonly passphrase: string } | { readonly failure: RunCliResult }
-> => {
-	const promptSecret = requirePromptSecret(terminal);
-
-	if (promptSecret === null) {
-		return { failure: presentFailure("PASSPHRASE_UNAVAILABLE") };
-	}
-
-	for (let attempt = 0; attempt < 3; attempt++) {
-		const passphrase = await readSecretPrompt(promptSecret, "Passphrase");
-
-		if ("failure" in passphrase) {
-			return passphrase;
-		}
-
-		const confirmation = await readSecretPrompt(
-			promptSecret,
-			"Confirm passphrase",
-		);
-
-		if ("failure" in confirmation) {
-			return confirmation;
-		}
-
-		if (passphrase.secret === confirmation.secret) {
-			return { passphrase: passphrase.secret };
-		}
-	}
-
-	return { failure: presentFailure("PASSPHRASE_CONFIRMATION_MISMATCH") };
-};
-
-const acquireConfirmedPassphrase = async (
 	input: RunCliInput,
 ): Promise<
 	| { readonly passphrase: string; readonly stderr: string }
@@ -440,12 +410,22 @@ const acquireConfirmedPassphrase = async (
 	}
 
 	let stderr = "";
+	let lastFailureCode = "PASSPHRASE_CONFIRMATION_MISMATCH";
 
 	for (let attempt = 0; attempt < 3; attempt++) {
-		const passphrase = await readSecretPrompt(promptSecret, "New passphrase");
+		const passphrase = await readSecretPrompt(promptSecret, "Passphrase");
 
 		if ("failure" in passphrase) {
 			return passphrase;
+		}
+
+		if (!isValidNewPassphrase(passphrase.secret)) {
+			lastFailureCode = "PASSPHRASE_TOO_SHORT";
+			stderr += await emitInteractiveFeedback(
+				input,
+				presentFailure("PASSPHRASE_TOO_SHORT"),
+			);
+			continue;
 		}
 
 		const confirmation = await readSecretPrompt(
@@ -461,6 +441,65 @@ const acquireConfirmedPassphrase = async (
 			return { passphrase: passphrase.secret, stderr };
 		}
 
+		lastFailureCode = "PASSPHRASE_CONFIRMATION_MISMATCH";
+	}
+
+	const failure = presentFailure(lastFailureCode);
+
+	return {
+		failure: {
+			...failure,
+			stderr: `${stderr}${failure.stderr}`,
+		},
+	};
+};
+
+const acquireConfirmedPassphrase = async (
+	input: RunCliInput,
+): Promise<
+	| { readonly passphrase: string; readonly stderr: string }
+	| { readonly failure: RunCliResult }
+> => {
+	const promptSecret = requirePromptSecret(input.terminal);
+
+	if (promptSecret === null) {
+		return { failure: presentFailure("PASSPHRASE_UNAVAILABLE") };
+	}
+
+	let stderr = "";
+	let lastFailureCode = "PASSPHRASE_CONFIRMATION_MISMATCH";
+
+	for (let attempt = 0; attempt < 3; attempt++) {
+		const passphrase = await readSecretPrompt(promptSecret, "New passphrase");
+
+		if ("failure" in passphrase) {
+			return passphrase;
+		}
+
+		if (!isValidNewPassphrase(passphrase.secret)) {
+			lastFailureCode = "PASSPHRASE_TOO_SHORT";
+			stderr += await emitInteractiveFeedback(
+				input,
+				presentFailure("PASSPHRASE_TOO_SHORT"),
+			);
+			continue;
+		}
+
+		const confirmation = await readSecretPrompt(
+			promptSecret,
+			"Confirm passphrase",
+		);
+
+		if ("failure" in confirmation) {
+			return confirmation;
+		}
+
+		if (passphrase.secret === confirmation.secret) {
+			return { passphrase: passphrase.secret, stderr };
+		}
+
+		lastFailureCode = "PASSPHRASE_CONFIRMATION_MISMATCH";
+
 		if (attempt < 2) {
 			stderr += await emitInteractiveFeedback(
 				input,
@@ -469,10 +508,12 @@ const acquireConfirmedPassphrase = async (
 		}
 	}
 
+	const failure = presentFailure(lastFailureCode);
+
 	return {
 		failure: {
-			...presentFailure("PASSPHRASE_CONFIRMATION_MISMATCH"),
-			stderr: `${stderr}${presentFailure("PASSPHRASE_CONFIRMATION_MISMATCH").stderr}`,
+			...failure,
+			stderr: `${stderr}${failure.stderr}`,
 		},
 	};
 };
@@ -574,7 +615,7 @@ const runSetup = async (
 		return presentFailure("SETUP_NAME_MISSING", 2);
 	}
 
-	const passphrase = await acquireNewPassphrase(input.terminal);
+	const passphrase = await acquireNewPassphrase(input);
 
 	if ("failure" in passphrase) {
 		return passphrase.failure;
@@ -586,10 +627,16 @@ const runSetup = async (
 	});
 
 	if (response.result.kind === "failure") {
-		return presentFailure(response.result.code);
+		const failure = presentFailure(response.result.code);
+
+		return { ...failure, stderr: `${passphrase.stderr}${failure.stderr}` };
 	}
 
-	return presentSuccess(`Identity created: ${response.result.value.handle}`);
+	const success = presentSuccess(
+		`Identity created: ${response.result.value.handle}`,
+	);
+
+	return { ...success, stderr: `${passphrase.stderr}${success.stderr}` };
 };
 
 const resolveExistingPayloadPath = async (

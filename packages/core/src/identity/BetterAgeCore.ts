@@ -1,5 +1,6 @@
 import { Either } from "effect";
 import {
+	type ArtifactDocumentParseError,
 	encodePublicIdentityString,
 	type HomeStateDocumentV2,
 	migrateHomeStateDocument,
@@ -100,12 +101,21 @@ export type DecryptedPayload = {
 
 export type CoreNotice = {
 	readonly level: "warning";
-	readonly code: "PAYLOAD_UPDATE_RECOMMENDED";
-	readonly details: {
-		readonly path: PayloadPath;
-		readonly reasons: ReadonlyArray<"self-recipient-refresh">;
-	};
-};
+} & (
+	| {
+			readonly code: "PAYLOAD_UPDATE_RECOMMENDED";
+			readonly details: {
+				readonly path: PayloadPath;
+				readonly reasons: ReadonlyArray<"self-recipient-refresh">;
+			};
+	  }
+	| {
+			readonly code: "LOCAL_PERMISSIONS_REPAIRED";
+			readonly details: {
+				readonly paths: ReadonlyArray<string>;
+			};
+	  }
+);
 
 export type CoreSuccess<TCode extends string, TValue> = {
 	readonly kind: "success";
@@ -132,6 +142,7 @@ export type HomeRepositoryPort = {
 		readonly ref: EncryptedPrivateKeyRef;
 		readonly encryptedKey: string;
 	}): Promise<void>;
+	consumeSecurityNotices?(): ReadonlyArray<CoreNotice>;
 };
 
 export type IdentityCryptoPort = {
@@ -199,6 +210,71 @@ const failure = <TCode extends string, TDetails = undefined>(
 	result: { kind: "failure", code, details },
 	notices: [],
 });
+
+const knownFailureCodeFromCause = (cause: unknown): string | null => {
+	if (!(cause instanceof Error)) {
+		return null;
+	}
+
+	switch (cause.message) {
+		case "ARTIFACT_UNSUPPORTED_VERSION":
+		case "HOME_STATE_INVALID":
+		case "KEY_TRANSACTION_INCOMPLETE":
+		case "LOCAL_PERMISSION_REPAIR_FAILED":
+		case "PRIVATE_KEY_INVALID":
+			return cause.message;
+		default:
+			return null;
+	}
+};
+
+const parseHomeStateFailureCode = (
+	error: ArtifactDocumentParseError,
+): "ARTIFACT_UNSUPPORTED_VERSION" | "HOME_STATE_INVALID" =>
+	error._tag === "ArtifactDocumentUnsupportedVersionError"
+		? "ARTIFACT_UNSUPPORTED_VERSION"
+		: "HOME_STATE_INVALID";
+
+const passphraseOrPrivateKeyFailure = (cause: unknown) =>
+	knownFailureCodeFromCause(cause) === "PRIVATE_KEY_INVALID"
+		? failure("PRIVATE_KEY_INVALID", undefined)
+		: failure("PASSPHRASE_INCORRECT", undefined);
+
+const withKnownCoreFailures =
+	<
+		TArgs extends ReadonlyArray<unknown>,
+		TResponse extends CoreResponse<unknown>,
+	>(
+		run: (...args: TArgs) => Promise<TResponse>,
+		consumeNotices: () => ReadonlyArray<CoreNotice> = () => [],
+	) =>
+	async (
+		...args: TArgs
+	): Promise<TResponse | CoreResponse<CoreFailure<string, undefined>>> => {
+		try {
+			const result = await run(...args);
+			const notices = consumeNotices();
+
+			return notices.length === 0
+				? result
+				: { ...result, notices: [...result.notices, ...notices] };
+		} catch (cause) {
+			const code = knownFailureCodeFromCause(cause);
+
+			if (code !== null) {
+				return response(
+					{
+						kind: "failure" as const,
+						code,
+						details: undefined,
+					},
+					consumeNotices(),
+				);
+			}
+
+			throw cause;
+		}
+	};
 
 const response = <TResult>(
 	result: TResult,
@@ -290,7 +366,7 @@ const loadCurrentHomeState = async (
 	const parsed = parseHomeStateDocument(document);
 
 	if (Either.isLeft(parsed)) {
-		throw new Error("HOME_STATE_INVALID");
+		throw new Error(parseHomeStateFailureCode(parsed.left));
 	}
 
 	const migrated = migrateHomeStateDocument(parsed.right);
@@ -492,13 +568,18 @@ export const createBetterAgeCore = (ports: BetterAgeCorePorts) => {
 				homeState,
 				passphrase: input.passphrase,
 			});
-		} catch {
-			return failure("PASSPHRASE_INCORRECT", undefined);
+		} catch (cause) {
+			return passphraseOrPrivateKeyFailure(cause);
 		}
 
 		const now = await ports.clock.now();
-		const payloadId =
-			(await ports.randomIds.nextPayloadId?.()) ?? `payload_${Date.now()}`;
+		const nextPayloadId = ports.randomIds.nextPayloadId;
+
+		if (nextPayloadId === undefined) {
+			return failure("PAYLOAD_ID_UNAVAILABLE", undefined);
+		}
+
+		const payloadId = await nextPayloadId();
 		const self = toPublicIdentity(homeState);
 		const plaintext: PayloadPlaintext = {
 			kind: "better-age/payload",
@@ -542,8 +623,8 @@ export const createBetterAgeCore = (ports: BetterAgeCorePorts) => {
 				homeState,
 				passphrase: input.passphrase,
 			});
-		} catch {
-			return failure("PASSPHRASE_INCORRECT", undefined);
+		} catch (cause) {
+			return passphraseOrPrivateKeyFailure(cause);
 		}
 
 		let rawPayloadFile: string;
@@ -633,10 +714,10 @@ export const createBetterAgeCore = (ports: BetterAgeCorePorts) => {
 				homeState,
 				passphrase: input.passphrase,
 			});
-		} catch {
+		} catch (cause) {
 			return {
 				kind: "failure" as const,
-				response: failure("PASSPHRASE_INCORRECT", undefined),
+				response: passphraseOrPrivateKeyFailure(cause),
 			};
 		}
 
@@ -1249,8 +1330,8 @@ export const createBetterAgeCore = (ports: BetterAgeCorePorts) => {
 				encryptedKey: encryptedCurrentKey,
 				passphrase: input.passphrase,
 			});
-		} catch {
-			return failure("PASSPHRASE_INCORRECT", undefined);
+		} catch (cause) {
+			return passphraseOrPrivateKeyFailure(cause);
 		}
 
 		const rotatedAt = await ports.clock.now();
@@ -1313,8 +1394,8 @@ export const createBetterAgeCore = (ports: BetterAgeCorePorts) => {
 				encryptedKey: encryptedCurrentKey,
 				passphrase: input.passphrase,
 			});
-		} catch {
-			return failure("PASSPHRASE_INCORRECT", undefined);
+		} catch (cause) {
+			return passphraseOrPrivateKeyFailure(cause);
 		}
 
 		return success("PASSPHRASE_VERIFIED", {
@@ -1355,8 +1436,8 @@ export const createBetterAgeCore = (ports: BetterAgeCorePorts) => {
 					ref,
 					encryptedKey: nextEncryptedKey,
 				});
-			} catch {
-				return failure("PASSPHRASE_INCORRECT", undefined);
+			} catch (cause) {
+				return passphraseOrPrivateKeyFailure(cause);
 			}
 		}
 
@@ -1365,30 +1446,93 @@ export const createBetterAgeCore = (ports: BetterAgeCorePorts) => {
 		});
 	};
 
+	const consumeHomeRepositoryNotices = () =>
+		ports.homeRepository.consumeSecurityNotices?.() ?? [];
+
 	return {
 		commands: {
-			changeIdentityPassphrase,
-			createPayload,
-			createSelfIdentity,
-			editPayload,
-			forgetKnownIdentity,
-			grantPayloadRecipient,
-			importKnownIdentity,
-			rotateSelfIdentity,
-			revokePayloadRecipient,
-			setEditorPreference,
-			updatePayload,
+			changeIdentityPassphrase: withKnownCoreFailures(
+				changeIdentityPassphrase,
+				consumeHomeRepositoryNotices,
+			),
+			createPayload: withKnownCoreFailures(
+				createPayload,
+				consumeHomeRepositoryNotices,
+			),
+			createSelfIdentity: withKnownCoreFailures(
+				createSelfIdentity,
+				consumeHomeRepositoryNotices,
+			),
+			editPayload: withKnownCoreFailures(
+				editPayload,
+				consumeHomeRepositoryNotices,
+			),
+			forgetKnownIdentity: withKnownCoreFailures(
+				forgetKnownIdentity,
+				consumeHomeRepositoryNotices,
+			),
+			grantPayloadRecipient: withKnownCoreFailures(
+				grantPayloadRecipient,
+				consumeHomeRepositoryNotices,
+			),
+			importKnownIdentity: withKnownCoreFailures(
+				importKnownIdentity,
+				consumeHomeRepositoryNotices,
+			),
+			rotateSelfIdentity: withKnownCoreFailures(
+				rotateSelfIdentity,
+				consumeHomeRepositoryNotices,
+			),
+			revokePayloadRecipient: withKnownCoreFailures(
+				revokePayloadRecipient,
+				consumeHomeRepositoryNotices,
+			),
+			setEditorPreference: withKnownCoreFailures(
+				setEditorPreference,
+				consumeHomeRepositoryNotices,
+			),
+			updatePayload: withKnownCoreFailures(
+				updatePayload,
+				consumeHomeRepositoryNotices,
+			),
 		},
 		queries: {
-			decryptPayload,
-			exportSelfIdentityString,
-			getEditorPreference,
-			getHomeStatus,
-			getSelfIdentity,
-			listKnownIdentities,
-			listRetiredKeys,
-			parseIdentityString,
-			verifySelfIdentityPassphrase,
+			decryptPayload: withKnownCoreFailures(
+				decryptPayload,
+				consumeHomeRepositoryNotices,
+			),
+			exportSelfIdentityString: withKnownCoreFailures(
+				exportSelfIdentityString,
+				consumeHomeRepositoryNotices,
+			),
+			getEditorPreference: withKnownCoreFailures(
+				getEditorPreference,
+				consumeHomeRepositoryNotices,
+			),
+			getHomeStatus: withKnownCoreFailures(
+				getHomeStatus,
+				consumeHomeRepositoryNotices,
+			),
+			getSelfIdentity: withKnownCoreFailures(
+				getSelfIdentity,
+				consumeHomeRepositoryNotices,
+			),
+			listKnownIdentities: withKnownCoreFailures(
+				listKnownIdentities,
+				consumeHomeRepositoryNotices,
+			),
+			listRetiredKeys: withKnownCoreFailures(
+				listRetiredKeys,
+				consumeHomeRepositoryNotices,
+			),
+			parseIdentityString: withKnownCoreFailures(
+				parseIdentityString,
+				consumeHomeRepositoryNotices,
+			),
+			verifySelfIdentityPassphrase: withKnownCoreFailures(
+				verifySelfIdentityPassphrase,
+				consumeHomeRepositoryNotices,
+			),
 		},
 	};
 };

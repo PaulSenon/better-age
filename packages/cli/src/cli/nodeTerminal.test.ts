@@ -82,7 +82,7 @@ describe("node terminal", () => {
 			}),
 		);
 		expect(runtime.promptFns.password).toHaveBeenCalledWith(
-			{ mask: "*", message: "Passphrase" },
+			{ mask: false, message: "Passphrase" },
 			expect.objectContaining({
 				input: runtime.stdin,
 				output: runtime.stderr,

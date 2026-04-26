@@ -44,4 +44,13 @@ describe("presenter styling", () => {
 			stderr: "",
 		});
 	});
+
+	it("renders unknown failure codes with an explicit unmapped-code fallback", () => {
+		expect(presentFailure("NEW_SECURITY_FAILURE")).toEqual({
+			exitCode: 1,
+			stdout: "",
+			stderr:
+				"[ERROR] NEW_SECURITY_FAILURE: unmapped failure code NEW_SECURITY_FAILURE\n",
+		});
+	});
 });
