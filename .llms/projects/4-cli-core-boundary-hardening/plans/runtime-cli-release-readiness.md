@@ -141,17 +141,17 @@ Replace the current one-shot interactive router with a real state-aware menu loo
 
 ### Acceptance Criteria
 
-- [ ] Before setup, root menu shows setup and quit only.
-- [ ] Successful setup transitions into normal setup-complete menu state.
-- [ ] After setup, root menu shows Files, Identities, and Quit.
-- [ ] Setup is not shown after setup exists.
-- [ ] Files submenu exposes human payload commands except `load`.
-- [ ] Identities submenu exposes identity commands.
-- [ ] Menus include back and quit where appropriate.
-- [ ] Selecting an action delegates to the same direct command flow.
-- [ ] After action completion, session returns to the active menu.
-- [ ] `load` and `interactive` are excluded from interactive menus.
-- [ ] No business logic is duplicated inside menu code.
+- [x] Before setup, root menu shows setup and quit only.
+- [x] Successful setup transitions into normal setup-complete menu state.
+- [x] After setup, root menu shows Files, Identities, and Quit.
+- [x] Setup is not shown after setup exists.
+- [x] Files submenu exposes human payload commands except `load`.
+- [x] Identities submenu exposes identity commands.
+- [x] Menus include back and quit where appropriate.
+- [x] Selecting an action delegates to the same direct command flow.
+- [x] After action completion, session returns to the active menu.
+- [x] `load` and `interactive` are excluded from interactive menus.
+- [x] No business logic is duplicated inside menu code.
 
 ---
 
@@ -165,15 +165,15 @@ Add minimal capability-detected styling for human output while preserving plain 
 
 ### Acceptance Criteria
 
-- [ ] Human successes, warnings, and errors are visually distinct when styling is enabled.
-- [ ] Styling applies only to human stderr output.
-- [ ] `load` stdout remains raw env text.
-- [ ] `identity export` stdout remains raw identity string.
-- [ ] `NO_COLOR` disables styling.
-- [ ] Non-TTY stderr disables styling.
-- [ ] Output remains readable without styling.
-- [ ] Emoji are not used by default.
-- [ ] Presenter tests cover styled and plain modes.
+- [x] Human successes, warnings, and errors are visually distinct when styling is enabled.
+- [x] Styling applies only to human stderr output.
+- [x] `load` stdout remains raw env text.
+- [x] `identity export` stdout remains raw identity string.
+- [x] `NO_COLOR` disables styling.
+- [x] Non-TTY stderr disables styling.
+- [x] Output remains readable without styling.
+- [x] Emoji are not used by default.
+- [x] Presenter tests cover styled and plain modes.
 
 ---
 
@@ -187,14 +187,14 @@ Switch the CLI release build from multi-file TypeScript output to a single stand
 
 ### Acceptance Criteria
 
-- [ ] Build emits one standalone executable `bage` JavaScript file.
-- [ ] Bundle includes CLI runtime and core dependency.
-- [ ] Shebang is preserved.
-- [ ] Package `bin` points to the bundled artifact.
-- [ ] Only truly unbundleable dependencies are externalized.
-- [ ] Bundle build is covered by package contract tests.
-- [ ] Built `bage` smoke tests cover startup and basic non-interactive failures.
-- [ ] Varlock still invokes the expected `bage load --protocol-version=1 <path>` contract.
+- [x] Build emits one standalone executable `bage` JavaScript file.
+- [x] Bundle includes CLI runtime and core dependency.
+- [x] Shebang is preserved.
+- [x] Package `bin` points to the bundled artifact.
+- [x] Only truly unbundleable dependencies are externalized.
+- [x] Bundle build is covered by package contract tests.
+- [x] Built `bage` smoke tests cover startup and basic non-interactive failures.
+- [x] Varlock still invokes the expected `bage load --protocol-version=1 <path>` contract.
 
 ---
 
@@ -208,12 +208,12 @@ Update release-facing docs and create a manual QA checklist for the terminal beh
 
 ### Acceptance Criteria
 
-- [ ] CLI README documents install/build, command list, examples, machine-output policy, and known limitations.
-- [ ] Varlock README documents `bage` bin assumption and custom launcher behavior.
-- [ ] Repository docs explain package roles without presenting legacy as releasable product.
-- [ ] Manual QA checklist covers hidden passphrase prompt.
-- [ ] Manual QA checklist covers editor launching and remembered editor preference.
-- [ ] Manual QA checklist covers secure viewer scrolling and quit.
-- [ ] Manual QA checklist covers interactive menu loop.
-- [ ] Manual QA checklist covers clean stdout for `load` and `identity export`.
-- [ ] Docs state Docker/pseudo-TTY E2E are deferred.
+- [x] CLI README documents install/build, command list, examples, machine-output policy, and known limitations.
+- [x] Varlock README documents `bage` bin assumption and custom launcher behavior.
+- [x] Repository docs explain package roles without presenting legacy as releasable product.
+- [x] Manual QA checklist covers hidden passphrase prompt.
+- [x] Manual QA checklist covers editor launching and remembered editor preference.
+- [x] Manual QA checklist covers secure viewer scrolling and quit.
+- [x] Manual QA checklist covers interactive menu loop.
+- [x] Manual QA checklist covers clean stdout for `load` and `identity export`.
+- [x] Docs state Docker/pseudo-TTY E2E are deferred.

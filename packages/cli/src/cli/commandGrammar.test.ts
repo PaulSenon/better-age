@@ -215,6 +215,17 @@ describe("release command grammar", () => {
 			stdout: "",
 			stderr: '[ERROR] COMMAND_UNKNOWN: unknown command "wat"\n',
 		});
+
+		const styled = await runCliWithGrammar({
+			argv: ["wat"],
+			core,
+			terminal: { mode: "interactive", presentation: { color: true } },
+		});
+
+		expect(styled.stdout).toBe("");
+		expect(styled.stderr).toBe(
+			'\u001B[31m[ERROR]\u001B[0m \u001B[1mCOMMAND_UNKNOWN:\u001B[0m unknown command "wat"\n',
+		);
 	});
 
 	it("delegates grammar-accepted commands to existing flows", async () => {

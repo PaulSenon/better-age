@@ -3,10 +3,10 @@
 	"version": "0.0.1",
 	"type": "module",
 	"bin": {
-		"bage": "./dist/bin/bage.js"
+		"bage": "./dist/bage"
 	},
 	"scripts": {
-		"build": "tsc -p tsconfig.build.json",
+		"build": "rimraf ./dist && node ./esbuild.config.mjs",
 		"lint": "biome check .",
 		"lint:fix": "biome check . --write",
 		"typecheck": "tsc --noEmit",
@@ -24,6 +24,8 @@
 		"@effect/language-service": "^0.85.1",
 		"@effect/vitest": "^0.29.0",
 		"@types/node": "^25.6.0",
+		"esbuild": "^0.28.0",
+		"rimraf": "catalog:",
 		"typescript": "^6.0.3",
 		"vitest": "^3.2.4"
 	}

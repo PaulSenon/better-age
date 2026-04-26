@@ -7,6 +7,7 @@ import { openSecureViewer, type SecureViewerRuntime } from "./secureViewer.js";
 
 type NodeTerminalRuntime = SecretPromptRuntime &
 	Partial<Pick<SecureViewerRuntime, "emitKeypressEvents">> & {
+		readonly env?: Readonly<Record<string, string | undefined>>;
 		readonly stderr: SecretPromptRuntime["stderr"] &
 			Partial<SecureViewerRuntime["stderr"]>;
 		readonly stdin: SecretPromptRuntime["stdin"] &
@@ -17,6 +18,7 @@ const defaultRuntime: NodeTerminalRuntime = {
 	emitKeypressEvents: (stream) => {
 		emitKeypressEvents(stream as NodeJS.ReadStream);
 	},
+	env: process.env,
 	stderr,
 	stdin,
 };
@@ -55,11 +57,12 @@ export const createNodeTerminal = (
 	runtime: NodeTerminalRuntime = defaultRuntime,
 ): CliTerminal => {
 	if (!runtime.stdin.isTTY || !runtime.stderr.isTTY) {
-		return { mode: "headless" };
+		return { mode: "headless", presentation: { color: false } };
 	}
 
 	return {
 		mode: "interactive",
+		presentation: { color: runtime.env?.NO_COLOR === undefined },
 		...(hasSecureViewerRuntime(runtime)
 			? {
 					openViewer: async (envText, path) => {

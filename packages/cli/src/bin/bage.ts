@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 import { stderr, stdout } from "node:process";
 import { createNodeCli } from "../cli/nodeCli.js";
 import { createNodeTerminal } from "../cli/nodeTerminal.js";

@@ -1,31 +1,53 @@
 # @better-age/cli
 
-New CLI package for the Better Age MVP reimplementation.
+Release-facing `bage` CLI for Better Age.
 
 Responsibilities:
 
-- target `bage` command surface
-- exact/guided command execution
+- exact and guided command execution
 - interactive/headless terminal policy
-- prompt, editor, viewer, and picker flows
-- presenter-driven human output
+- hidden passphrase prompts
+- editor, secure viewer, and picker flows
+- human stderr presentation
 - clean machine stdout for `load` and `identity export`
 
-Command surface:
+## Install / Build
+
+Install workspace dependencies from the repository root:
+
+```sh
+pnpm install
+```
+
+Build the standalone CLI artifact:
+
+```sh
+pnpm -F @better-age/cli build
+```
+
+Build output:
 
 ```txt
-bage create <payload>
-bage edit <payload>
-bage grant <payload> <identity-ref>
-bage inspect <payload>
-bage load --protocol-version=1 <payload>
-bage revoke <payload> <identity-ref>
-bage update <payload>
-bage view <payload>
+packages/cli/dist/bage
+```
+
+The package `bin` points to that standalone bundled file.
+
+## Command List
+
+```txt
+bage create [payload]
+bage edit [payload]
+bage grant [payload] [identity-ref]
+bage inspect [payload]
+bage load [payload] --protocol-version=1
+bage revoke [payload] [identity-ref]
+bage update [payload]
+bage view [payload]
 
 bage identity export
-bage identity forget <identity-ref>
-bage identity import <identity-string> [--alias <alias>]
+bage identity forget [identity-ref]
+bage identity import [identity-string] [--alias <alias>]
 bage identity list
 bage identity passphrase
 bage identity pass
@@ -37,18 +59,69 @@ bage interactive
 bage i
 ```
 
-Machine-output commands:
+Promptable operands are optional in the grammar. In an interactive terminal,
+missing payloads, identities, and setup names can be requested by the command
+flow. Protocol inputs stay strict; `load` requires `--protocol-version=1`.
 
-- `bage load --protocol-version=1 <payload>` writes raw `.env` text to stdout only.
-- `bage identity export` writes the identity string to stdout only.
-- prompts, warnings, errors, and human success messages go to stderr.
+## Examples
 
-MVP notes:
+```sh
+bage setup --name Isaac
+bage create .env.prod.enc
+bage edit .env.prod.enc
+bage identity import 'bage-id-v1:...' --alias ops
+bage grant .env.prod.enc ops
+bage inspect .env.prod.enc
+bage view .env.prod.enc
+bage load .env.prod.enc --protocol-version=1
+```
 
-- passphrases are prompted only in interactive terminals.
-- headless payload reads fail fast because MVP has no passphrase injection mechanism.
-- `edit` and `view` depend on terminal adapters; unavailable adapters return explicit errors.
+Interactive launcher:
+
+```sh
+bage interactive
+```
+
+## Machine Output Policy
+
+- `bage load --protocol-version=1 <payload>` writes raw `.env` text to stdout.
+- `bage identity export` writes the public identity string to stdout.
+- Prompts, warnings, errors, success messages, viewer UI, and editor UI are not
+  written to stdout.
+- Human output goes to stderr and may use ANSI color when stderr is a TTY.
+- `NO_COLOR` disables ANSI color.
+
+## Runtime Behavior
+
+- Passphrases are prompted only in interactive terminals.
+- Headless payload reads fail fast because MVP has no passphrase injection
+  mechanism.
+- `edit` resolves `$VISUAL`, then `$EDITOR`, then remembered editor preference,
+  then interactive editor picker.
+- `view` uses an in-process secure viewer with keyboard scrolling and quit.
+- `interactive` opens a setup-aware menu loop. It excludes `load` and
+  `interactive` from menus.
+
+## Known Limitations
+
+- Docker and pseudo-TTY E2E are deferred.
+- Interactive terminal behavior is covered by unit/contract tests plus the
+  repository manual QA checklist.
+- The MVP targets Unix-like terminals.
+- Headless secret injection is out of scope.
+
+## Development
+
+```sh
+pnpm -F @better-age/cli test
+pnpm -F @better-age/cli check
+pnpm -F @better-age/cli build
+```
+
+Manual QA:
+
+- [../../docs/manual-qa.md](../../docs/manual-qa.md)
 
 Implementation plan source:
 
-- `../../.llms/projects/4-cli-core-boundary-hardening/plans/better-age-mvp-reimplementation.md`
+- [../../.llms/projects/4-cli-core-boundary-hardening/plans/runtime-cli-release-readiness.md](../../.llms/projects/4-cli-core-boundary-hardening/plans/runtime-cli-release-readiness.md)

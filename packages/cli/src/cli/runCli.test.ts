@@ -73,6 +73,26 @@ const decryptedPayload = {
 	],
 };
 
+const notSetupHomeStatus = { status: "not-setup" as const };
+
+const setupHomeStatus = {
+	status: "setup" as const,
+	self: {
+		ownerId: "owner_self",
+		publicIdentity: {
+			ownerId: "owner_self",
+			displayName: "Isaac",
+			publicKey: "age1self",
+			identityUpdatedAt: "2026-04-25T10:00:00.000Z",
+		},
+		handle: "Isaac#fp_self",
+		fingerprint: "fp_self",
+		keyMode: "pq-hybrid",
+		createdAt: "2026-04-25T10:00:00.000Z",
+		rotationTtl: "3m",
+	},
+};
+
 type CoreOverrides = {
 	readonly commands?: Partial<CliCore["commands"]>;
 	readonly queries?: Partial<CliCore["queries"]>;
@@ -546,13 +566,15 @@ describe("runCli command contracts", () => {
 				payloadPathExists: async () => true,
 				terminal: {
 					mode: "interactive",
+					presentation: { color: true },
 					promptSecret: async () => "correct horse",
 				},
 			}),
 		).resolves.toEqual({
 			exitCode: 0,
 			stdout: decryptedPayload.envText,
-			stderr: "[WARN] Payload update recommended: run bage update\n",
+			stderr:
+				"\u001B[33m[WARN]\u001B[0m Payload update recommended: run bage update\n",
 		});
 	});
 
@@ -1283,8 +1305,30 @@ describe("runCli command contracts", () => {
 		expect(headless.calls).toEqual([]);
 	});
 
-	it("routes the interactive session and i alias through direct command flows", async () => {
-		const routed = makeCore();
+	it("gates interactive session setup state and loops into normal menus after setup", async () => {
+		let isSetup = false;
+		const setupCalls: Array<unknown> = [];
+		const routed = makeCore({
+			queries: {
+				getHomeStatus: async () =>
+					success(
+						"HOME_STATUS_QUERIED",
+						isSetup ? setupHomeStatus : notSetupHomeStatus,
+					),
+			},
+			commands: {
+				createSelfIdentity: async (input) => {
+					setupCalls.push(input);
+					isSetup = true;
+					return success("SELF_IDENTITY_CREATED", {
+						ownerId: "owner_self",
+						handle: "Isaac#fp_self",
+					});
+				},
+			},
+		});
+		const menus: Array<ReadonlyArray<string>> = [];
+		const selections = ["setup", "quit"];
 
 		await expect(
 			runCli({
@@ -1292,15 +1336,115 @@ describe("runCli command contracts", () => {
 				core: routed.core,
 				terminal: {
 					mode: "interactive",
-					selectOne: async () => "identity list",
+					promptText: async () => "Isaac",
+					promptSecret: async () => "correct horse",
+					selectOne: async (_label, choices) => {
+						menus.push(choices.map((choice) => choice.value));
+						return selections.shift() ?? "quit";
+					},
 				},
 			}),
-		).resolves.toMatchObject({
+		).resolves.toEqual({
 			exitCode: 0,
-			stderr: "",
+			stdout: "",
+			stderr: "[OK] Identity created: Isaac#fp_self\n",
+		});
+		expect(menus).toEqual([
+			["setup", "quit"],
+			["files", "identities", "quit"],
+		]);
+		expect(setupCalls).toEqual([
+			{ displayName: "Isaac", passphrase: "correct horse" },
+		]);
+	});
+
+	it("routes interactive submenus through direct command flows and excludes machine/session commands", async () => {
+		const routed = makeCore();
+		const menus: Array<ReadonlyArray<string>> = [];
+		const selections = [
+			"identities",
+			"identity list",
+			"back",
+			"files",
+			"view",
+			"quit",
+		];
+		let viewedText = "";
+
+		await expect(
+			runCli({
+				argv: ["interactive"],
+				core: routed.core,
+				payloadPathExists: async () => true,
+				terminal: {
+					mode: "interactive",
+					openViewer: async (envText) => {
+						viewedText = envText;
+					},
+					promptSecret: async () => "correct horse",
+					promptText: async () => "secrets.env.enc",
+					selectOne: async (_label, choices) => {
+						menus.push(choices.map((choice) => choice.value));
+						return selections.shift() ?? "quit";
+					},
+				},
+			}),
+		).resolves.toEqual({
+			exitCode: 0,
 			stdout:
 				"Self\n  Isaac owner_self fp_self\n\nKnown identities\n  ops owner_sarah age1sarah\n  Nora owner_nora age1nora\n\nRetired keys\n  none\n",
+			stderr: "[OK] Viewer closed\n",
 		});
+
+		expect(menus).toEqual([
+			["files", "identities", "quit"],
+			[
+				"identity export",
+				"identity import",
+				"identity list",
+				"identity forget",
+				"identity passphrase",
+				"identity rotate",
+				"back",
+				"quit",
+			],
+			[
+				"identity export",
+				"identity import",
+				"identity list",
+				"identity forget",
+				"identity passphrase",
+				"identity rotate",
+				"back",
+				"quit",
+			],
+			["files", "identities", "quit"],
+			[
+				"create",
+				"edit",
+				"grant",
+				"inspect",
+				"revoke",
+				"update",
+				"view",
+				"back",
+				"quit",
+			],
+			[
+				"create",
+				"edit",
+				"grant",
+				"inspect",
+				"revoke",
+				"update",
+				"view",
+				"back",
+				"quit",
+			],
+		]);
+		expect(menus.flat()).not.toContain("load");
+		expect(menus.flat()).not.toContain("interactive");
+		expect(viewedText).toBe(decryptedPayload.envText);
 
 		await expect(
 			runCli({

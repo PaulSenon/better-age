@@ -6,6 +6,7 @@ const readPackageJson = async (path: string) =>
 	JSON.parse(await readFile(path, "utf8")) as {
 		readonly bin?: Record<string, string>;
 		readonly dependencies?: Record<string, string>;
+		readonly devDependencies?: Record<string, string>;
 		readonly exports?: Record<string, string>;
 		readonly private?: boolean;
 		readonly scripts?: Record<string, string>;
@@ -17,11 +18,15 @@ describe("package contracts", () => {
 			join(process.cwd(), "package.json"),
 		);
 
-		expect(packageJson.bin).toEqual({ bage: "./dist/bin/bage.js" });
-		expect(packageJson.scripts?.build).toBe("tsc -p tsconfig.build.json");
+		expect(packageJson.bin).toEqual({ bage: "./dist/bage" });
+		expect(packageJson.scripts?.build).toBe(
+			"rimraf ./dist && node ./esbuild.config.mjs",
+		);
 		expect(packageJson.dependencies).not.toHaveProperty(
 			"@better-age/cli-legacy",
 		);
+		expect(packageJson.devDependencies).toHaveProperty("esbuild");
+		expect(packageJson.devDependencies).toHaveProperty("rimraf");
 	});
 
 	it("keeps cli-legacy private and without a bage bin", async () => {

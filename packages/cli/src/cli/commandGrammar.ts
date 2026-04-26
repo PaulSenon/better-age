@@ -1,6 +1,6 @@
 import { Args, Command, Options } from "@effect/cli";
 import { Effect } from "effect";
-import { presentParseFailure } from "./presenter.js";
+import { presentParseFailure, styleRunCliResult } from "./presenter.js";
 import { type RunCliInput, type RunCliResult, runCli } from "./runCli.js";
 
 type CommandSpec = {
@@ -285,6 +285,11 @@ const findCommandSpec = (argv: ReadonlyArray<string>) =>
 const stripHelpFlags = (argv: ReadonlyArray<string>) =>
 	argv.filter((token) => token !== "--help" && token !== "-h");
 
+const styleResult = (input: RunCliInput, result: RunCliResult) =>
+	styleRunCliResult(result, {
+		color: input.terminal.presentation?.color ?? false,
+	});
+
 const validateCommandPath = (
 	argv: ReadonlyArray<string>,
 ): RunCliResult | null => {
@@ -346,7 +351,7 @@ export const runCliWithGrammar = async (
 	const parseFailure = validateCommandPath(input.argv);
 
 	if (parseFailure !== null) {
-		return parseFailure;
+		return styleResult(input, parseFailure);
 	}
 
 	return await runCli(input);

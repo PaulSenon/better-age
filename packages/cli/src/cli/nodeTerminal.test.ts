@@ -4,6 +4,7 @@ import { createNodeTerminal } from "./nodeTerminal.js";
 
 const makeRuntime = (inputIsTty: boolean, errorIsTty: boolean) => ({
 	emitKeypressEvents: vi.fn(),
+	env: {},
 	stderr: {
 		clearScreenDown: vi.fn(),
 		cursorTo: vi.fn(),
@@ -28,6 +29,7 @@ describe("node terminal", () => {
 		const terminal = createNodeTerminal(makeRuntime(false, true));
 
 		expect(terminal.mode).toBe("headless");
+		expect(terminal.presentation).toEqual({ color: false });
 		expect(terminal.promptSecret).toBeUndefined();
 		expect(terminal.promptText).toBeUndefined();
 	});
@@ -36,8 +38,16 @@ describe("node terminal", () => {
 		const terminal = createNodeTerminal(makeRuntime(true, true));
 
 		expect(terminal.mode).toBe("interactive");
+		expect(terminal.presentation).toEqual({ color: true });
 		expect(terminal.promptSecret).toBeTypeOf("function");
 		expect(terminal.promptText).toBeTypeOf("function");
+	});
+
+	it("disables color when NO_COLOR is present", () => {
+		const runtime = { ...makeRuntime(true, true), env: { NO_COLOR: "1" } };
+		const terminal = createNodeTerminal(runtime);
+
+		expect(terminal.presentation).toEqual({ color: false });
 	});
 
 	it("exposes secure viewer only for interactive TTYs", async () => {

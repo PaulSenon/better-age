@@ -1,10 +1,12 @@
 import {
+	type PresentationStyle,
 	presentFailure,
 	presentIdentityList,
 	presentIdentityString,
 	presentPayloadInspect,
 	presentSuccess,
 	presentWarning,
+	styleRunCliResult,
 } from "./presenter.js";
 import { CliPromptCancelledError } from "./secretPrompt.js";
 
@@ -220,6 +222,7 @@ export type CliTerminal = {
 		| { readonly kind: "saved"; readonly text: string }
 	>;
 	readonly openViewer?: (envText: string, path: string) => Promise<void>;
+	readonly presentation?: PresentationStyle;
 	readonly promptText?: (label: string) => Promise<string>;
 	readonly promptSecret?: (label: string) => Promise<string>;
 	readonly selectOne?: (
@@ -1332,28 +1335,53 @@ const runIdentityPassphrase = async (
 	return presentFailure("PASSPHRASE_INCORRECT");
 };
 
-const interactiveCommandChoices = [
-	{ value: "create", label: "create", disabled: false },
-	{ value: "edit", label: "edit", disabled: false },
-	{ value: "grant", label: "grant", disabled: false },
-	{ value: "inspect", label: "inspect", disabled: false },
-	{ value: "load", label: "load", disabled: false },
-	{ value: "revoke", label: "revoke", disabled: false },
-	{ value: "update", label: "update", disabled: false },
-	{ value: "view", label: "view", disabled: false },
-	{ value: "identity export", label: "identity export", disabled: false },
-	{ value: "identity import", label: "identity import", disabled: false },
-	{ value: "identity list", label: "identity list", disabled: false },
-	{ value: "identity forget", label: "identity forget", disabled: false },
-	{
-		value: "identity passphrase",
-		label: "identity passphrase",
-		disabled: false,
-	},
-	{ value: "identity rotate", label: "identity rotate", disabled: false },
-	{ value: "setup", label: "setup", disabled: false },
-	{ value: "__cancel__", label: "Cancel", disabled: false },
-] as const;
+const choice = (value: string, label = value) => ({
+	value,
+	label,
+	disabled: false,
+});
+
+const rootBeforeSetupChoices = [choice("setup"), choice("quit", "Quit")];
+
+const rootAfterSetupChoices = [
+	choice("files", "Files"),
+	choice("identities", "Identities"),
+	choice("quit", "Quit"),
+];
+
+const filesMenuChoices = [
+	choice("create"),
+	choice("edit"),
+	choice("grant"),
+	choice("inspect"),
+	choice("revoke"),
+	choice("update"),
+	choice("view"),
+	choice("back", "Back"),
+	choice("quit", "Quit"),
+];
+
+const identitiesMenuChoices = [
+	choice("identity export"),
+	choice("identity import"),
+	choice("identity list"),
+	choice("identity forget"),
+	choice("identity passphrase"),
+	choice("identity rotate"),
+	choice("back", "Back"),
+	choice("quit", "Quit"),
+];
+
+type InteractiveMenu = "root" | "files" | "identities";
+
+const appendSessionResult = (
+	session: RunCliResult,
+	result: RunCliResult,
+): RunCliResult => ({
+	exitCode: result.exitCode,
+	stdout: `${session.stdout}${result.stdout}`,
+	stderr: `${session.stderr}${result.stderr}`,
+});
 
 const runInteractiveSession = async (
 	input: RunCliInput,
@@ -1365,22 +1393,59 @@ const runInteractiveSession = async (
 		return presentFailure("INTERACTIVE_UNAVAILABLE");
 	}
 
-	const selected = await input.terminal.selectOne(
-		"Command",
-		interactiveCommandChoices,
-	);
+	let activeMenu: InteractiveMenu = "root";
+	let session: RunCliResult = { exitCode: 0, stdout: "", stderr: "" };
 
-	if (selected === "__cancel__") {
-		return presentFailure("CANCELLED", 130);
+	while (true) {
+		const homeStatus = await input.core.queries.getHomeStatus();
+
+		if (homeStatus.result.kind === "failure") {
+			return appendSessionResult(
+				session,
+				presentFailure(homeStatus.result.code),
+			);
+		}
+
+		const isSetup = homeStatus.result.value.status === "setup";
+
+		if (!isSetup && activeMenu !== "root") {
+			activeMenu = "root";
+		}
+
+		const choices =
+			activeMenu === "files"
+				? filesMenuChoices
+				: activeMenu === "identities"
+					? identitiesMenuChoices
+					: isSetup
+						? rootAfterSetupChoices
+						: rootBeforeSetupChoices;
+
+		const selected = await input.terminal.selectOne("Command", choices);
+
+		if (selected === "quit") {
+			return { ...session, exitCode: 0 };
+		}
+
+		if (selected === "back") {
+			activeMenu = "root";
+			continue;
+		}
+
+		if (selected === "files" || selected === "identities") {
+			activeMenu = selected;
+			continue;
+		}
+
+		const result = await runCli({
+			...input,
+			argv: selected.split(" "),
+		});
+		session = appendSessionResult(session, result);
 	}
-
-	return await runCli({
-		...input,
-		argv: selected.split(" "),
-	});
 };
 
-export const runCli = async (input: RunCliInput): Promise<RunCliResult> => {
+const runCliUnstyled = async (input: RunCliInput): Promise<RunCliResult> => {
 	const args = parseArgs(input.argv);
 	const [command, subcommand] = args.positionals;
 
@@ -1455,3 +1520,8 @@ export const runCli = async (input: RunCliInput): Promise<RunCliResult> => {
 
 	return presentFailure("COMMAND_UNKNOWN", 2);
 };
+
+export const runCli = async (input: RunCliInput): Promise<RunCliResult> =>
+	styleRunCliResult(await runCliUnstyled(input), {
+		color: input.terminal.presentation?.color ?? false,
+	});

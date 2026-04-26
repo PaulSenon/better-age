@@ -141,3 +141,67 @@
 - Phase 5 checklist marked complete in runtime CLI release readiness plan.
 - Verification passed: `pnpm -F @better-age/cli test:unit`, `pnpm test`, `pnpm check`, `git diff --check`.
 - Next phase: Phase 6 Real Interactive Loop.
+
+2026-04-26 Runtime CLI release readiness Phase 6 start:
+- Plan source: `.llms/projects/4-cli-core-boundary-hardening/plans/runtime-cli-release-readiness.md`.
+- Current phase: Real Interactive Loop.
+- Scope: replace one-shot interactive router with setup-aware root/files/identities menus, back/quit, direct flow delegation, and repeat-after-action behavior.
+- TDD target: `runCli` interactive-session behavior tests through terminal `selectOne`; keep business logic in existing direct command flows; then `pnpm test`, `pnpm check`, `git diff --check`.
+
+2026-04-26 Runtime CLI release readiness Phase 6 complete:
+- Replaced one-shot interactive command picker with setup-aware loop in `packages/cli/src/cli/runCli.ts`.
+- Before setup: menu shows setup/quit only; successful setup re-queries home status and transitions to normal root menu.
+- After setup: root shows Files/Identities/Quit; Files submenu exposes create/edit/grant/inspect/revoke/update/view plus back/quit; Identities exposes export/import/list/forget/passphrase/rotate plus back/quit.
+- `load` and `interactive` are excluded from menus; selected actions delegate back into direct `runCli` flows and return to active submenu after completion.
+- Added `runCli` tests for setup gating, action delegation, loop-back behavior, menu exclusions, and headless unavailable behavior.
+- Phase 6 checklist marked complete in runtime CLI release readiness plan.
+- Verification passed: `pnpm -F @better-age/cli test:unit`, `pnpm -F @better-age/cli check`, `pnpm test`, `pnpm check`, `git diff --check`.
+- Next phase: Phase 7 Styling + Presenter Polish.
+
+2026-04-26 Runtime CLI release readiness Phase 7 start:
+- Plan source: `.llms/projects/4-cli-core-boundary-hardening/plans/runtime-cli-release-readiness.md`.
+- Current phase: Styling + Presenter Polish.
+- Scope: add minimal ANSI styling for human stderr only, gated by TTY capability and `NO_COLOR`; keep machine stdout raw for `load` and `identity export`; no emoji.
+- TDD target: presenter tests for plain/styled modes plus `runCli` contracts proving machine stdout remains unstyled; then `pnpm test`, `pnpm check`, `git diff --check`.
+
+2026-04-26 Runtime CLI release readiness Phase 7 complete:
+- Added `PresentationStyle`, `styleHumanStderr`, and `styleRunCliResult` in `packages/cli/src/cli/presenter.ts`.
+- Styling is final-boundary only: stdout is never styled; stderr labels `[OK]`, `[WARN]`, `[ERROR]` and error codes get minimal ANSI when enabled.
+- `createNodeTerminal` now sets `presentation.color` from interactive stderr TTY capability and disables color when `NO_COLOR` exists; headless terminals set color false.
+- `runCli` applies presentation styling after command execution; grammar parse failures apply the same styling path.
+- Added presenter tests for plain/styled/no-emoji/stdout-safe behavior, terminal NO_COLOR test, grammar styled parse failure test, and `load` raw stdout under styled stderr.
+- Phase 7 checklist marked complete in runtime CLI release readiness plan.
+- Verification passed: `pnpm -F @better-age/cli test:unit`, `pnpm -F @better-age/cli check`, `pnpm test`, `pnpm check`, `git diff --check`.
+- Next phase: Phase 8 Standalone Bundle.
+
+2026-04-26 Runtime CLI release readiness Phase 8 start:
+- Plan source: `.llms/projects/4-cli-core-boundary-hardening/plans/runtime-cli-release-readiness.md`.
+- Current phase: Standalone Bundle.
+- Scope: switch `@better-age/cli` build from multi-file TypeScript output to one esbuild bundled executable `dist/bage`, preserving shebang and bundling core/CLI runtime.
+- TDD target: package contract tests for bin/build config; bundle smoke tests for shebang, single output file, help startup, parse failure; keep varlock launcher contract tests passing; then `pnpm test`, `pnpm check`, `git diff --check`.
+
+2026-04-26 Runtime CLI release readiness Phase 8 complete:
+- Added `packages/cli/esbuild.config.mjs` for one-file ESM bundle output at `dist/bage`.
+- Bundle config preserves shebang via banner, defines `require` with `createRequire` for bundled CJS dependencies, bundles core/CLI runtime, externalizes nothing, disables sourcemaps, and chmods output executable.
+- `@better-age/cli` package bin now points to `./dist/bage`; build script is `rimraf ./dist && node ./esbuild.config.mjs`; added `esbuild` and `rimraf` dev deps through pnpm.
+- Removed source shebang from `src/bin/bage.ts`; generated bundle owns executable shebang.
+- Added bundle smoke tests that build into ignored `dist/`, assert single executable `bage`, shebang, no `@better-age/core` external import, root help startup, and parse-failure stdout/stderr policy.
+- Package contract tests updated for bundled bin/build/deps; varlock unit tests still prove `bage load --protocol-version=1 <path>` launcher contract.
+- Phase 8 checklist marked complete in runtime CLI release readiness plan.
+- Verification passed: `pnpm -F @better-age/cli test:unit`, `pnpm -F @better-age/cli check`, `pnpm -F @better-age/varlock test:unit`, `pnpm test`, `pnpm check`, `git diff --check`.
+- Next phase: Phase 9 Release Docs + Manual QA.
+
+2026-04-26 Runtime CLI release readiness Phase 9 start:
+- Plan source: `.llms/projects/4-cli-core-boundary-hardening/plans/runtime-cli-release-readiness.md`.
+- Current phase: Release Docs + Manual QA.
+- Scope: update release-facing CLI/varlock/repo docs and add manual QA checklist for terminal behaviors not covered by pseudo-TTY/Docker E2E.
+- TDD target: docs contract tests for required sections and command/output policy, then update docs, run package/full tests/checks and `git diff --check`.
+
+2026-04-26 Runtime CLI release readiness Phase 9 complete:
+- Expanded `packages/cli/README.md` with install/build, standalone artifact, command list, examples, machine output policy, runtime behavior, known limitations, development, and manual QA links.
+- Expanded `packages/varlock/README.md` with `bage` launcher assumption, custom `command=` launcher prefix behavior, inherited stdin/stderr and piped stdout contract, minimal usage, runtime behavior, and manual QA link.
+- Updated root `README.md` package roles for core/cli/varlock and clarified `@better-age/cli-legacy` is a private reference package, not a releasable product.
+- Added `docs/manual-qa.md` covering hidden passphrase prompt, editor and remembered preference, secure viewer scrolling/quit, interactive menu loop, clean stdout for `load` and `identity export`, varlock smoke, and deferred Docker/pseudo-TTY E2E.
+- Added `packages/cli/src/cli/releaseDocs.test.ts` to keep release docs and manual QA checklist from regressing.
+- Phase 9 checklist marked complete in runtime CLI release readiness plan; all phases in that plan are now complete.
+- Verification passed: `pnpm -F @better-age/cli test:unit`, `pnpm -F @better-age/cli check`, `pnpm test`, `pnpm check`, `git diff --check`.

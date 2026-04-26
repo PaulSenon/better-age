@@ -1,5 +1,9 @@
 import type { RunCliResult } from "./runCli.js";
 
+export type PresentationStyle = {
+	readonly color: boolean;
+};
+
 export type IdentityListView = {
 	readonly self: {
 		readonly ownerId: string;
@@ -146,6 +150,37 @@ export const presentIdentityList = (input: IdentityListView): RunCliResult => {
 
 export const presentWarning = (message: string): string =>
 	`[WARN] ${message}\n`;
+
+const ansi = {
+	reset: "\u001B[0m",
+	bold: "\u001B[1m",
+	green: "\u001B[32m",
+	yellow: "\u001B[33m",
+	red: "\u001B[31m",
+};
+
+export const styleHumanStderr = (
+	stderr: string,
+	style: PresentationStyle,
+): string => {
+	if (!style.color || stderr.length === 0) {
+		return stderr;
+	}
+
+	return stderr
+		.replace(/^(\[ERROR\] )([A-Z0-9_]+):/gm, `$1${ansi.bold}$2:${ansi.reset}`)
+		.replaceAll("[OK]", `${ansi.green}[OK]${ansi.reset}`)
+		.replaceAll("[WARN]", `${ansi.yellow}[WARN]${ansi.reset}`)
+		.replaceAll("[ERROR]", `${ansi.red}[ERROR]${ansi.reset}`);
+};
+
+export const styleRunCliResult = (
+	result: RunCliResult,
+	style: PresentationStyle,
+): RunCliResult => ({
+	...result,
+	stderr: styleHumanStderr(result.stderr, style),
+});
 
 export const presentPayloadInspect = (
 	input: PayloadInspectView,

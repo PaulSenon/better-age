@@ -20,8 +20,10 @@ Why this repo exists:
 
 ## Packages
 
-- [`@better-age/cli`](packages/cli/README.md): main `bage` CLI
-- [`@better-age/varlock`](packages/varlock/README.md): thin varlock plugin adapter
+- [`@better-age/core`](packages/core/README.md): internal library for artifact codecs, identity lifecycle, payload lifecycle, migrations, crypto ports, and typed outcomes. It does not depend on CLI or varlock.
+- [`@better-age/cli`](packages/cli/README.md): main release-facing `bage` CLI. It bundles core and owns terminal UX, command flows, prompts, editor/viewer adapters, and stdout/stderr policy.
+- [`@better-age/varlock`](packages/varlock/README.md): thin varlock plugin adapter. It shells out to `bage load --protocol-version=1 <path>` and preserves the proven stdio contract.
+- `@better-age/cli-legacy`: private reference package for the old proof of concept. It is not a releasable product and has no public `bage` bin.
 
 ## Repo setup
 
@@ -50,8 +52,8 @@ Typical flow:
 bage setup
 bage create .env.prod.enc
 bage edit .env.prod.enc
-bage add-identity 'better-age://identity/v1/<base64url-json>'
-bage grant .env.prod.enc teammate#0123abcd
+bage identity import 'bage-id-v1:...' --alias teammate
+bage grant .env.prod.enc teammate
 bage view .env.prod.enc
 bage load --protocol-version=1 .env.prod.enc
 ```
@@ -59,6 +61,7 @@ bage load --protocol-version=1 .env.prod.enc
 Package-level usage, command docs, and integration details live in package READMEs:
 - [packages/cli/README.md](packages/cli/README.md)
 - [packages/varlock/README.md](packages/varlock/README.md)
+- [docs/manual-qa.md](docs/manual-qa.md)
 
 ## Repo map
 
