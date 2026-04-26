@@ -475,8 +475,17 @@ export const createNodePayloadRepository = (): PayloadRepositoryPort => ({
 	},
 	readPayloadFile: async (path) => await readFile(path, "utf8"),
 	writePayloadFile: async (path, contents) => {
+		const tempPath = `${path}.tmp`;
+
 		await mkdir(dirname(path), { recursive: true });
-		await writeFile(path, contents, "utf8");
+
+		try {
+			await writeFile(tempPath, contents, "utf8");
+			await rename(tempPath, path);
+		} catch (error) {
+			await rm(tempPath, { force: true }).catch(() => undefined);
+			throw error;
+		}
 	},
 });
 

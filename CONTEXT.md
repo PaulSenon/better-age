@@ -26,6 +26,10 @@ _Avoid_: Payload json, inner blob, container
 The human-readable outer file format around an age-armored encrypted payload, using `BETTER AGE PAYLOAD` begin/end markers plus explanatory comments.
 _Avoid_: Raw JSON payload file, opaque binary file, replacing age armor
 
+**Encrypted Payload Temp**:
+The same-directory `<payload>.tmp` file containing final encrypted payload bytes before rename-over-target commit.
+_Avoid_: Plaintext temp, editor temp, hidden payload registry
+
 **Identity Snapshot**:
 The canonical versioned representation of one identity state that may be serialized in different containers such as home records, payload recipient entries, or identity strings.
 _Avoid_: Identity string, contact row, recipient row
@@ -84,6 +88,10 @@ _Avoid_: Pager, less, cat view
 The TTY-only hidden-input prompt used to acquire a **Passphrase** without exposing it through argv, env, stdout, or piped stdin.
 _Avoid_: Text prompt, readline question, password flag
 
+**Trusted Key Update**:
+The explicit trust gate required when a V1 unsigned known identity keeps the same owner id but changes public key.
+_Avoid_: Silent key refresh, signed identity verification
+
 **Keyboard Select**:
 A keyboard-navigable terminal choice prompt used for interactive menus and guided pickers.
 _Avoid_: Numbered readline choice prompt, typed index selection
@@ -111,6 +119,10 @@ _Avoid_: Text-only identity prompt, public-key-heavy list, local-only picker
 **Compact Identity Line**:
 The normal human rendering for identities in lists and pickers: alias/display name, derived handle, and contextual tags without full public key noise.
 _Avoid_: Full public key row, raw JSON, untagged owner id only
+
+**Terminal-Safe Text**:
+Human display text sanitized so imported names and decrypted view text cannot inject terminal control behavior.
+_Avoid_: Raw untrusted terminal output
 
 **Guided Retry**:
 The interactive behavior where invalid guided input is shown immediately and the user can correct or cancel within the same flow.
@@ -214,24 +226,32 @@ _Avoid_: User resource, user-owned file
 Persisted user-owned data that the CLI must not rewrite without explicit user intent.
 _Avoid_: Internal state, managed state
 
-**Local Alias Map**:
-Home-local mapping from identity owner to a user-scoped alias, stored separately from the public identity snapshot.
+**Local Alias Overlay**:
+Home-local alias data for known identities, keyed by owner identity semantics and stored outside the public identity snapshot.
 _Avoid_: Canonical display name, embedded identity field
+
+**Key Transaction Marker**:
+The private local marker used to recover after an interrupted passphrase-change key replacement.
+_Avoid_: Key generation directory, garbage-collector queue
 
 ## Relationships
 
 - A **Home State**, **Identity String**, and **Payload Envelope** each carry their own **Artifact Schema Version**.
 - A **Payload File Envelope** wraps, but does not replace, the inner age armored encrypted file.
+- An **Encrypted Payload Temp** is encrypted and same-directory so rename can replace the payload atomically where the filesystem supports it.
 - **Home Status** is the CLI-facing setup gate derived from **Home State**.
 - An **Identity Snapshot** may appear in multiple serialized containers, including **Identity String**, home records, and payload recipients.
 - Identity evolution is centered on one canonical **Identity Snapshot** schema.
 - The shared canonical identity shape is the **Public Identity Snapshot**.
 - **Identity String**, payload recipients, and known identities must all map to the same **Public Identity Snapshot** without information loss.
 - **Self Identity** reuses the same **Public Identity Snapshot** as its public core.
-- A **Local Alias Map** belongs only to home-local managed state and is not part of the **Public Identity Snapshot**.
-- A **Local Alias Map** is keyed by **Owner Id**.
-- `/home` known identities are modeled as a collection of **Public Identity Snapshot** records keyed by **Owner Id**, plus separate **Local Alias Map** overlay state.
-- Persisted **Self Identity** stores the same **Public Identity Snapshot** plus only local/private fields such as `privateKeyPath`, `createdAt`, and `keyMode`.
+- A **Local Alias Overlay** belongs only to home-local managed state and is not part of the **Public Identity Snapshot**.
+- A **Local Alias Overlay** is resolved by **Owner Id** semantics.
+- A **Trusted Key Update** must show old/new fingerprints in interactive flows or require `--trust-key-update` in exact/headless flows.
+- **Terminal-Safe Text** applies to identity/display output and secure viewer rendering; it must not mutate persisted payload content.
+- A **Key Transaction Marker** is checked before home/key reads so interrupted passphrase changes fail closed or recover before normal use.
+- Home known identities are modeled as **Public Identity Snapshot** records plus local alias overlay data.
+- Persisted **Self Identity** stores owner id, display name, identity update time, current key metadata, retired key metadata, and preferences.
 - **Handle** is a **Derived Handle**, not a stored field of the **Public Identity Snapshot**.
 - **Fingerprint** is a **Derived Fingerprint**, not a stored field of the **Public Identity Snapshot**.
 - The current target persisted fields of **Public Identity Snapshot** are `ownerId`, `publicKey`, `displayName`, and `identityUpdatedAt`.
@@ -249,12 +269,13 @@ _Avoid_: Canonical display name, embedded identity field
 - A **Keyboard Select** is required for release-facing interactive menus and guided pickers.
 - An **Interactive Result Pause** is used for primary output screens such as identity export, but not for simple success/status logs.
 - An **Abort Signal** is never interpreted as Back.
-- A **Payload Path Picker** discovers current-directory `.env.*.enc` candidates and always allows custom path entry.
+- A **Payload Path Picker** discovers current-directory `.env.enc` and `.env.*.enc` candidates and always allows custom path entry.
 - A **Payload Creation Target** defaults to `.env.enc` and resolves collisions through explicit interactive choice.
 - An **Identity Picker** merges relevant identity sources and overlays local aliases.
 - A **Compact Identity Line** is used for normal identity display; full public keys are not shown by default.
 - A **Guided Retry** is required for recoverable invalid guided input.
 - A **Secret Prompt** is required for **Passphrase** acquisition in release-ready CLI runtime adapters.
+- A **Secret Prompt** must not echo typed characters or mask length.
 - A **Secret Prompt** must fail before prompting when no interactive TTY is available.
 - An **Editor Preference** is overridden by `$VISUAL` / `$EDITOR`.
 - An **Editor Preference** belongs to **Home State**, not to a **Payload**.
@@ -269,12 +290,12 @@ _Avoid_: Canonical display name, embedded identity field
 - A **Migration Engine** is shared across versioned artifacts.
 - A **Migration Policy** is artifact-specific and sits above the **Migration Engine**.
 - Payload migration owns payload container shape only and uses **Nested Identity Migration** for embedded public identities.
-- Home migration owns home container/state shape only, uses **Nested Identity Migration** for embedded public identities, and keeps alias-map evolution local.
+- Home migration owns home container/state shape only, uses **Nested Identity Migration** for embedded public identities, and keeps alias evolution local.
 - The CLI runs one global **Home Migration Preflight** before any command-specific logic.
 - Payload commands share one **Payload Migration Preflight** before business logic runs.
 - A versioned artifact should expose a **Schema Version Marker** so migration routing is deterministic.
 - Payload `schemaVersion` lives only inside the encrypted envelope and is not duplicated in plaintext wrapper metadata.
-- A **Hard-Break Policy Table** exists per artifact, defaults to allow, and is used only for intentional de-support decisions.
+- Intentional support cutoffs must be explicit; default policy is to keep released artifact schemas migratable.
 - A read operation may use an **In-Memory Migration** but must not perform a **Persistent Migration**.
 - A write operation may require a **Persistent Migration** before mutation.
 - A **Payload Update** may perform both **Payload Self Refresh** and **Payload Format Migration**.
@@ -314,10 +335,10 @@ _Avoid_: Canonical display name, embedded identity field
 > **Domain expert:** "Not in MVP. If the payload recipient matches an existing **Known Identity** and carries a newer snapshot, update that known identity silently. Unknown payload recipients stay transient for the current command until a future import-from-payload flow exists."
 >
 > **Dev:** "Then where does the user-scoped alias live?"
-> **Domain expert:** "In a separate **Local Alias Map** under home state, not inside the shared public identity shape."
+> **Domain expert:** "As **Local Alias Overlay** data under home state, not inside the shared public identity shape."
 >
-> **Dev:** "What key should the local alias map use?"
-> **Domain expert:** "**Owner Id**, because alias should survive both key rotation and rename."
+> **Dev:** "What identity should local aliases follow?"
+> **Domain expert:** "**Owner Id** semantics, because alias should survive both key rotation and rename."
 >
 > **Dev:** "Should handle be stored in the public identity snapshot?"
 > **Domain expert:** "No. It is a **Derived Handle** computed from display name and owner id."
@@ -326,19 +347,19 @@ _Avoid_: Canonical display name, embedded identity field
 > **Domain expert:** "No. It is a **Derived Fingerprint** computed from public key."
 >
 > **Dev:** "Does self identity get a different public shape than everyone else?"
-> **Domain expert:** "No. **Self Identity** embeds the same **Public Identity Snapshot** and only adds local/private fields around it."
+> **Domain expert:** "No. **Self Identity** stores the same public fields and only adds local key metadata and preferences around them."
 >
 > **Dev:** "How should known identities live in home state?"
-> **Domain expert:** "As **Public Identity Snapshot** records keyed by **Owner Id**, with aliases stored separately in the **Local Alias Map**."
+> **Domain expert:** "As **Public Identity Snapshot** records with home-local alias overlay data."
 >
 > **Dev:** "Should self identity still store handle and fingerprint explicitly?"
-> **Domain expert:** "No. Persisted **Self Identity** stores the same **Public Identity Snapshot** and only adds local/private fields."
+> **Domain expert:** "No. Persisted **Self Identity** stores the same public fields plus local key metadata and preferences."
 >
 > **Dev:** "Does payload migration also define identity evolution rules for recipients?"
 > **Domain expert:** "No. Payload migration owns payload shape only and delegates embedded recipient upgrades through **Nested Identity Migration**."
 >
 > **Dev:** "And home migration follows the same rule?"
-> **Domain expert:** "Yes. Home migration owns home shape only, reuses **Nested Identity Migration** for embedded public identities, and keeps alias-map evolution local."
+> **Domain expert:** "Yes. Home migration owns home shape only, reuses **Nested Identity Migration** for embedded public identities, and keeps alias evolution local."
 >
 > **Dev:** "Do payload commands decide migration status independently?"
 > **Domain expert:** "No. They all start from the same **Payload Migration Preflight**, then command policy decides read, write, or update behavior."
@@ -353,7 +374,7 @@ _Avoid_: Canonical display name, embedded identity field
 > **Domain expert:** "No. The payload `schemaVersion` lives only inside the encrypted envelope."
 >
 > **Dev:** "How do we model intentional support cutoffs later?"
-> **Domain expert:** "With one explicit per-artifact **Hard-Break Policy Table** in code. Default is allow."
+> **Domain expert:** "With an explicit support cutoff in code and docs. Default is to keep released schemas migratable."
 >
 > **Dev:** "How should an interactive read behave when the payload is outdated but still readable?"
 > **Domain expert:** "Complete the read with **In-Memory Migration**, then warn. Do not prompt for update."
@@ -394,7 +415,7 @@ _Avoid_: Canonical display name, embedded identity field
 - "version" was used for both artifact schema and load contract. Resolution: use **Artifact Schema Version** for persisted/shared artifacts and **Load Protocol** for the external caller contract.
 - "read operations should not trigger updates" was ambiguous across payload and home state. Resolution: this restriction applies to **User-Managed Resource** payload rewrites, not to **Managed State** home migration.
 - "identity string" was used to mean both one import/export encoding and the broader reusable identity representation. Resolution: use **Identity Snapshot** for the canonical versioned entity shape and **Identity String** for one serialized encoding of it.
-- "payload recipient as projection" conflicted with lossless promotion into known identities. Resolution: payload recipients, identity strings, and known identities share one **Public Identity Snapshot**; only local alias remains separate in **Local Alias Map**.
+- "payload recipient as projection" conflicted with lossless promotion into known identities. Resolution: payload recipients, identity strings, and known identities share one **Public Identity Snapshot**; only local alias remains separate in **Local Alias Overlay**.
 - "payload recipients become known automatically" was too broad. Resolution: existing known identities may silently refresh from newer payload recipient snapshots; unknown payload recipients remain transient in MVP and need a future import-from-payload flow.
 
 ## Current Target
@@ -406,16 +427,16 @@ The current target design is:
 - payload never auto-rewrites on read; reads may use **In-Memory Migration** only
 - one user-facing payload `update` command covering both **Payload Self Refresh** and **Payload Format Migration**
 - one canonical **Public Identity Snapshot** shared across identity strings, payload recipients, and known identities
-- **Self Identity** embeds that same **Public Identity Snapshot** as its public core
-- `/home` known identities are stored as public snapshots keyed by `ownerId`, plus separate alias overlay state
-- persisted self identity stores public snapshot + only local/private fields
+- **Self Identity** stores the same public fields plus local key metadata and preferences
+- home known identities store public snapshots plus local alias overlay data
+- persisted self identity stores public fields, current/retired key metadata, and preferences
 - payload migration owns payload shape; nested identities reuse shared identity migration
-- home migration owns home shape; embedded identities reuse shared identity migration; alias map stays local
+- home migration owns home shape; embedded identities reuse shared identity migration; aliases stay local
 - home migration runs as global CLI preflight before any command logic
 - payload commands share one preflight state machine before command-specific logic
 - payload has one explicit stable schema version marker for deterministic migration routing
 - payload schema version marker lives only inside encrypted envelope
-- hard-break gate exists as explicit per-artifact policy table, default allow
+- intentional support cutoff must be explicit; default is to keep released schemas migratable
 - interactive readable-outdated payload reads succeed via in-memory migration, then warn only
 - headless readable-outdated payload reads succeed via in-memory migration, warn on `stderr`, never prompt
 - interactive readable-outdated payload writes prompt, then migrate-and-continue or abort-without-mutation
@@ -429,4 +450,4 @@ The current target design is:
   - `identityUpdatedAt`
 - `handle` is derived from `displayName + ownerId`
 - `fingerprint` is derived from `publicKey`
-- local aliases live in separate home-local state keyed by `ownerId`
+- local aliases live in home-local state and resolve by `ownerId` semantics

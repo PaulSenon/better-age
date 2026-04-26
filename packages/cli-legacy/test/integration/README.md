@@ -1,5 +1,8 @@
 # Integration Tests
 
+Historical prototype notes only. Current integration behavior belongs to
+`packages/core`, `packages/cli`, and `packages/varlock`.
+
 Integration tests verify real source-level composition.
 
 Allowed:

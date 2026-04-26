@@ -1,5 +1,8 @@
 # Tests
 
+Historical prototype test notes only. The release-facing CLI test contract lives
+under `packages/cli/test` and package-local `packages/cli/src/**/*.test.ts`.
+
 This package uses 3 test tiers.
 
 - `src/**/*.test.ts`

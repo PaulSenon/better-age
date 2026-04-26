@@ -32,7 +32,8 @@ packages/cli/dist/bage --help
 
 - Run `packages/cli/dist/bage setup --name QA`.
 - Type a passphrase and confirmation.
-- Confirm typed characters are hidden or masked by the prompt UI.
+- Confirm typed characters are hidden and mask characters do not reveal length.
+- Confirm passphrases shorter than 8 characters are rejected.
 - Type a wrong passphrase during an edit/read flow.
 - Confirm the wrong-passphrase error appears before the retry prompt, not after
   returning to the menu.
@@ -141,6 +142,8 @@ packages/cli/dist/bage --help
 - Confirm the file contains `-----BEGIN BETTER AGE PAYLOAD-----`.
 - Confirm the Better Age block wraps an inner `-----BEGIN AGE ENCRYPTED FILE-----`
   block.
+- After a create/edit/grant/revoke/update write, confirm no `<payload>.tmp`
+  encrypted staging file remains next to the payload.
 - Confirm `packages/cli/dist/bage load <payload> --protocol-version=1` still
   decrypts the payload.
 

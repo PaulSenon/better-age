@@ -503,3 +503,17 @@
 - Interactive `selectOne` labels and identity row labels are sanitized before reaching prompt adapters.
 - Tests cover malicious identity display names in identity list, payload inspect, and guided grant picker labels.
 - Verification passed: `pnpm -F @better-age/cli test:unit -- runCli.test.ts presenter.test.ts`, `pnpm -F @better-age/cli check`, `git diff --check`.
+
+2026-04-27 Security review follow-up:
+- Fixed non-atomic encrypted payload writes.
+- Payload repository now writes encrypted output to same-directory `<target>.tmp`, then renames over the target.
+- If rename/write fails, temp cleanup is best-effort and the old payload remains untouched when rename fails.
+- No plaintext temp file is introduced; temp contains the final encrypted wrapper.
+- Tests cover write-temp-then-rename and cleanup after rename failure.
+- Verification passed: `pnpm -F @better-age/core test:unit -- RealCoreAdapters.transaction.test.ts`, `pnpm -F @better-age/core check`, `git diff --check`.
+
+2026-04-27 Documentation alignment pass:
+- Updated root/package docs, context, ubiquitous language, contributor schema guide, manual QA, ADR note, notices, and legacy disclaimers.
+- Docs now reflect current commands (`bage identity export/import`, `better-age://identity/v1/...`), Effect CLI/Inquirer stack, hidden no-length passphrase prompts, 8-char passphrase minimum, V1 trusted key update gate, payload `.env.enc` discovery, encrypted `<payload>.tmp` rename writes, key transaction recovery, key ref guard, terminal-safe rendering, and private file permissions.
+- Schema-change guide now points to current core files/tests instead of old `packages/cli/src/domain`/`app` paths.
+- Verification passed: `pnpm check`, `git diff --check`.

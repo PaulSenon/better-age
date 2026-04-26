@@ -13,9 +13,10 @@
 | **Identity Updated At** | The UTC timestamp for when an **Identity** snapshot became current. | Last seen at, exported at, rotated at |
 | **Passphrase** | The required secret that protects the local private key material and gates decrypt operations. | Password, unlock code |
 | **Known Identity** | A home-local address-book entry for an external **Identity**. | Contact, saved recipient, known host |
-| **Local Alias** | A home-local nickname pointing to one **Known Identity** (used to overlay identity `Display Name` in case of name colision, just for convenience). | Display name, handle, identity id |
-| **Key Mode** | The cryptographic key mode carried by local identity records. Current canonical value: `pq-hybrid`. | Crypto mode, algorithm preset |
+| **Local Alias** | A home-local nickname pointing to one **Known Identity** (used to overlay identity `Display Name` in case of name collision, just for convenience). | Display name, handle, identity id |
+| **Key Mode** | The cryptographic key mode reported for local identity summaries. Current canonical value: `pq-hybrid`. | Crypto mode, algorithm preset |
 | **Forget Identity** | The local-only operation that removes one **Known Identity** from **Home State** without touching any **Payload**. | Revoke identity, delete recipient, unshare |
+| **Trusted Key Update** | The explicit trust decision required when importing a known **Owner Id** with a changed public key before signed identities exist. | Silent refresh, normal import |
 
 ## CLI command language
 
@@ -60,9 +61,11 @@
 | **Display Snapshot** | The payload-stored or home-stored copy of a **Display Name** used only for UX. | Alias, canonical name |
 | **Preamble** | The static plaintext instructional header at the top of a payload file. | Metadata header, comments block |
 | **Envelope** | The decrypted structured payload body containing metadata plus `envText`. | Container, inner blob, payload json |
+| **Encrypted Payload Temp** | The same-directory `<payload>.tmp` file used only as an encrypted staging file before atomic rename. | Plaintext temp, editor temp, hidden registry |
 | **You Marker** | A viewer-relative render hint such as `[you]` shown when a listed identity is the current local self identity. It is never persisted as payload or home-state data. | Me flag, self tag |
 | **Interactive Session** | The guided keyboard-navigable CLI mode entered through `bage interactive`. | Wizard, shell, menu mode |
-| **Secure Viewer** | The in-process scrollable readonly terminal surface used by **View**. It may render plaintext to the terminal UI, but it must never fall back to plaintext `stdout`. | Pager, less, cat view |
+| **Secure Viewer** | The in-process scrollable readonly terminal surface used by **View**. It may render plaintext to the terminal UI, but it must never fall back to plaintext `stdout`; control characters are displayed visibly. | Pager, less, cat view |
+| **Key Transaction Marker** | The local marker file used to recover an interrupted passphrase-change key replacement. | Generation directory, GC queue |
 
 ## Interaction model
 
@@ -96,12 +99,13 @@
 - An **Identity String** exports one current snapshot of one **Identity**.
 - A **Known Identity** belongs to one local **Home State**.
 - A **Local Alias** points to exactly one **Known Identity**.
+- A **Trusted Key Update** is required when a known **Owner Id** changes public key in V1 unsigned identities.
 - A **Forget Identity** removes one **Known Identity** from **Home State** only.
 - An **Identity Command Group** contains **Identity Export**, **Identity List**, **Identity Import**, **Identity Forget**, **Identity Rotate**, and **Identity Passphrase**.
 - **Identity Import** is the MVP command that can set or change **Local Alias**.
 - The **Setup Command** is root-level even though it creates local identity state.
 - A **Passphrase** is required for local private-key protection.
-- A **Key Mode** belongs to one concrete local identity record.
+- A **Key Mode** describes the current local identity key algorithm.
 - A **Payload** has exactly one stable **Payload Id**.
 - A **Payload** contains zero or more **Recipient Entries**.
 - A **Recipient Entry** refers to one **Identity** by **Owner Id** and current key snapshot.
@@ -119,9 +123,11 @@
 - A **Retired Key** belongs to one local **Identity** history in **Home State**.
 - A **Preamble** belongs to one **Payload** file but carries no sensitive metadata.
 - An **Envelope** belongs to one **Payload** and contains both metadata and env content.
+- An **Encrypted Payload Temp** contains encrypted wrapper bytes only, never editor plaintext.
 - A **You Marker** is computed at render time from current local self identity.
 - An **Interactive Session** routes human workflows through keyboard-select navigation.
 - A **Secure Viewer** belongs to the human UX path and is distinct from **Load**.
+- A **Key Transaction Marker** may be consumed by recovery before home/key reads.
 - An **Exact Invocation** must not rely on an **Interactive Terminal** to complete missing operands.
 - An **Exact Invocation** may still require an interactive passphrase prompt unless a later headless credential channel is explicitly specified.
 - A **Guided Invocation** may require an **Interactive Terminal**.

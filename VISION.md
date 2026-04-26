@@ -21,14 +21,15 @@ That means:
 - one machine path for loading secrets
 
 The intended social workflow is simple:
-- ask someone to set up `better-age` once (can be done with just `npx @better-age/cli setup` once)
-- they send their identity string (`npx @better-age/cli me`)
+- ask someone to set up `better-age` once with `bage setup`
+- they send their identity string with `bage identity export`
 - you grant access
-- from then on they can decrypt any env payload shared with that identity. 
+- from then on they can decrypt any env payload shared with that identity.
 
 > [!NOTE]
-> All identities granted to a file can now revoke, grant, share this payload. 
-> You own the encrypted file distribution. Could be one time share accross an insecure stream (email/slack), adding to your repo versioning (for private repo only please), or whatever distribution/sync pipeline you wanna build on top.
+> All identities granted to a file can revoke, grant, and share that payload.
+> You own encrypted file distribution. That can be a one-time transfer, private
+> repo versioning, or any sync pipeline you build on top.
 
 The tool should remove excuses to use it badly.
 

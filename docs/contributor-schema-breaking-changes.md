@@ -20,22 +20,26 @@ Compatibility boundary kept separate:
 - `Load Protocol`
 
 Core rules implemented today:
-- one shared migration engine
+- one shared parser/migration helper module in core
 - explicit version marker per persisted artifact
 - adjacent steps only
 - normalize to current runtime shape only
-- support all released versions by default
-- intentional support cutoffs only through explicit hard-break policy
+- support all rebuilt-MVP released versions by default
+- intentional support cutoffs must be explicit and documented before removing
+  old schema support
 
 Current code entry points:
-- shared engine: `packages/cli/src/domain/migration/ArtifactMigration.ts`
-- home migration definition: `packages/cli/src/domain/home/HomeStateMigration.ts`
-- payload migration definition: `packages/cli/src/domain/payload/PayloadEnvelopeMigration.ts`
-- identity-string migration definition: `packages/cli/src/domain/identity/IdentityString.ts`
-- shared legacy identity adapters: `packages/cli/src/domain/identity/PublicIdentityMigration.ts`
-- home preflight: `packages/cli/src/app/shared/HomeStatePreflight.ts`
-- payload read preflight: `packages/cli/src/app/shared/OpenPayload.ts`
-- explicit payload update boundary: `packages/cli/src/app/update-payload/UpdatePayload.ts`
+- artifact schemas, parsers, encoders, and migration helpers:
+  `packages/core/src/persistence/ArtifactDocument.ts`
+- payload file wrapper parser/formatter:
+  `packages/core/src/persistence/PayloadFileEnvelope.ts`
+- core command/query behavior:
+  `packages/core/src/identity/BetterAgeCore.ts`
+- node persistence/crypto adapters:
+  `packages/core/src/infra/RealCoreAdapters.ts`
+- CLI grammar and flows:
+  `packages/cli/src/cli/commandGrammar.ts`,
+  `packages/cli/src/cli/runCli.ts`
 
 ## First question: which artifact changed?
 
@@ -64,7 +68,7 @@ Use when the shared public identity representation changed.
 
 Important:
 - do not invent parallel identity migration logic inside home or payload
-- migrate legacy identity shapes in `PublicIdentityMigration.ts`
+- migrate legacy identity shapes in `ArtifactDocument.ts`
 - then let home/payload migrations reuse that
 
 ### Identity String
@@ -96,10 +100,8 @@ That keeps migration steps smaller and easier to reason about.
 Update the canonical runtime schema.
 
 Examples:
-- `HomeState.ts`
-- `PayloadEnvelope.ts`
-- `PublicIdentity.ts`
-- `IdentityString.ts`
+- `ArtifactDocument.ts`
+- `PayloadFileEnvelope.ts` when the outer payload wrapper changes
 
 Keep runtime shape as the only destination shape. Do not add “target version” options.
 
@@ -146,14 +148,14 @@ Pattern:
 The shared engine will:
 - read current artifact version
 - reject newer unsupported versions
-- reject explicit hard-broken versions
+- reject explicit support cutoffs, if one exists
 - walk adjacent steps until current
 
 ### 6. Reuse nested identity migration instead of duplicating it
 
 If a home or payload change includes embedded identity snapshots:
 - keep container migration in the home/payload file
-- reuse helpers from `PublicIdentityMigration.ts`
+- reuse shared public identity helpers from `ArtifactDocument.ts`
 
 Do not let payload/home own public-identity evolution rules.
 
@@ -179,27 +181,16 @@ Payload update:
 - remain idempotent
 
 If behavior changes, update:
-- `OpenPayload.ts`
-- `UpdatePayload.ts`
-- payload write flows/commands
+- `BetterAgeCore.ts`
+- `runCli.ts`
+- payload write command tests
 
-## Hard-break policy
+## Intentional support cutoffs
 
 Default rule:
 - all released versions remain migratable
 
-Only de-support an old version by explicit policy.
-
-Shared policy shape lives in:
-- `ArtifactMigrationPolicy`
-
-Current knobs:
-- `hardBreakAtOrBelowVersion`
-- `hardBreakVersions`
-
-Use this only when you intentionally want:
-- old version to stop migrating
-- hard failure with explicit remediation
+Only de-support an old version by explicit code and documentation.
 
 Do not remove legacy schema support “because tests still pass”. That creates accidental cutoffs.
 
@@ -210,22 +201,21 @@ Minimum required coverage for any breaking schema change:
 ### Artifact migration definition tests
 
 Update or add:
-- `HomeStateMigration.test.ts`
-- `PayloadEnvelopeMigration.test.ts`
+- `packages/core/src/persistence/ArtifactDocument.test.ts`
+- `packages/core/src/persistence/PayloadFileEnvelope.test.ts`
 
 Must prove:
 - current version stays current
 - previous released version migrates
 - oldest supported version still multi-hop migrates
-- explicit hard-break policy flips migratable old versions into failure
-- unsupported newer stays distinct from hard-broken old
+- explicit support cutoff, if introduced, flips migratable old versions into failure
+- unsupported newer stays distinct from intentionally unsupported old
 
 ### Preflight tests
 
 Update:
-- `HomeStatePreflight.test.ts`
-- `ReadPayload.test.ts`
-- `OpenPayload.test.ts`
+- `packages/core/src/identity/BetterAgeCore.test.ts`
+- `packages/core/src/identity/BetterAgeCore.payload.test.ts`
 
 Must prove:
 - correct artifact classification
@@ -249,8 +239,8 @@ Must prove:
 ### Integration tests
 
 Keep these green:
-- `test/integration/create-user-identity/CreateUserIdentity.integration.test.ts`
-- `test/integration/payload-crypto/PayloadAgeCrypto.integration.test.ts`
+- `packages/core/test/integration/**/*.integration.test.ts`
+- package-local unit tests affected by CLI rendering or command behavior
 
 These catch shape drift that unit tests can miss.
 
@@ -259,6 +249,8 @@ These catch shape drift that unit tests can miss.
 Run:
 
 ```sh
+pnpm -F @better-age/core check
+pnpm -F @better-age/core test
 pnpm -F @better-age/cli check
 pnpm -F @better-age/cli test
 ```
@@ -277,12 +269,15 @@ Before merging a breaking schema change, confirm all are true:
 - exactly one adjacent migration step was added
 - legacy schema union still decodes all supported released versions
 - nested public identity changes were delegated to shared identity migration
-- no accidental hard-break was introduced
+- no accidental support cutoff was introduced
 - home vs payload policy behavior still matches contract
-- definition tests cover current, oldest supported, multi-hop, hard-break, unsupported-newer
+- definition tests cover current, oldest supported, multi-hop, support cutoff,
+  unsupported-newer
 - app/command tests cover user-facing behavior changes
 - `pnpm -F @better-age/cli check` passes
 - `pnpm -F @better-age/cli test` passes
+- `pnpm -F @better-age/core check` passes
+- `pnpm -F @better-age/core test` passes
 
 ## Current target shapes
 
@@ -302,15 +297,17 @@ Derived only:
 
 Persist:
 - public identity snapshots
-- local alias map keyed by `ownerId`
+- local alias overlay data keyed by `ownerId` semantics
 
 ### Self identity
 
 Persist:
-- `publicIdentity`
-- `privateKeyPath`
-- `createdAt`
-- `keyMode`
+- `ownerId`
+- `displayName`
+- `identityUpdatedAt`
+- current key metadata, including `encryptedPrivateKeyRef`
+- retired key metadata
+- preferences
 
 ### Payload recipients
 

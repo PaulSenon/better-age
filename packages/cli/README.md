@@ -73,8 +73,8 @@ is limited to the secure viewer and final stdout/stderr writing.
 bage setup --name Isaac
 bage create .env.prod.enc
 bage edit .env.prod.enc
-bage identity import 'bage-id-v1:...' --alias ops
-bage identity import 'bage-id-v1:...' --trust-key-update
+bage identity import 'better-age://identity/v1/...' --alias ops
+bage identity import 'better-age://identity/v1/...' --trust-key-update
 bage grant .env.prod.enc ops
 bage inspect .env.prod.enc
 bage view .env.prod.enc
@@ -98,7 +98,9 @@ bage interactive
 
 ## Runtime Behavior
 
-- Passphrases are prompted only in interactive terminals.
+- Passphrases are prompted only in interactive terminals. Prompt input is hidden
+  without echoing mask characters, so passphrase length is not displayed.
+- New passphrases must be at least 8 characters.
 - Headless payload reads fail fast because MVP has no passphrase injection
   mechanism.
 - Missing existing payload paths discover `.env.enc` and `.env.*.enc` in the current directory.
@@ -111,6 +113,9 @@ bage interactive
   string entry.
 - `identity forget` lists known identities only and never changes payload files.
 - Guided identity import retries invalid strings and duplicate aliases.
+- Reimporting a known owner with a changed public key requires explicit trust.
+  Interactive mode asks for confirmation with old/new fingerprints; exact mode
+  requires `--trust-key-update`.
 - Recoverable prompt-loop feedback, such as wrong passphrases or invalid edited
   `.env` content, is printed immediately in interactive sessions instead of
   being buffered until the command returns to the menu.
@@ -127,6 +132,20 @@ bage interactive
   Control characters are rendered visibly, not interpreted by the terminal.
 - `interactive` opens a setup-aware menu loop. It excludes `load` and
   `interactive` from menus.
+
+## Local Security And Durability
+
+- Home state and encrypted private key files are written under private
+  filesystem permissions where supported.
+- Loose home/key permissions are repaired before use and surfaced as notices.
+- Private key refs are constrained to `keys/<safe-name>.age`.
+- Passphrase changes prepare and verify all replacement key blobs before
+  committing. A transaction marker lets the next read recover if a crash
+  interrupts the replace.
+- Payload writes encrypt and verify in memory, then write the encrypted wrapper
+  to `<payload>.tmp` in the same directory and rename it over the target.
+  Cleanup removes the temp file on failure when possible.
+- Human-rendered identity/display text is sanitized before terminal output.
 
 ## Payload File Format
 

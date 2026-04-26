@@ -52,7 +52,7 @@ Typical flow:
 bage setup
 bage create .env.prod.enc
 bage edit .env.prod.enc
-bage identity import 'bage-id-v1:...' --alias teammate
+bage identity import 'better-age://identity/v1/...' --alias teammate
 bage grant .env.prod.enc teammate
 bage view .env.prod.enc
 bage load --protocol-version=1 .env.prod.enc

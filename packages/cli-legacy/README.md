@@ -4,6 +4,8 @@ Legacy `better-age` CLI package kept as a private source reference during the MV
 
 This package does not expose the `bage` command anymore.
 New implementation work should happen in `packages/core` and `packages/cli`.
+Command names and examples below are historical prototype notes, not current
+release-facing documentation.
 
 For project pitch and rationale:
 - [../../README.md](../../README.md)

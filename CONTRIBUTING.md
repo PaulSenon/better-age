@@ -12,6 +12,7 @@ Start here:
 - [UBIQUITOUS_LANGUAGE.md](UBIQUITOUS_LANGUAGE.md)
 
 Then read the package you are touching:
+- [packages/core/README.md](packages/core/README.md)
 - [packages/cli/README.md](packages/cli/README.md)
 - [packages/varlock/README.md](packages/varlock/README.md)
 
@@ -50,8 +51,14 @@ Rotation is local state. Payload rewrites stay explicit.
 ## Package map
 
 `@better-age/cli`
-- source of truth for identities, payloads, and command UX
+- source of truth for command UX, prompts, editor/viewer adapters, and
+  stdout/stderr policy
 - publishes the `bage` executable
+
+`@better-age/core`
+- source of truth for artifact codecs, identity lifecycle, payload lifecycle,
+  migrations, crypto ports, and typed outcomes
+- must not depend on CLI or varlock
 
 `@better-age/varlock`
 - thin adapter
@@ -63,7 +70,9 @@ Rotation is local state. Payload rewrites stay explicit.
 - TypeScript
 - Effect
 - `@effect/cli`
+- `@effect/platform`
 - `@effect/platform-node`
+- `@inquirer/prompts`
 - `@effect/vitest`
 - `age-encryption`
 - esbuild
@@ -83,6 +92,8 @@ Per package:
 ```sh
 pnpm -F @better-age/cli check
 pnpm -F @better-age/cli test
+pnpm -F @better-age/core check
+pnpm -F @better-age/core test
 pnpm -F @better-age/varlock check
 pnpm -F @better-age/varlock test
 ```
@@ -90,10 +101,9 @@ pnpm -F @better-age/varlock test
 ## Architecture rules
 
 - keep v0 simple
-- prefer deep modules over premature package splits
-- preserve layering: domain, app, port, infra, cli, program
+- prefer core primitives plus thin CLI orchestration over broad abstractions
 - keep runtime schemas as persisted-state source of truth
-- keep CLI interaction outside domain/app
+- keep CLI interaction outside core
 - keep docs aligned with shipped behavior, not stale naming
 
 ## Testing stance

@@ -1,5 +1,8 @@
 # E2E Tests
 
+Historical prototype notes only. The legacy package is private and no longer
+exposes the current `bage` binary.
+
 E2E tests verify the built CLI contract.
 
 Rules:
