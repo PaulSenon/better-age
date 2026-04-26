@@ -154,6 +154,45 @@ describe("ArtifactDocument", () => {
 		);
 	});
 
+	it("rejects home-state private key refs outside the managed keys directory", () => {
+		const maliciousRefs = [
+			"../outside.age",
+			"keys/../../outside.age",
+			"/tmp/outside.age",
+			"keys/not safe.age",
+			"keys/fp_current.txt",
+		];
+
+		for (const encryptedPrivateKeyRef of maliciousRefs) {
+			expect(
+				getLeft(
+					parseHomeStateDocument({
+						...validHomeStateDocumentV2,
+						currentKey: {
+							...validHomeStateDocumentV2.currentKey,
+							encryptedPrivateKeyRef,
+						},
+					}),
+				),
+			).toBeInstanceOf(ArtifactDocumentInvalidError);
+		}
+
+		expect(
+			getLeft(
+				parseHomeStateDocument({
+					...validHomeStateDocumentV2,
+					retiredKeys: [
+						{
+							...validHomeStateDocumentV2.currentKey,
+							encryptedPrivateKeyRef: "../outside.age",
+							retiredAt: "2026-04-25T11:00:00.000Z",
+						},
+					],
+				}),
+			),
+		).toBeInstanceOf(ArtifactDocumentInvalidError);
+	});
+
 	it("classifies invalid artifact cases for every artifact parser", () => {
 		const parserCases: ReadonlyArray<ParserCase> = [
 			{

@@ -5,7 +5,9 @@ const OwnerId = Schema.String;
 const DisplayName = Schema.String;
 const PublicKey = Schema.String;
 const KeyFingerprint = Schema.String;
-const EncryptedPrivateKeyRef = Schema.String;
+const EncryptedPrivateKeyRef = Schema.String.pipe(
+	Schema.pattern(/^keys\/[A-Za-z0-9._-]+\.age$/),
+);
 const LocalAlias = Schema.String;
 const PayloadId = Schema.String;
 const EnvText = Schema.String;

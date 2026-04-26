@@ -232,6 +232,7 @@ const knownFailureCodeFromCause = (cause: unknown): string | null => {
 		case "ARTIFACT_UNSUPPORTED_VERSION":
 		case "HOME_STATE_INVALID":
 		case "KEY_TRANSACTION_INCOMPLETE":
+		case "LOCAL_KEY_MISSING":
 		case "LOCAL_PERMISSION_REPAIR_FAILED":
 		case "PRIVATE_KEY_INVALID":
 			return cause.message;
@@ -247,10 +248,14 @@ const parseHomeStateFailureCode = (
 		? "ARTIFACT_UNSUPPORTED_VERSION"
 		: "HOME_STATE_INVALID";
 
-const passphraseOrPrivateKeyFailure = (cause: unknown) =>
-	knownFailureCodeFromCause(cause) === "PRIVATE_KEY_INVALID"
-		? failure("PRIVATE_KEY_INVALID", undefined)
+const passphraseOrPrivateKeyFailure = (cause: unknown) => {
+	const knownCode = knownFailureCodeFromCause(cause);
+
+	return knownCode === "PRIVATE_KEY_INVALID" ||
+		knownCode === "LOCAL_KEY_MISSING"
+		? failure(knownCode, undefined)
 		: failure("PASSPHRASE_INCORRECT", undefined);
+};
 
 const withKnownCoreFailures =
 	<

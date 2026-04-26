@@ -9,3 +9,4 @@ In-process editor: future high-security edit mode if external editor plaintext t
 Branded domain ids: later introduce stronger branded boundaries for owner id, payload id, key fingerprints, key refs, and age recipients.
 Core export-path split: later consider `@better-age/core` pure API and `@better-age/core/node` adapter exports.
 Payload atomic replace: deferred because user rejects project-local temp/staging files; current hardening only verifies in memory before final write.
+Future identity health/repair command: inspect local key refs in home state, report missing/corrupt current and retired key files, and allow explicit repair such as forgetting missing retired-key refs. Do not silently remove retired refs as side effect of normal commands.

@@ -475,3 +475,31 @@
 - Deferred/off-scope work remains parked in `.llms/memory/backlog.txt`, including signed Identity V2, structured varlock launcher, strict/in-process editor, branded IDs, core export split, and payload atomic replace.
 - Full verification passed: `pnpm test`, `pnpm check`, `git diff --check`.
 - Release readiness is still pending user manual QA; do not claim released/ready until user QA passes.
+
+2026-04-27 Security review follow-up:
+- Fixed `replaceEncryptedPrivateKeys` mixed-passphrase risk during backup cleanup.
+- Transaction marker deletion is now the commit point; `.bak` cleanup runs best-effort afterward and cannot trigger rollback.
+- Added adapter regression test proving backup cleanup failure still leaves all stable keys on the new committed blobs and marker removed.
+- Verification passed: `pnpm -F @better-age/core test:unit -- RealCoreAdapters.transaction.test.ts`, `pnpm -F @better-age/core check`, `git diff --check`.
+
+2026-04-27 Security review follow-up:
+- Fixed private key ref path traversal risk.
+- Home-state schema now accepts only `keys/<safe>.age` private key refs and rejects traversal, absolute paths, nested paths, spaces, and wrong extensions.
+- Node home repository also validates direct port refs before read/write/replace/recovery path joins.
+- Added parser and adapter regression tests for malicious refs.
+- Verification passed: `pnpm -F @better-age/core test:unit -- ArtifactDocument.test.ts RealCoreAdapters.transaction.test.ts`, `pnpm -F @better-age/core check`, `git diff --check`.
+
+2026-04-27 Security review follow-up:
+- Added deferred backlog item for future `identity health` / repair command to inspect missing/corrupt key refs and explicitly forget missing retired-key refs.
+- Fixed missing key file handling: missing current key now returns `LOCAL_KEY_MISSING` instead of crashing or becoming `PASSPHRASE_INCORRECT`.
+- Node home repository maps missing key file `ENOENT` to `LOCAL_KEY_MISSING`.
+- Core maps `LOCAL_KEY_MISSING` as known failure and preserves it through passphrase/decrypt helper paths.
+- Tests cover rotate, verify passphrase, passphrase change, and direct adapter missing-key reads.
+- Verification passed: `pnpm -F @better-age/core test:unit -- RealCoreAdapters.transaction.test.ts BetterAgeCore.test.ts BetterAgeCore.payload.test.ts`, `pnpm -F @better-age/core check`, `git diff --check`.
+
+2026-04-27 Security review follow-up:
+- Fixed untrusted identity display-name terminal injection in CLI human output.
+- Added `sanitizeTerminalText` at presenter boundary for identity lists, payload inspect, success/warning/error/parse messages.
+- Interactive `selectOne` labels and identity row labels are sanitized before reaching prompt adapters.
+- Tests cover malicious identity display names in identity list, payload inspect, and guided grant picker labels.
+- Verification passed: `pnpm -F @better-age/cli test:unit -- runCli.test.ts presenter.test.ts`, `pnpm -F @better-age/cli check`, `git diff --check`.

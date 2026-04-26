@@ -57,7 +57,15 @@ const makeHarness = (
 		saveCurrentHomeStateDocument: async (document) => {
 			homeState = document;
 		},
-		readEncryptedPrivateKey: async (ref) => encryptedKeys.get(ref) ?? "",
+		readEncryptedPrivateKey: async (ref) => {
+			const encryptedKey = encryptedKeys.get(ref);
+
+			if (encryptedKey === undefined) {
+				throw new Error("LOCAL_KEY_MISSING");
+			}
+
+			return encryptedKey;
+		},
 		writeEncryptedPrivateKey: async ({ ref, encryptedKey }) => {
 			encryptedKeys.set(ref, encryptedKey);
 		},

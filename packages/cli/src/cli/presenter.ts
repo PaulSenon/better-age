@@ -35,19 +35,44 @@ export type PayloadInspectView = {
 	}>;
 };
 
+const renderControlCharacter = (character: string) => {
+	switch (character) {
+		case "\t":
+			return "\\t";
+		case "\r":
+			return "\\r";
+		default:
+			return `\\x${character.charCodeAt(0).toString(16).padStart(2, "0")}`;
+	}
+};
+
+export const sanitizeTerminalText = (text: string) =>
+	Array.from(text)
+		.map((character) => {
+			const code = character.charCodeAt(0);
+
+			return code < 0x20 || code === 0x7f || (code >= 0x80 && code <= 0x9f)
+				? renderControlCharacter(character)
+				: character;
+		})
+		.join("");
+
 const renderIdentityLabel = (input: {
 	readonly displayName: string;
 	readonly ownerId: string;
 	readonly localAlias: string | null;
 	readonly tag?: string;
 }) => {
+	const displayName = sanitizeTerminalText(input.displayName);
+	const localAlias =
+		input.localAlias === null ? null : sanitizeTerminalText(input.localAlias);
+	const ownerId = sanitizeTerminalText(input.ownerId);
+	const tag =
+		input.tag === undefined ? "" : ` ${sanitizeTerminalText(input.tag)}`;
 	const name =
-		input.localAlias === null
-			? input.displayName
-			: `${input.localAlias} (${input.displayName})`;
-	const tag = input.tag === undefined ? "" : ` ${input.tag}`;
+		localAlias === null ? displayName : `${localAlias} (${displayName})`;
 
-	return `${name} ${input.ownerId}${tag}`;
+	return `${name} ${ownerId}${tag}`;
 };
 
 const failureMessage = (code: string) => {
@@ -122,13 +147,13 @@ const failureMessage = (code: string) => {
 export const presentSuccess = (message: string): RunCliResult => ({
 	exitCode: 0,
 	stdout: "",
-	stderr: `[OK] ${message}\n`,
+	stderr: `[OK] ${sanitizeTerminalText(message)}\n`,
 });
 
 export const presentFailure = (code: string, exitCode = 1): RunCliResult => ({
 	exitCode,
 	stdout: "",
-	stderr: `[ERROR] ${code}: ${failureMessage(code)}\n`,
+	stderr: `[ERROR] ${sanitizeTerminalText(code)}: ${sanitizeTerminalText(failureMessage(code))}\n`,
 });
 
 export const presentParseFailure = (
@@ -137,7 +162,7 @@ export const presentParseFailure = (
 ): RunCliResult => ({
 	exitCode: 2,
 	stdout: "",
-	stderr: `[ERROR] ${code}: ${message}\n`,
+	stderr: `[ERROR] ${sanitizeTerminalText(code)}: ${sanitizeTerminalText(message)}\n`,
 });
 
 export const presentIdentityString = (
@@ -166,7 +191,10 @@ export const presentIdentityList = (input: IdentityListView): RunCliResult => {
 		input.retired.length === 0
 			? "  none\n"
 			: input.retired
-					.map((key) => `  ${key.fingerprint} ${key.retiredAt}\n`)
+					.map(
+						(key) =>
+							`  ${sanitizeTerminalText(key.fingerprint)} ${sanitizeTerminalText(key.retiredAt)}\n`,
+					)
 					.join("");
 
 	return {
@@ -189,7 +217,7 @@ export const presentIdentityList = (input: IdentityListView): RunCliResult => {
 };
 
 export const presentWarning = (message: string): string =>
-	`[WARN] ${message}\n`;
+	`[WARN] ${sanitizeTerminalText(message)}\n`;
 
 const ansi = {
 	reset: "\u001B[0m",
@@ -228,7 +256,7 @@ export const presentPayloadInspect = (
 	const envKeyLines =
 		input.envKeys.length === 0
 			? "  none\n"
-			: input.envKeys.map((key) => `  ${key}\n`).join("");
+			: input.envKeys.map((key) => `  ${sanitizeTerminalText(key)}\n`).join("");
 	const recipientLines =
 		input.recipients.length === 0
 			? "  none\n"
@@ -254,10 +282,10 @@ export const presentPayloadInspect = (
 		exitCode: 0,
 		stdout: [
 			"Payload\n",
-			`  path: ${input.path}\n`,
-			`  payload id: ${input.payloadId}\n`,
+			`  path: ${sanitizeTerminalText(input.path)}\n`,
+			`  payload id: ${sanitizeTerminalText(input.payloadId)}\n`,
 			`  schema version: ${input.schemaVersion}\n`,
-			`  compatibility: ${input.compatibility}\n`,
+			`  compatibility: ${sanitizeTerminalText(input.compatibility)}\n`,
 			"\nEnv keys\n",
 			envKeyLines,
 			"\nRecipients\n",

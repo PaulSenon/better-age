@@ -2,7 +2,11 @@ Current goal: security release hardening implementation complete; await user QA.
 
 Active state:
 - Phase 1-7 complete.
-- Full verification passed: `pnpm test`, `pnpm check`, `git diff --check`.
+- Review follow-up fixed key backup cleanup rollback risk.
+- Review follow-up fixed private key ref path traversal risk.
+- Review follow-up fixed missing key file failure mapping.
+- Review follow-up fixed untrusted identity display-name terminal injection in CLI output/picker labels.
+- Latest verification passed: `pnpm -F @better-age/cli test:unit -- runCli.test.ts presenter.test.ts`, `pnpm -F @better-age/cli check`, `git diff --check`.
 
 Next:
 - User runs manual QA from `docs/manual-qa.md`.

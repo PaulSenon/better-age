@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
 	presentFailure,
+	presentIdentityList,
 	presentIdentityString,
+	presentPayloadInspect,
 	presentSuccess,
 	presentWarning,
 	styleHumanStderr,
@@ -52,5 +54,47 @@ describe("presenter styling", () => {
 			stderr:
 				"[ERROR] NEW_SECURITY_FAILURE: unmapped failure code NEW_SECURITY_FAILURE\n",
 		});
+	});
+
+	it("renders untrusted identity names without terminal control characters", () => {
+		const maliciousName = "Eve\u001B]52;c;secret\u0007\rAdmin";
+
+		const identityList = presentIdentityList({
+			known: [
+				{
+					ownerId: "owner_eve",
+					publicIdentity: { displayName: maliciousName },
+					localAlias: "ops",
+				},
+			],
+			retired: [],
+			self: {
+				ownerId: "owner_self",
+				publicIdentity: { displayName: maliciousName },
+			},
+		});
+		const payloadInspect = presentPayloadInspect({
+			compatibility: "up-to-date",
+			envKeys: [],
+			path: ".env.enc",
+			payloadId: "payload_123",
+			recipients: [
+				{
+					displayName: maliciousName,
+					isSelf: false,
+					isStaleSelf: false,
+					localAlias: null,
+					ownerId: "owner_eve",
+				},
+			],
+			schemaVersion: 1,
+		});
+
+		for (const stdout of [identityList.stdout, payloadInspect.stdout]) {
+			expect(stdout).not.toContain("\u001B]52");
+			expect(stdout).not.toContain("\u0007");
+			expect(stdout).not.toContain("\r");
+			expect(stdout).toContain("\\x1b]52;c;secret\\x07\\rAdmin");
+		}
 	});
 });

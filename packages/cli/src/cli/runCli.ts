@@ -6,6 +6,7 @@ import {
 	presentPayloadInspect,
 	presentSuccess,
 	presentWarning,
+	sanitizeTerminalText,
 	styleRunCliResult,
 } from "./presenter.js";
 import { CliPromptCancelledError } from "./secretPrompt.js";
@@ -617,13 +618,16 @@ const renderIdentityRow = (input: {
 	readonly localAlias: string | null;
 	readonly tag?: string;
 }) => {
+	const displayName = sanitizeTerminalText(input.displayName);
+	const localAlias =
+		input.localAlias === null ? null : sanitizeTerminalText(input.localAlias);
+	const ownerId = sanitizeTerminalText(input.ownerId);
+	const tag =
+		input.tag === undefined ? "" : ` ${sanitizeTerminalText(input.tag)}`;
 	const name =
-		input.localAlias === null
-			? input.displayName
-			: `${input.localAlias} (${input.displayName})`;
-	const tag = input.tag === undefined ? "" : ` ${input.tag}`;
+		localAlias === null ? displayName : `${localAlias} (${displayName})`;
 
-	return `${name} ${input.ownerId}${tag}`;
+	return `${name} ${ownerId}${tag}`;
 };
 
 const exactCommandHasAllOperands = (args: ParsedArgs) =>
@@ -648,7 +652,13 @@ const promptSelectOne = async (
 		return null;
 	}
 
-	return await selectOne(label, choices);
+	return await selectOne(
+		sanitizeTerminalText(label),
+		choices.map((choice) => ({
+			...choice,
+			label: sanitizeTerminalText(choice.label),
+		})),
+	);
 };
 
 const promptPayloadPath = async (

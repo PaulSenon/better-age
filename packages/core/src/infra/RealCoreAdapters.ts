@@ -29,6 +29,7 @@ import {
 const privateDirectoryMode = 0o700;
 const privateFileMode = 0o600;
 const keyTransactionMarkerRef = "keys/.passphrase-change.json";
+const privateKeyRefPattern = /^keys\/[A-Za-z0-9._-]+\.age$/;
 
 const throwPermissionRepairFailure = (cause: unknown): never => {
 	throw new Error("LOCAL_PERMISSION_REPAIR_FAILED", { cause });
@@ -43,6 +44,16 @@ const isNotFoundError = (error: unknown) =>
 	error !== null &&
 	"code" in error &&
 	error.code === "ENOENT";
+
+const validatePrivateKeyRef = (ref: string) => {
+	if (!privateKeyRefPattern.test(ref)) {
+		throw new Error("PRIVATE_KEY_REF_INVALID");
+	}
+};
+
+const throwLocalKeyMissing = (cause: unknown): never => {
+	throw new Error("LOCAL_KEY_MISSING", { cause });
+};
 
 const modeBits = (mode: number) => mode & 0o777;
 
@@ -126,7 +137,17 @@ const ensurePrivateFile = async (
 	path: string,
 	recordRepair: (path: string) => void,
 ) => {
-	const fileStat = await stat(path);
+	let fileStat: Awaited<ReturnType<typeof stat>>;
+
+	try {
+		fileStat = await stat(path);
+	} catch (error) {
+		if (isNotFoundError(error)) {
+			throwLocalKeyMissing(error);
+		}
+
+		throw error;
+	}
 
 	if (isPrivateFileMode(fileStat.mode)) {
 		return;
@@ -247,6 +268,7 @@ const recoverKeyTransaction = async (input: {
 		const marker = parseKeyTransactionMarker(markerContents);
 
 		for (const entry of marker.entries) {
+			validatePrivateKeyRef(entry.ref);
 			const { backupPath, newPath, stablePath } = transactionPaths(
 				input.homeDir,
 				entry.ref,
@@ -324,6 +346,7 @@ export const createNodeHomeRepository = (input: {
 			});
 		},
 		readEncryptedPrivateKey: async (ref) => {
+			validatePrivateKeyRef(ref);
 			await recoverKeyTransaction({
 				homeDir: input.homeDir,
 				recordRepair: recordPermissionRepair,
@@ -335,9 +358,18 @@ export const createNodeHomeRepository = (input: {
 			const keyPath = join(input.homeDir, ref);
 			await ensurePrivateFile(keyPath, recordPermissionRepair);
 
-			return await readFile(keyPath, "utf8");
+			try {
+				return await readFile(keyPath, "utf8");
+			} catch (error) {
+				if (isNotFoundError(error)) {
+					throwLocalKeyMissing(error);
+				}
+
+				throw error;
+			}
 		},
 		writeEncryptedPrivateKey: async ({ ref, encryptedKey }) => {
+			validatePrivateKeyRef(ref);
 			await writeFileAtomically(join(input.homeDir, ref), encryptedKey, {
 				directoryMode: "private",
 				fileMode: "private",
@@ -345,6 +377,10 @@ export const createNodeHomeRepository = (input: {
 			});
 		},
 		replaceEncryptedPrivateKeys: async ({ keys }) => {
+			for (const key of keys) {
+				validatePrivateKeyRef(key.ref);
+			}
+
 			await recoverKeyTransaction({
 				homeDir: input.homeDir,
 				recordRepair: recordPermissionRepair,
@@ -388,12 +424,14 @@ export const createNodeHomeRepository = (input: {
 					await chmod(stablePath, privateFileMode);
 				}
 
-				for (const key of keys) {
-					const { backupPath } = transactionPaths(input.homeDir, key.ref);
-					await rm(backupPath, { force: true });
-				}
-
 				await rm(markerPath, { force: true });
+
+				await Promise.all(
+					keys.map(async (key) => {
+						const { backupPath } = transactionPaths(input.homeDir, key.ref);
+						await rm(backupPath, { force: true }).catch(() => undefined);
+					}),
+				);
 			} catch (error) {
 				try {
 					await recoverKeyTransaction({

@@ -1204,6 +1204,62 @@ describe("runCli command contracts", () => {
 		]);
 	});
 
+	it("sanitizes untrusted identity names in interactive picker labels", async () => {
+		const maliciousName = "Eve\u001B]52;c;secret\u0007\rAdmin";
+		let options: ReadonlyArray<{ readonly label: string }> = [];
+		const guided = makeCore({
+			queries: {
+				decryptPayload: async () =>
+					success("PAYLOAD_DECRYPTED", {
+						...decryptedPayload,
+						recipients: [
+							{
+								displayName: "Isaac",
+								fingerprint: "fp_self",
+								handle: "Isaac#fp_self",
+								identityUpdatedAt: "2026-04-25T10:00:00.000Z",
+								isSelf: true,
+								isStaleSelf: false,
+								localAlias: null,
+								ownerId: "owner_self",
+								publicKey: "age1self",
+							},
+						],
+					}),
+				listKnownIdentities: async () =>
+					success("KNOWN_IDENTITIES_LISTED", [
+						{
+							...knownNora,
+							publicIdentity: {
+								...knownNora.publicIdentity,
+								displayName: maliciousName,
+							},
+						},
+					]),
+			},
+		});
+
+		await runCli({
+			argv: ["grant", "secrets.env.enc"],
+			core: guided.core,
+			payloadPathExists: async () => true,
+			terminal: {
+				mode: "interactive",
+				promptSecret: async () => "correct horse",
+				selectOne: async (_label, choices) => {
+					options = choices;
+					return "cancel";
+				},
+			},
+		});
+
+		const labels = options.map((choice) => choice.label).join("\n");
+		expect(labels).not.toContain("\u001B]52");
+		expect(labels).not.toContain("\u0007");
+		expect(labels).not.toContain("\r");
+		expect(labels).toContain("\\x1b]52;c;secret\\x07\\rAdmin");
+	});
+
 	it("imports a custom guided grant identity string before granting", async () => {
 		let identityPromptCount = 0;
 		const guided = makeCore();

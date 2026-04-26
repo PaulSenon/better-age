@@ -58,7 +58,15 @@ const makeHarness = (
 			homeState = document;
 			savedHomeStates.push(document);
 		},
-		readEncryptedPrivateKey: async (ref) => encryptedKeys.get(ref) ?? "",
+		readEncryptedPrivateKey: async (ref) => {
+			const encryptedKey = encryptedKeys.get(ref);
+
+			if (encryptedKey === undefined) {
+				throw new Error("LOCAL_KEY_MISSING");
+			}
+
+			return encryptedKey;
+		},
 		writeEncryptedPrivateKey: async ({ ref, encryptedKey }) => {
 			if (ref === failOnWriteRef) {
 				throw new Error("write failed");
@@ -749,6 +757,36 @@ describe("BetterAgeCore identity lifecycle", () => {
 		expect(encryptedKeys.get("keys/fp_rotated.age")).toBe(
 			"protected:new passphrase:AGE-SECRET-KEY-ROTATED",
 		);
+	});
+
+	it("reports missing local current key without blaming the passphrase", async () => {
+		const { core, encryptedKeys } = makeHarness();
+		await core.commands.createSelfIdentity({
+			displayName: "Isaac",
+			passphrase: "correct horse",
+		});
+		encryptedKeys.delete("keys/fp_self.age");
+
+		await expect(
+			core.commands.rotateSelfIdentity({ passphrase: "correct horse" }),
+		).resolves.toMatchObject({
+			result: { kind: "failure", code: "LOCAL_KEY_MISSING" },
+		});
+		await expect(
+			core.queries.verifySelfIdentityPassphrase({
+				passphrase: "correct horse",
+			}),
+		).resolves.toMatchObject({
+			result: { kind: "failure", code: "LOCAL_KEY_MISSING" },
+		});
+		await expect(
+			core.commands.changeIdentityPassphrase({
+				currentPassphrase: "correct horse",
+				nextPassphrase: "new passphrase",
+			}),
+		).resolves.toMatchObject({
+			result: { kind: "failure", code: "LOCAL_KEY_MISSING" },
+		});
 	});
 
 	it("does not rewrite any key when one local key cannot be decrypted during passphrase change", async () => {
