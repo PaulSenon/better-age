@@ -153,7 +153,7 @@ Payload files are readable wrapper files around untouched age armor:
 
 ```txt
 # better-age encrypted env payload
-# Docs: https://github.com/better-age/better-age
+# Docs: https://github.com/PaulSenon/better-age
 # This file is safe to commit only if your policy allows encrypted secrets.
 # Do not edit the armored block manually.
 

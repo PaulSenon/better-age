@@ -38,7 +38,7 @@ export const formatPayloadFileEnvelope = (armoredPayload: string): string => {
 
 	return [
 		"# better-age encrypted env payload",
-		"# Docs: https://github.com/better-age/better-age",
+		"# Docs: https://github.com/PaulSenon/better-age",
 		"# This file is safe to commit only if your policy allows encrypted secrets.",
 		"# Do not edit the armored block manually.",
 		"",
