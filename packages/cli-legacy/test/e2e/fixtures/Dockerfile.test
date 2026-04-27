@@ -1,0 +1,15 @@
+FROM node:lts-slim
+
+COPY dist-artifacts/*.tgz /tmp/
+
+RUN set -eu; \
+  tarball="$(find /tmp -maxdepth 1 -name '*.tgz' | sort | tail -n 1)"; \
+  test -n "$tarball"; \
+  npm install -g "$tarball"; \
+  rm -f /tmp/*.tgz
+
+RUN groupadd -g 1001 testUser \
+ && useradd -u 1001 -g testUser -m -s /bin/bash testUser
+
+WORKDIR /home/testUser
+USER testUser
