@@ -4,7 +4,8 @@ import process from "node:process";
 import { prereleaseDistTag, publishedPackages } from "./release-config.mjs";
 
 const channelFlagIndex = process.argv.indexOf("--channel");
-const channel = channelFlagIndex >= 0 ? process.argv[channelFlagIndex + 1] : undefined;
+const channel =
+	channelFlagIndex >= 0 ? process.argv[channelFlagIndex + 1] : undefined;
 
 if (!channel) {
 	console.error("Missing required --channel <name> argument.");
@@ -12,7 +13,9 @@ if (!channel) {
 }
 
 if (channel !== prereleaseDistTag) {
-	console.error(`Unsupported prerelease channel '${channel}'. Expected '${prereleaseDistTag}'.`);
+	console.error(
+		`Unsupported prerelease channel '${channel}'. Expected '${prereleaseDistTag}'.`,
+	);
 	process.exit(1);
 }
 
@@ -46,7 +49,9 @@ const version = packageJson.version;
 const parsed = parseSemver(version);
 
 if (!parsed) {
-	console.error(`Expected stable semver before prerelease derivation, got '${version}'.`);
+	console.error(
+		`Expected stable semver before prerelease derivation, got '${version}'.`,
+	);
 	process.exit(1);
 }
 
@@ -56,9 +61,14 @@ const prereleaseVersion = `${parsed.major}.${parsed.minor}.${parsed.patch}-${cha
 
 for (const publishedPackage of publishedPackages) {
 	const publishedPackageJsonPath = `${publishedPackage.path}/package.json`;
-	const publishedPackageJson = JSON.parse(readFileSync(publishedPackageJsonPath, "utf8"));
+	const publishedPackageJson = JSON.parse(
+		readFileSync(publishedPackageJsonPath, "utf8"),
+	);
 	publishedPackageJson.version = prereleaseVersion;
-	writeFileSync(publishedPackageJsonPath, `${JSON.stringify(publishedPackageJson, null, "\t")}\n`);
+	writeFileSync(
+		publishedPackageJsonPath,
+		`${JSON.stringify(publishedPackageJson, null, "\t")}\n`,
+	);
 }
 
 const githubOutputFlag = process.argv.includes("--github-output");
@@ -69,5 +79,7 @@ if (githubOutputFlag) {
 		process.exit(1);
 	}
 
-	writeFileSync(githubOutputPath, `version=${prereleaseVersion}\n`, { flag: "a" });
+	writeFileSync(githubOutputPath, `version=${prereleaseVersion}\n`, {
+		flag: "a",
+	});
 }

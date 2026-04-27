@@ -4,14 +4,24 @@ import process from "node:process";
 import { publishedPackages } from "./release-config.mjs";
 
 const readPackageVersion = (packagePath) => {
-	const packageJson = JSON.parse(readFileSync(`${packagePath}/package.json`, "utf8"));
+	const packageJson = JSON.parse(
+		readFileSync(`${packagePath}/package.json`, "utf8"),
+	);
 	return packageJson.version;
 };
 
-const versions = [...new Set(publishedPackages.map((publishedPackage) => readPackageVersion(publishedPackage.path)))];
+const versions = [
+	...new Set(
+		publishedPackages.map((publishedPackage) =>
+			readPackageVersion(publishedPackage.path),
+		),
+	),
+];
 
 if (versions.length !== 1) {
-	console.error(`Expected one shared published package version, got: ${versions.join(", ")}`);
+	console.error(
+		`Expected one shared published package version, got: ${versions.join(", ")}`,
+	);
 	process.exit(1);
 }
 
@@ -31,7 +41,9 @@ if (githubOutputFlag) {
 		process.exit(1);
 	}
 
-	writeFileSync(githubOutputPath, `version=${version}\ntag=${tag}\n`, { flag: "a" });
+	writeFileSync(githubOutputPath, `version=${version}\ntag=${tag}\n`, {
+		flag: "a",
+	});
 } else {
 	process.stdout.write(`${version}\n`);
 }

@@ -24,4 +24,5 @@ export const publishedPackageNames = Object.freeze(
 	publishedPackages.map((publishedPackage) => publishedPackage.name),
 );
 
-export const isPublishedPackage = (packageName) => publishedPackageNames.includes(packageName);
+export const isPublishedPackage = (packageName) =>
+	publishedPackageNames.includes(packageName);
