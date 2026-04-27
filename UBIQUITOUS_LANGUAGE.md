@@ -27,6 +27,7 @@
 | **Setup Command** | The root command `bage setup`, which creates the local self identity state. | Identity setup, init user |
 | **Identity Export** | The command `bage identity export`, which prints the current local **Identity String**. | Me, share identity |
 | **Identity List** | The command `bage identity list`, which inspects local self identity, known identities, and retired keys. | Identities, inspect home |
+| **Identity Keys** | The command `bage identity keys`, which lists current and retired local key files and can print path-only stdout for age CLI interop. | Key export, raw key dump |
 | **Identity Import** | The command `bage identity import`, which saves an external **Identity String** as a **Known Identity**. | Add identity, import contact |
 | **Identity Forget** | The command `bage identity forget`, which performs **Forget Identity**. | Forget identity, remove contact |
 | **Identity Rotate** | The command `bage identity rotate`, which performs **Key Rotation** for the local self identity. | Rotate, rekey |
@@ -56,6 +57,7 @@
 | Term | Definition | Aliases to avoid |
 | --- | --- | --- |
 | **Home State** | The local persisted state under the tool home directory. | Config, cache, metadata db |
+| **Local Key File** | A passphrase-encrypted age identity file referenced by **Home State**. Its decrypted plaintext is age-compatible: Better Age metadata comments plus one age identity line. | JSON key blob, proprietary key |
 | **Key Rotation** | Replacing the current key of an **Identity** while keeping the same **Owner Id**. | Rekey identity, rename identity |
 | **Retired Key** | A previously active local key kept after **Key Rotation** for historical decryptability. | Old key, archived key |
 | **Display Snapshot** | The payload-stored or home-stored copy of a **Display Name** used only for UX. | Alias, canonical name |
@@ -101,10 +103,11 @@
 - A **Local Alias** points to exactly one **Known Identity**.
 - A **Trusted Key Update** is required when a known **Owner Id** changes public key in V1 unsigned identities.
 - A **Forget Identity** removes one **Known Identity** from **Home State** only.
-- An **Identity Command Group** contains **Identity Export**, **Identity List**, **Identity Import**, **Identity Forget**, **Identity Rotate**, and **Identity Passphrase**.
+- An **Identity Command Group** contains **Identity Export**, **Identity List**, **Identity Keys**, **Identity Import**, **Identity Forget**, **Identity Rotate**, and **Identity Passphrase**.
 - **Identity Import** is the MVP command that can set or change **Local Alias**.
 - The **Setup Command** is root-level even though it creates local identity state.
 - A **Passphrase** is required for local private-key protection.
+- A **Local Key File** decrypts to age identity-file plaintext, not JSON.
 - A **Key Mode** describes the current local identity key algorithm.
 - A **Payload** has exactly one stable **Payload Id**.
 - A **Payload** contains zero or more **Recipient Entries**.
@@ -121,6 +124,7 @@
 - A **Self Recipient** may become stale after **Key Rotation**.
 - A **Key Rotation** keeps the same **Owner Id** but changes the current **Fingerprint**.
 - A **Retired Key** belongs to one local **Identity** history in **Home State**.
+- **Home State** is the authority for whether a **Local Key File** is current or retired.
 - A **Preamble** belongs to one **Payload** file but carries no sensitive metadata.
 - An **Envelope** belongs to one **Payload** and contains both metadata and env content.
 - An **Encrypted Payload Temp** contains encrypted wrapper bytes only, never editor plaintext.

@@ -20,6 +20,18 @@ export type IdentityListView = {
 	}>;
 };
 
+export type IdentityKeysView = {
+	readonly current: {
+		readonly fingerprint: string;
+		readonly path: string;
+	} | null;
+	readonly retired: ReadonlyArray<{
+		readonly fingerprint: string;
+		readonly path: string;
+		readonly retiredAt: string;
+	}>;
+};
+
 export type PayloadInspectView = {
 	readonly path: string;
 	readonly payloadId: string;
@@ -215,6 +227,42 @@ export const presentIdentityList = (input: IdentityListView): RunCliResult => {
 		stderr: "",
 	};
 };
+
+export const presentIdentityKeys = (input: IdentityKeysView): RunCliResult => {
+	const retiredLines =
+		input.retired.length === 0
+			? "  none\n"
+			: input.retired
+					.map(
+						(key) =>
+							`  ${sanitizeTerminalText(key.fingerprint)}  ${sanitizeTerminalText(key.retiredAt)}  ${sanitizeTerminalText(key.path)}\n`,
+					)
+					.join("");
+
+	return {
+		exitCode: 0,
+		stdout: [
+			...(input.current === null
+				? []
+				: [
+						"Current key\n",
+						`  ${sanitizeTerminalText(input.current.fingerprint)}  ${sanitizeTerminalText(input.current.path)}\n`,
+						"\n",
+					]),
+			"Retired keys\n",
+			retiredLines,
+		].join(""),
+		stderr: "",
+	};
+};
+
+export const presentIdentityKeyPaths = (
+	paths: ReadonlyArray<string>,
+): RunCliResult => ({
+	exitCode: 0,
+	stdout: paths.map((path) => `${path}\n`).join(""),
+	stderr: "",
+});
 
 export const presentWarning = (message: string): string =>
 	`[WARN] ${sanitizeTerminalText(message)}\n`;

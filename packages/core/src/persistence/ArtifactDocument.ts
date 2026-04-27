@@ -12,6 +12,7 @@ const LocalAlias = Schema.String;
 const PayloadId = Schema.String;
 const EnvText = Schema.String;
 const RotationTtl = Schema.String;
+const keyMetadataPrefix = "# better-age-key-metadata/v1 ";
 
 const ArtifactVersionV1 = Schema.Literal(1);
 const HomeStateVersionV2 = Schema.Literal(2);
@@ -88,6 +89,19 @@ export const PrivateKeyPlaintextV1 = Schema.Struct({
 
 export type PrivateKeyPlaintextV1 = Schema.Schema.Type<
 	typeof PrivateKeyPlaintextV1
+>;
+
+export const PrivateKeyMetadataV1 = Schema.Struct({
+	kind: Schema.Literal("better-age/key-metadata"),
+	version: ArtifactVersionV1,
+	ownerId: OwnerId,
+	publicKey: PublicKey,
+	fingerprint: KeyFingerprint,
+	createdAt: IsoUtcTimestamp,
+});
+
+export type PrivateKeyMetadataV1 = Schema.Schema.Type<
+	typeof PrivateKeyMetadataV1
 >;
 
 export const PublicIdentityDocumentV1 = Schema.Struct({
@@ -380,13 +394,82 @@ export const parseHomeStateDocument = (
 
 export const parsePrivateKeyPlaintext = (
 	input: unknown,
-): Either.Either<PrivateKeyPlaintextV1, ArtifactDocumentParseError> =>
-	parseCurrentDocument(
-		input,
-		PrivateKeyPlaintextV1,
-		"private-key",
-		"better-age/private-key",
+): Either.Either<PrivateKeyPlaintextV1, ArtifactDocumentParseError> => {
+	if (typeof input !== "string") {
+		return Either.left(
+			new ArtifactDocumentInvalidError({
+				artifact: "private-key",
+				message: "Private key plaintext must be age identity text",
+			}),
+		);
+	}
+
+	const lines = input.split(/\r?\n/).filter((line) => line.trim().length > 0);
+	const metadataLine = lines[0];
+
+	if (
+		metadataLine === undefined ||
+		!metadataLine.startsWith(keyMetadataPrefix)
+	) {
+		return Either.left(
+			new ArtifactDocumentInvalidError({
+				artifact: "private-key",
+				message: "Private key metadata is missing or malformed",
+			}),
+		);
+	}
+
+	const decodedMetadata = Encoding.decodeBase64UrlString(
+		metadataLine.slice(keyMetadataPrefix.length),
+	).pipe(
+		Either.flatMap((metadataJson) =>
+			Schema.decodeUnknownEither(Schema.parseJson(Schema.Unknown))(
+				metadataJson,
+			),
+		),
+		Either.flatMap((metadata) =>
+			Schema.decodeUnknownEither(PrivateKeyMetadataV1)(metadata),
+		),
 	);
+
+	if (Either.isLeft(decodedMetadata)) {
+		return Either.left(
+			new ArtifactDocumentInvalidError({
+				artifact: "private-key",
+				message: "Private key metadata is invalid",
+			}),
+		);
+	}
+
+	const identityLines = lines.filter((line) => !line.startsWith("#"));
+
+	if (identityLines.length !== 1) {
+		return Either.left(
+			new ArtifactDocumentInvalidError({
+				artifact: "private-key",
+				message: "Private key identity line is missing or ambiguous",
+			}),
+		);
+	}
+
+	const privateKey = identityLines[0];
+
+	if (privateKey === undefined) {
+		return Either.left(
+			new ArtifactDocumentInvalidError({
+				artifact: "private-key",
+				message: "Private key identity line is missing",
+			}),
+		);
+	}
+
+	return Either.right({
+		...decodedMetadata.right,
+		kind: "better-age/private-key",
+		version: 1,
+		privateKey,
+	});
+};
 
 export const parsePayloadPlaintext = (
 	input: unknown,
@@ -424,7 +507,24 @@ export const encodeHomeStateDocument = (
 
 export const encodePrivateKeyPlaintext = (
 	document: PrivateKeyPlaintextV1,
-): string => encodeJsonDocument(document);
+): string => {
+	const metadata: PrivateKeyMetadataV1 = {
+		kind: "better-age/key-metadata",
+		version: 1,
+		ownerId: document.ownerId,
+		publicKey: document.publicKey,
+		fingerprint: document.fingerprint,
+		createdAt: document.createdAt,
+	};
+
+	return [
+		`${keyMetadataPrefix}${Encoding.encodeBase64Url(
+			encodeJsonDocument(metadata),
+		)}`,
+		document.privateKey,
+		"",
+	].join("\n");
+};
 
 export const encodePayloadPlaintext = (document: PayloadPlaintextV1): string =>
 	encodeJsonDocument(document);

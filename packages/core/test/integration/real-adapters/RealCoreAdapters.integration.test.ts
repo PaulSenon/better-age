@@ -8,6 +8,7 @@ import {
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import * as age from "age-encryption";
 import { afterEach, describe, expect, it } from "vitest";
 import { createBetterAgeCore } from "../../../src/identity/BetterAgeCore.js";
 import {
@@ -82,6 +83,12 @@ describe("real core adapters", () => {
 			join(homeDir, homeState.currentKey.encryptedPrivateKeyRef),
 			"utf8",
 		);
+		const keyDecrypter = new age.Decrypter();
+		keyDecrypter.addPassphrase("old passphrase");
+		const keyPlaintext = await keyDecrypter.decrypt(
+			age.armor.decode(keyBlob),
+			"text",
+		);
 		const payloadFile = await readFile(payloadPath, "utf8");
 
 		expect(await permissionBits(homeDir)).toBe(0o700);
@@ -95,6 +102,9 @@ describe("real core adapters", () => {
 			/^keys\/.+\.age$/,
 		);
 		expect(keyBlob).toContain("BEGIN AGE ENCRYPTED FILE");
+		expect(keyPlaintext).toContain("# better-age-key-metadata/v1 ");
+		expect(keyPlaintext).toContain("AGE-SECRET-KEY-PQ-1");
+		expect(keyPlaintext).not.toContain('"kind":"better-age/private-key"');
 		expect(payloadFile).toContain("# better-age encrypted env payload");
 		expect(payloadFile).toContain("BEGIN BETTER AGE PAYLOAD");
 		expect(payloadFile).toContain("BEGIN AGE ENCRYPTED FILE");

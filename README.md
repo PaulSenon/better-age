@@ -54,6 +54,7 @@ bage create .env.prod.enc
 bage edit .env.prod.enc
 bage identity import 'better-age://identity/v1/...' --alias teammate
 bage grant .env.prod.enc teammate
+bage identity keys --current --path
 bage view .env.prod.enc
 bage load --protocol-version=1 .env.prod.enc
 ```

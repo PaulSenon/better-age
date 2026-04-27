@@ -10,6 +10,7 @@ Responsibilities:
 - editor, secure viewer, and picker flows
 - human stderr presentation
 - clean machine stdout for `load` and `identity export`
+- age interop transparency for local key paths
 
 ## Install / Build
 
@@ -48,6 +49,7 @@ bage view [payload]
 bage identity export
 bage identity forget [identity-ref]
 bage identity import [identity-string] [--alias <alias>] [--trust-key-update]
+bage identity keys [--current | --retired] [--path]
 bage identity list
 bage identity passphrase
 bage identity pass
@@ -75,6 +77,7 @@ bage create .env.prod.enc
 bage edit .env.prod.enc
 bage identity import 'better-age://identity/v1/...' --alias ops
 bage identity import 'better-age://identity/v1/...' --trust-key-update
+bage identity keys --current --path
 bage grant .env.prod.enc ops
 bage inspect .env.prod.enc
 bage view .env.prod.enc
@@ -91,6 +94,7 @@ bage interactive
 
 - `bage load --protocol-version=1 <payload>` writes raw `.env` text to stdout.
 - `bage identity export` writes the public identity string to stdout.
+- `bage identity keys --path` writes local key file paths to stdout, one per line.
 - Prompts, warnings, errors, success messages, viewer UI, and editor UI are not
   written to stdout.
 - Human output goes to stderr and may use ANSI color when stderr is a TTY.
@@ -131,7 +135,9 @@ bage interactive
 - `view` uses an in-process secure viewer with keyboard scrolling and quit.
   Control characters are rendered visibly, not interpreted by the terminal.
 - `interactive` opens a setup-aware menu loop. It excludes `load` and
-  `interactive` from menus.
+	  `interactive` from menus.
+- `identity keys` lists local current and retired key files. `--path` switches to
+  path-only stdout for shell interop.
 
 ## Local Security And Durability
 
@@ -139,6 +145,10 @@ bage interactive
   filesystem permissions where supported.
 - Loose home/key permissions are repaired before use and surfaced as notices.
 - Private key refs are constrained to `keys/<safe-name>.age`.
+- Local private key files decrypt to an age-compatible identity-file plaintext:
+  a Better Age metadata comment followed by one age identity line.
+- Current and retired key files stay flat under `keys/<fingerprint>.age`; Home
+  State is the authority for current vs retired status.
 - Passphrase changes prepare and verify all replacement key blobs before
   committing. A transaction marker lets the next read recover if a crash
   interrupts the replace.
@@ -167,6 +177,38 @@ Payload files are readable wrapper files around untouched age armor:
 `load`, `view`, `inspect`, and write commands extract the inner age armor before
 decrypting. Missing, duplicated, malformed, or non-age-armored Better Age blocks
 fail clearly.
+
+## Age CLI Interop
+
+For transparency, Better Age local key files are passphrase-encrypted age
+identity files. To find the current key path:
+
+```sh
+bage identity keys --current --path
+```
+
+Payload files intentionally keep the Better Age wrapper, so direct
+`age -d .env.enc` is not expected to work. Extract the inner age armor first:
+
+```sh
+sed -n '/^-----BEGIN AGE ENCRYPTED FILE-----$/,/^-----END AGE ENCRYPTED FILE-----$/p' .env.enc \
+  | age -d -i "$(bage identity keys --current --path)"
+```
+
+Portable-ish `awk` variant:
+
+```sh
+awk '
+  /^-----BEGIN AGE ENCRYPTED FILE-----$/ { on=1 }
+  on { print }
+  /^-----END AGE ENCRYPTED FILE-----$/ { on=0 }
+' .env.enc | age -d -i "$(bage identity keys --current --path)"
+```
+
+> [!NOTE]
+> This is just for transparency purpose. Do not rely on this other than really specific adhoc needs.
+> This will decrypt the raw payload with the better-age metadata. For real life scenario, use
+`bage load --protocol-version=1 <payload>` when raw `.env` stdout is needed.
 
 ## Known Limitations
 

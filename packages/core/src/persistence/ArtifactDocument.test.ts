@@ -1,4 +1,4 @@
-import { Either } from "effect";
+import { Either, Encoding, Schema } from "effect";
 import { describe, expect, it } from "vitest";
 import {
 	validHomeStateDocumentV1,
@@ -78,7 +78,9 @@ describe("ArtifactDocument", () => {
 
 	it("parses and no-op migrates all current v1 artifact documents", () => {
 		const privateKey = Either.getOrThrow(
-			parsePrivateKeyPlaintext(validPrivateKeyPlaintextV1),
+			parsePrivateKeyPlaintext(
+				encodePrivateKeyPlaintext(validPrivateKeyPlaintextV1),
+			),
 		);
 		const payloadPlaintext = Either.getOrThrow(
 			parsePayloadPlaintext(validPayloadPlaintextV1),
@@ -193,19 +195,13 @@ describe("ArtifactDocument", () => {
 		).toBeInstanceOf(ArtifactDocumentInvalidError);
 	});
 
-	it("classifies invalid artifact cases for every artifact parser", () => {
+	it("classifies invalid artifact cases for every JSON artifact parser", () => {
 		const parserCases: ReadonlyArray<ParserCase> = [
 			{
 				artifact: "home-state",
 				valid: validHomeStateDocumentV2,
 				parse: parseHomeStateDocument,
 				missingField: "currentKey",
-			},
-			{
-				artifact: "private-key",
-				valid: validPrivateKeyPlaintextV1,
-				parse: parsePrivateKeyPlaintext,
-				missingField: "privateKey",
 			},
 			{
 				artifact: "payload-plaintext",
@@ -263,7 +259,7 @@ describe("ArtifactDocument", () => {
 		}
 	});
 
-	it("encodes every v1 artifact document as parseable JSON", () => {
+	it("encodes every JSON artifact document as parseable JSON", () => {
 		expect(
 			Either.getOrThrow(
 				parseHomeStateDocument(
@@ -271,13 +267,6 @@ describe("ArtifactDocument", () => {
 				),
 			),
 		).toEqual(validHomeStateDocumentV2);
-		expect(
-			Either.getOrThrow(
-				parsePrivateKeyPlaintext(
-					JSON.parse(encodePrivateKeyPlaintext(validPrivateKeyPlaintextV1)),
-				),
-			),
-		).toEqual(validPrivateKeyPlaintextV1);
 		expect(
 			Either.getOrThrow(
 				parsePayloadPlaintext(
@@ -301,6 +290,57 @@ describe("ArtifactDocument", () => {
 				),
 			),
 		).toEqual(validPublicIdentityDocumentV1);
+	});
+
+	it("encodes private key plaintext as an age-compatible identity file with metadata", () => {
+		const encoded = encodePrivateKeyPlaintext(validPrivateKeyPlaintextV1);
+		const lines = encoded.split("\n");
+		const metadataLine = lines[0] ?? "";
+		const privateKeyLine = lines.find(
+			(line) => line.length > 0 && !line.startsWith("#"),
+		);
+
+		expect(metadataLine.startsWith("# better-age-key-metadata/v1 ")).toBe(true);
+		expect(privateKeyLine).toBe(validPrivateKeyPlaintextV1.privateKey);
+		expect(encoded).not.toContain('"kind":"better-age/private-key"');
+		expect(Either.getOrThrow(parsePrivateKeyPlaintext(encoded))).toEqual(
+			validPrivateKeyPlaintextV1,
+		);
+
+		const encodedMetadata = metadataLine.slice(
+			"# better-age-key-metadata/v1 ".length,
+		);
+		const decodedMetadata = Either.getOrThrow(
+			Schema.decodeUnknownEither(Schema.parseJson(Schema.Unknown))(
+				Either.getOrThrow(Encoding.decodeBase64UrlString(encodedMetadata)),
+			),
+		);
+
+		expect(decodedMetadata).toEqual({
+			kind: "better-age/key-metadata",
+			version: 1,
+			ownerId: validPrivateKeyPlaintextV1.ownerId,
+			publicKey: validPrivateKeyPlaintextV1.publicKey,
+			fingerprint: validPrivateKeyPlaintextV1.fingerprint,
+			createdAt: validPrivateKeyPlaintextV1.createdAt,
+		});
+	});
+
+	it("rejects old JSON private key plaintext and malformed identity files", () => {
+		const encoded = encodePrivateKeyPlaintext(validPrivateKeyPlaintextV1);
+		const oldJsonPlaintext = JSON.stringify(validPrivateKeyPlaintextV1);
+		const withoutMetadata = validPrivateKeyPlaintextV1.privateKey;
+		const withExtraIdentity = `${encoded}\nAGE-SECRET-KEY-EXTRA\n`;
+
+		expect(getLeft(parsePrivateKeyPlaintext(oldJsonPlaintext))).toBeInstanceOf(
+			ArtifactDocumentInvalidError,
+		);
+		expect(getLeft(parsePrivateKeyPlaintext(withoutMetadata))).toBeInstanceOf(
+			ArtifactDocumentInvalidError,
+		);
+		expect(getLeft(parsePrivateKeyPlaintext(withExtraIdentity))).toBeInstanceOf(
+			ArtifactDocumentInvalidError,
+		);
 	});
 
 	it("round-trips public identity document through the shareable identity string", () => {

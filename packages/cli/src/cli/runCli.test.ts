@@ -38,6 +38,22 @@ const knownNora = {
 	localAlias: null,
 };
 
+const localKeys = {
+	current: {
+		fingerprint: "fp_current",
+		encryptedPrivateKeyRef: "keys/fp_current.age",
+		createdAt: "2026-04-25T10:00:00.000Z",
+	},
+	retired: [
+		{
+			fingerprint: "fp_old",
+			encryptedPrivateKeyRef: "keys/fp_old.age",
+			createdAt: "2026-04-25T09:00:00.000Z",
+			retiredAt: "2026-04-25T12:00:00.000Z",
+		},
+	],
+};
+
 const decryptedPayload = {
 	path: "secrets.env.enc",
 	payloadId: "payload_123",
@@ -212,6 +228,7 @@ const makeCore = (overrides: CoreOverrides = {}) => {
 			listKnownIdentities: async () =>
 				success("KNOWN_IDENTITIES_LISTED", [knownSarah, knownNora]),
 			listRetiredKeys: async () => success("RETIRED_KEYS_LISTED", []),
+			listLocalKeys: async () => success("LOCAL_KEYS_LISTED", localKeys),
 			verifySelfIdentityPassphrase: async (input) => {
 				calls.push({ name: "verifySelfIdentityPassphrase", input });
 				return success("PASSPHRASE_VERIFIED", { ownerId: "owner_self" });
@@ -435,6 +452,56 @@ describe("runCli command contracts", () => {
 			exitCode: 0,
 			stdout: "bage-id-v1:abc123\n",
 			stderr: "",
+		});
+	});
+
+	it("lists local identity key paths for age interop", async () => {
+		const { core } = makeCore();
+		const keyPathFromRef = (ref: string) => `/home/isaac/.better-age/${ref}`;
+
+		await expect(
+			runCli({
+				argv: ["identity", "keys", "--current", "--path"],
+				core,
+				keyPathFromRef,
+				terminal: { mode: "headless" },
+			}),
+		).resolves.toEqual({
+			exitCode: 0,
+			stdout: "/home/isaac/.better-age/keys/fp_current.age\n",
+			stderr: "",
+		});
+
+		await expect(
+			runCli({
+				argv: ["identity", "keys"],
+				core,
+				keyPathFromRef,
+				terminal: { mode: "headless" },
+			}),
+		).resolves.toEqual({
+			exitCode: 0,
+			stdout: [
+				"Current key\n",
+				"  fp_current  /home/isaac/.better-age/keys/fp_current.age\n",
+				"\nRetired keys\n",
+				"  fp_old  2026-04-25T12:00:00.000Z  /home/isaac/.better-age/keys/fp_old.age\n",
+			].join(""),
+			stderr: "",
+		});
+
+		await expect(
+			runCli({
+				argv: ["identity", "keys", "--current", "--retired"],
+				core,
+				keyPathFromRef,
+				terminal: { mode: "headless" },
+			}),
+		).resolves.toEqual({
+			exitCode: 2,
+			stdout: "",
+			stderr:
+				"[ERROR] COMMAND_PARSE: choose --current or --retired, not both\n",
 		});
 	});
 
@@ -1834,6 +1901,7 @@ describe("runCli command contracts", () => {
 				"identity export",
 				"identity import",
 				"identity list",
+				"identity keys",
 				"identity forget",
 				"identity passphrase",
 				"identity rotate",
@@ -1844,6 +1912,7 @@ describe("runCli command contracts", () => {
 				"identity export",
 				"identity import",
 				"identity list",
+				"identity keys",
 				"identity forget",
 				"identity passphrase",
 				"identity rotate",

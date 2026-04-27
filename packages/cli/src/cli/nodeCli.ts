@@ -92,6 +92,7 @@ export const createNodeCli = (options: NodeCliOptions) => {
 						: null;
 				},
 				discoverPayloadPaths,
+				keyPathFromRef: (ref) => join(homeDir, ref),
 				payloadPathExists: payloadRepository.payloadExists,
 				terminal,
 			}),

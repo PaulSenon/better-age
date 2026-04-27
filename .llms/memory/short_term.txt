@@ -517,3 +517,11 @@
 - Docs now reflect current commands (`bage identity export/import`, `better-age://identity/v1/...`), Effect CLI/Inquirer stack, hidden no-length passphrase prompts, 8-char passphrase minimum, V1 trusted key update gate, payload `.env.enc` discovery, encrypted `<payload>.tmp` rename writes, key transaction recovery, key ref guard, terminal-safe rendering, and private file permissions.
 - Schema-change guide now points to current core files/tests instead of old `packages/cli/src/domain`/`app` paths.
 - Verification passed: `pnpm check`, `git diff --check`.
+
+2026-04-27 Age key interop transparency:
+- Replaced Better Age private-key plaintext JSON with age-compatible identity-file plaintext: metadata comment `# better-age-key-metadata/v1 <base64url-json>` plus one age identity line.
+- No migration from old pre-release JSON key plaintext; invalid old plaintext maps to `PRIVATE_KEY_INVALID`.
+- Key files remain flat under `keys/<fingerprint>.age`; no retired folder/symlink/pointer. Home State remains authority for current vs retired.
+- Added `identity keys` command with `--current`, `--retired`, and `--path`; interactive identities menu includes it.
+- Payload wrapper remains unchanged; CLI docs show `sed`/`awk` extraction piped to `age -d -i "$(bage identity keys --current --path)"`.
+- Full verification passed: `pnpm test`, `pnpm check`, `git diff --check`.
