@@ -1,0 +1,97 @@
+---
+title: Share with a teammate
+description: Bob exports an identity, Alice imports it, Alice grants access, then Alice sends the encrypted payload.
+---
+
+Sharing has two directions:
+
+1. Bob sends Alice his public identity string.
+2. Alice sends Bob the encrypted payload after granting him.
+
+The identity string is public identity material. It is not Bob's private key and it cannot decrypt anything by itself.
+
+## The flow
+
+```txt
+Bob                         Alice
+---                         -----
+bage identity export
+  |
+  | identity string
+  | chat / email / DM
+  v
+                            bage identity import 'better-age://identity/v1/...' --alias bob
+                            bage grant .env.enc bob
+                            send .env.enc
+  ^
+  | encrypted payload
+  | chat / email / repo / sync
+  |
+bage view .env.enc
+```
+
+## 1. Bob exports his identity
+
+Bob runs:
+
+```sh
+bage identity export
+```
+
+That prints something shaped like:
+
+```txt
+better-age://identity/v1/...
+```
+
+Bob sends that string to Alice through whatever channel the team already uses.
+
+## 2. Alice imports Bob
+
+Alice runs:
+
+```sh
+bage identity import 'better-age://identity/v1/...' --alias bob
+```
+
+The alias is local to Alice. It makes future commands easier:
+
+```sh
+bage grant .env.enc bob
+```
+
+## 3. Alice grants Bob on the payload
+
+```sh
+bage grant .env.enc bob
+```
+
+This rewrites `.env.enc` so Bob's identity can decrypt the payload.
+
+## 4. Alice sends Bob the payload
+
+Alice sends Bob the encrypted `.env.enc` file.
+
+Bob can now run:
+
+```sh
+bage view .env.enc
+```
+
+or use it through Varlock:
+
+```txt
+# @plugin(@better-age/varlock)
+# @initBetterAge(path=.env.enc)
+# @setValuesBulk(betterAgeLoad(), format=env)
+```
+
+## What is safe to share?
+
+The identity string is designed to be shareable. It only lets someone grant Bob future access.
+
+The encrypted payload is also designed to be portable. It is still better practice to avoid public channels for payloads unless you have explicitly decided that is acceptable for your project.
+
+<Callout type="info">
+  **better-age** handles encrypted access. It does not deliver files for you. Use chat, email, a private repo, or your own sync path.
+</Callout>

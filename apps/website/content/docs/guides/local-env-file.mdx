@@ -1,0 +1,76 @@
+---
+title: Local env file
+description: Create, edit, inspect, and view one encrypted env payload.
+---
+
+This guide is the core **better-age** loop before Varlock or team sharing enter the picture.
+
+## Create the payload
+
+```sh
+bage create .env.enc
+```
+
+The file is visible in your project, but its contents are encrypted:
+
+```txt
+# better-age encrypted env payload
+# Docs: https://github.com/PaulSenon/better-age
+# This file is safe to commit only if your policy allows encrypted secrets.
+# Do not edit the armored block manually.
+
+-----BEGIN BETTER AGE PAYLOAD-----
+-----BEGIN AGE ENCRYPTED FILE-----
+...
+-----END AGE ENCRYPTED FILE-----
+-----END BETTER AGE PAYLOAD-----
+```
+
+## Edit secrets
+
+```sh
+bage edit .env.enc
+```
+
+**better-age** decrypts the payload, opens your editor, validates the env text when the editor closes, then writes the encrypted payload back.
+
+Example env text:
+
+```txt
+DATABASE_URL=postgres://localhost:5432/app
+API_TOKEN=dev-token
+```
+
+If the env text is invalid, **better-age** lets you reopen the editor with your edited content preserved.
+
+<Callout type="info">
+  `edit` temporarily writes plaintext to a private temp file while your editor is open. **better-age** cleans it up afterward, but editor backups, swap files, crash recovery, and plugins are outside its control.
+</Callout>
+
+## Inspect without secrets
+
+```sh
+bage inspect .env.enc
+```
+
+Use `inspect` when you want metadata, env key names, recipients, and compatibility state without opening secret values.
+
+## View as a human
+
+```sh
+bage view .env.enc
+```
+
+`view` opens an in-process terminal viewer. It is for humans reading the env file.
+
+It does not print plaintext to stdout.
+
+## Load as a machine
+
+```sh
+bage load --protocol-version=1 .env.enc
+```
+
+`load` prints raw env text to stdout after prompting for your passphrase. This is the machine boundary used by Varlock.
+
+For normal app runs, prefer [Varlock runtime](/docs/guides/varlock-runtime).

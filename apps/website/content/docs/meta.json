@@ -1,9 +1,12 @@
 {
   "pages": [
     "index",
-    "getting-started",
+    "quickstart",
+    "install",
+    "why",
+    "trust",
+    "limitations",
     "guides",
-    "integrations",
     "reference"
   ]
 }

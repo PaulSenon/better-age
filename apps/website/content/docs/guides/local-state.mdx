@@ -1,0 +1,197 @@
+---
+title: Internals and local state
+description: What better-age stores locally, how rotation works, and what happens with old keys.
+---
+
+This page explains what happens inside **better-age** after `bage setup`.
+
+You do not need this for the happy path, but it helps when you want to understand why setup, passphrases, rotation, and old payloads behave the way they do.
+
+## Where local state lives
+
+By default, the CLI stores user-local state under:
+
+```txt
+~/.better-age
+```
+
+Payload files like `.env.enc` are not stored there. They live wherever you create them.
+
+This split is intentional:
+
+```txt
+~/.better-age       tool-owned identity state
+.env.enc           caller-owned encrypted payload
+```
+
+That is also why the CLI is normally installed globally. Your **better-age** identity belongs to you, not to one project.
+
+## What lives there
+
+`~/.better-age` contains local state such as:
+
+- home state
+- encrypted private keys
+- known identities
+- retired keys after rotation
+- editor preference
+
+The important part: the private keys are not stored as raw plaintext. They are encrypted key files protected by your passphrase.
+
+## The local identity model
+
+Your **better-age** identity has:
+
+- one stable owner id
+- one current key
+- zero or more retired keys
+
+The owner id is the continuity marker. It says "this is still the same identity."
+
+The current key is the key new grants should use.
+
+Retired keys are older keys kept so you can still open payloads that were encrypted before rotation.
+
+```txt
+identity
+  owner id: same over time
+  current key: used for new grants
+  retired keys: old keys kept for old payloads
+```
+
+<Callout type="info">
+  For now, **better-age** does not automatically detect which retired keys are no longer needed and delete them. Retired-key cleanup is planned, but the current default is to keep old keys so old payloads stay readable.
+</Callout>
+
+## Why rotation exists
+
+**better-age** intentionally nudges you toward key rotation.
+
+Rotating creates a new current key for the same owner id:
+
+```sh
+bage identity rotate
+```
+
+After rotation:
+
+- your old current key becomes a retired key
+- your new key becomes the current key
+- your owner id stays the same
+- existing old payloads may still be encrypted for the retired key
+
+That is why the CLI warns you to update payloads after rotation.
+
+```sh
+bage update .env.enc
+```
+
+`update` refreshes the payload so your self recipient points at the current key again.
+
+## Opening payloads granted to old keys
+
+When **better-age** opens a payload, it first tries your current key.
+
+If that does not decrypt the payload, it tries your retired keys.
+
+```txt
+try current key
+  -> if it works, done
+  -> if not, try retired keys one by one
+```
+
+This is why old payloads can still open after rotation.
+
+<Callout type="info">
+  Retired keys are kept for decrypting old payloads. They are not the preferred key for new grants.
+</Callout>
+
+## Passphrases and all keys
+
+Your passphrase protects the encrypted private key files in `~/.better-age/keys`.
+
+Today, **better-age** expects the current key and all retired keys to be protected by the same active passphrase.
+
+When you change your passphrase:
+
+```sh
+bage identity passphrase
+```
+
+**better-age** re-encrypts:
+
+- the current key
+- every retired key
+
+with the new passphrase.
+
+That means you do not need to remember one old passphrase per old key.
+
+```txt
+old passphrase unlocks all keys before change
+new passphrase unlocks all keys after change
+```
+
+Before committing the change, **better-age** prepares and verifies the replacement key files. If one key cannot be decrypted with the current passphrase, the passphrase change fails instead of half-updating the local key set.
+
+## What happens if a retired key is unreadable
+
+If a retired key file is corrupt or cannot be unlocked, **better-age** skips it and keeps trying the next retired key.
+
+If none of the current or retired keys can decrypt the payload, the payload cannot be opened from this local identity.
+
+That is one reason deleting or damaging `~/.better-age` is serious.
+
+## Reset or uninstall
+
+Uninstalling the global CLI removes the command:
+
+```sh
+npm uninstall -g @better-age/cli
+```
+
+Deleting local state is separate:
+
+```sh
+rm -rf ~/.better-age
+```
+
+<Callout type="warning">
+  Deleting `~/.better-age` deletes your local identity and encrypted private keys. If no other granted identity can decrypt a payload, that payload may become unreadable.
+</Callout>
+
+Before deleting it, make sure at least one other identity has access to the payloads you care about.
+
+## Dev containers
+
+There are two workable patterns.
+
+## Reuse the host identity
+
+Mount the host state into the container:
+
+```txt
+~/.better-age -> /home/node/.better-age
+```
+
+Use a readonly mount if the container only needs to decrypt/load payloads.
+
+Use a read-write mount if the container needs to import identities, rotate, change passphrase, update editor preference, or otherwise mutate **better-age** home state.
+
+## Use a container identity
+
+If your dev container has a persisted home volume, you can create a separate **better-age** identity inside the container:
+
+```sh
+bage setup --name dev-container
+bage identity export
+```
+
+Then grant that identity from a machine that already has access to the encrypted payload:
+
+```sh
+bage identity import 'better-age://identity/v1/...' --alias dev-container
+bage grant .env.enc dev-container
+```
+
+This avoids mounting host keys into the container, at the cost of managing one more identity.

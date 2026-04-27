@@ -1,0 +1,115 @@
+---
+title: Age 101
+description: The simple mental model behind age keys, recipients, and encrypted files.
+---
+
+This page is not a crypto lesson.
+
+It only explains age, the encryption primitive: keys, passphrases, recipients, and encrypted files.
+
+<Callout type="info">
+  This page is about age itself, not the **better-age** wrapper. For **better-age**-specific behavior like local state, identity rotation, and retired keys, read [Internals and local state](/docs/guides/local-state).
+</Callout>
+
+## The short version
+
+age encrypts files.
+
+You can encrypt a file for one or more recipients. Each recipient can decrypt the file with their own private key.
+
+That is the core idea.
+
+## Keys
+
+A key pair has two sides:
+
+- a public key
+- a private key
+
+The public key is safe to share. Other people use it when they want to encrypt something for you.
+
+The private key is secret. You use it to decrypt files that were encrypted for your public key.
+
+```txt
+public key  -> safe to share
+private key -> keep secret
+```
+
+## Recipients
+
+A recipient is a public key the file is encrypted for.
+
+When you encrypt a file, you choose who should be able to read it by choosing recipient public keys.
+
+```txt
+file encrypted for:
+- Alice public key
+- Bob public key
+```
+
+Alice can decrypt it with Alice's private key.
+
+Bob can decrypt it with Bob's private key.
+
+Someone else cannot decrypt it just because they have the encrypted file.
+
+## Multiple recipients
+
+An age file can be encrypted for multiple recipients at once.
+
+That does not mean everyone shares one secret key. Each recipient keeps their own private key.
+
+```txt
+same encrypted file
+  -> opens with Alice private key
+  -> opens with Bob private key
+  -> does not open with Eve private key
+```
+
+## Passphrases
+
+A passphrase can protect secret material on disk.
+
+The basic mental model:
+
+```txt
+passphrase unlocks private material
+private material decrypts encrypted file
+```
+
+The passphrase is local. It is not something you send to the people you encrypt files for.
+
+## Changing recipients
+
+If you want to add or remove who can read an encrypted file, you rewrite the encrypted file with a different recipient list.
+
+```txt
+old file:
+- Alice
+- Bob
+
+new file:
+- Alice
+```
+
+The new file is no longer encrypted for Bob.
+
+<Callout type="warning">
+  Rewriting a new file does not erase old copies. If Bob already has an old encrypted file that was encrypted for Bob, that old copy is still readable by Bob.
+</Callout>
+
+## Tiny glossary
+
+**Public key**: the shareable side of a key pair. Others use it to encrypt for you.
+
+**Private key**: the secret side of a key pair. You use it to decrypt.
+
+**Recipient**: a public key that the encrypted file is made readable for.
+
+**Passphrase**: a local secret used to unlock protected secret material.
+
+**Encrypted file**: the output file age creates. It is safe to move around only according to your own policy.
+
+## Sources
+
+- [age website](https://age-encryption.org/)

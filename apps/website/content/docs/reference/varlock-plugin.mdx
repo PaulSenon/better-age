@@ -1,0 +1,123 @@
+---
+title: Varlock plugin reference
+description: The @better-age/varlock plugin surface.
+---
+
+Package: `@better-age/varlock`
+
+Plugin path:
+
+```txt
+@better-age/varlock
+```
+
+## Decorator
+
+### Configure payload path
+
+Configures the encrypted payload path.
+
+```txt
+@initBetterAge(path=...)
+```
+
+```txt
+# @plugin(@better-age/varlock)
+# @initBetterAge(path=.env.enc)
+# @setValuesBulk(betterAgeLoad(), format=env)
+```
+
+`path` is required and must be a non-empty string.
+
+## Custom launcher
+
+### Override the launcher
+
+Overrides the command used to start **better-age**.
+
+```txt
+@initBetterAge(path=..., command=...)
+```
+
+```txt
+# @plugin(@better-age/varlock)
+# @initBetterAge(path=.env.enc, command="npx @better-age/cli")
+# @setValuesBulk(betterAgeLoad(), format=env)
+```
+
+`command` is a launcher prefix. The plugin still appends:
+
+```txt
+load --protocol-version=1 <path>
+```
+
+For example:
+
+```txt
+command="npx @better-age/cli"
+```
+
+runs:
+
+```txt
+npx @better-age/cli 'load' '--protocol-version=1' '.env.enc'
+```
+
+Treat `command` as trusted local config. Do not build it from untrusted input.
+
+## Resolver
+
+### Load env text
+
+Loads env text from the configured **better-age** payload.
+
+```txt
+betterAgeLoad()
+```
+
+Typical Varlock usage:
+
+```txt
+# @setValuesBulk(betterAgeLoad(), format=env)
+```
+
+It takes no arguments.
+
+## Runtime contract
+
+Default launcher:
+
+```txt
+bage
+```
+
+Default command shape:
+
+```txt
+bage load --protocol-version=1 <path>
+```
+
+Stdio:
+
+- stdin is inherited, so **better-age** can prompt for passphrase
+- stdout is piped, so Varlock receives raw env text
+- stderr is inherited, so prompts, warnings, and errors stay visible
+
+## Caching
+
+One successful load is cached in memory for the current Varlock process.
+
+Failed loads are not cached. A later call can retry.
+
+Concurrent calls share the same in-flight load.
+
+## Current limits
+
+- one `@initBetterAge(...)` config per process
+- no multi-payload layering through the plugin yet
+- **better-age** CLI must be runnable from the Varlock process
+- passphrase prompting requires an interactive terminal
+
+<Callout type="info">
+  If you need multiple encrypted payloads layered through Varlock, [open a feature request](https://github.com/PaulSenon/better-age/issues). The current plugin intentionally starts with one payload per process.
+</Callout>

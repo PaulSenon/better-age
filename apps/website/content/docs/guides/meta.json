@@ -1,11 +1,15 @@
 {
   "title": "Guides",
+  "defaultOpen": true,
   "pages": [
     "index",
-    "first-time-setup",
-    "create-and-edit",
-    "grant-access",
-    "revoke-access",
-    "load-for-machines"
+    "age-101",
+    "local-env-file",
+    "varlock-runtime",
+    "share-with-teammate",
+    "rotate-and-update",
+    "local-state",
+    "custom-load-integration",
+    "age-cli-interop"
   ]
 }

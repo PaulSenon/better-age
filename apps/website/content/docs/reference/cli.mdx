@@ -1,0 +1,212 @@
+---
+title: CLI reference
+description: The compact command reference for bage.
+---
+
+Package: `@better-age/cli`
+
+Command: `bage`
+
+## Setup
+
+### Setup local identity
+
+Creates local **better-age** home state and your self identity.
+
+```sh
+bage setup [--name <display-name>]
+```
+
+If `--name` is omitted in an interactive terminal, **better-age** prompts for it.
+
+## Payload commands
+
+### Create payload
+
+Creates a new encrypted env payload.
+
+```sh
+bage create [payload]
+```
+
+If the path is omitted, interactive mode can suggest `.env.enc`.
+
+### Edit payload
+
+Decrypts the payload, opens your editor, validates env text, and writes the encrypted payload back.
+
+```sh
+bage edit [payload]
+```
+
+Editor resolution uses `$VISUAL`, then `$EDITOR`, then saved editor preference, then an interactive picker.
+
+### View payload
+
+Opens plaintext env text in the secure terminal viewer.
+
+```sh
+bage view [payload]
+```
+
+`view` is the human reading path. It does not print plaintext to stdout.
+
+### Inspect payload
+
+Shows non-secret payload metadata.
+
+```sh
+bage inspect [payload]
+```
+
+Use it to check env keys, recipients, schema version, compatibility, and payload id without showing secret values.
+
+### Grant access
+
+Adds or refreshes a recipient on the payload.
+
+```sh
+bage grant [payload] [identity-ref]
+```
+
+`identity-ref` can be a known alias, handle, owner id, or pasted identity string in guided flows.
+
+### Revoke access
+
+Removes a recipient from future rewritten versions of the payload.
+
+```sh
+bage revoke [payload] [identity-ref]
+```
+
+Revocation does not erase old copies someone already received.
+
+### Update payload
+
+Rewrites a payload with current metadata when **better-age** says it is needed.
+
+```sh
+bage update [payload]
+```
+
+Typical use: refresh your self recipient after `bage identity rotate`.
+
+### Load payload
+
+Decrypts the payload and writes raw env text to stdout.
+
+```sh
+bage load [payload] --protocol-version=1
+```
+
+This is the machine boundary used by Varlock and custom integrations.
+
+Contract:
+
+- stdout is raw `.env` text only
+- stderr contains prompts, warnings, and errors
+- exit code `0` means stdout is usable env text
+- non-zero means do not use stdout
+- the command currently prompts for passphrase in an interactive terminal
+
+## Identity commands
+
+### Export identity
+
+Prints your public identity string to stdout.
+
+```sh
+bage identity export
+```
+
+Identity strings look like:
+
+```txt
+better-age://identity/v1/...
+```
+
+They are public identity material. They cannot decrypt anything by themselves.
+
+### Import identity
+
+Saves another identity locally.
+
+```sh
+bage identity import [identity-string] [--alias <alias>] [--trust-key-update]
+```
+
+Use `--trust-key-update` when importing a changed key for an identity you already know and you want to confirm that change directly from the command.
+
+### List identities
+
+Lists your self identity, known identities, and retired keys.
+
+```sh
+bage identity list
+```
+
+### Forget identity
+
+Removes a known identity from local home state.
+
+```sh
+bage identity forget [identity-ref]
+```
+
+This does not modify any payload files.
+
+### Rotate identity
+
+Rotates your local identity key while keeping the same owner id.
+
+```sh
+bage identity rotate
+```
+
+Existing payloads may need:
+
+```sh
+bage update .env.enc
+```
+
+### Change passphrase
+
+Changes your local identity passphrase.
+
+```sh
+bage identity passphrase
+```
+
+Aliases:
+
+```sh
+bage identity pass
+bage identity pw
+```
+
+## Interactive mode
+
+### Open interactive mode
+
+Opens the setup-aware interactive menu.
+
+```sh
+bage interactive
+```
+
+Alias:
+
+```sh
+bage i
+```
+
+Interactive mode excludes `load`; use `load` directly when a machine needs stdout.
+
+## Global behavior
+
+- Missing payloads and identities can prompt in an interactive terminal.
+- Headless terminals cannot prompt and fail fast when required input is missing.
+- Passphrases are prompted interactively.
+- `NO_COLOR` disables ANSI color.
+- Human messages, prompts, warnings, errors, editor UI, and viewer UI stay off stdout.
+- `load` and `identity export` are the main machine-readable stdout surfaces.

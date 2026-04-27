@@ -1,0 +1,126 @@
+---
+title: Install
+description: Global CLI install first, npx as an alternative, project install only when intentional.
+---
+
+The default install is a global `bage` command.
+
+**better-age** stores identity state in your home directory, not in one project. That is why the CLI is normally a user tool, not a project dependency.
+
+## Recommended: global CLI
+
+```sh
+npm install -g @better-age/cli
+```
+
+Then:
+
+```sh
+bage setup --name Alice
+```
+
+Use this path if you want Varlock to work with the default plugin config:
+
+```txt
+# @plugin(@better-age/varlock)
+# @initBetterAge(path=.env.enc)
+# @setValuesBulk(betterAgeLoad(), format=env)
+```
+
+The plugin expects `bage` to be runnable from the shell where Varlock runs.
+
+## Alternative: no-install CLI
+
+You can run the CLI through `npx`:
+
+```sh
+npx @better-age/cli setup --name Alice
+npx @better-age/cli edit .env.enc
+```
+
+This keeps the command fresh, but it is noisier for day-to-day use.
+
+For Varlock, pass the launcher explicitly:
+
+```txt
+# @plugin(@better-age/varlock)
+# @initBetterAge(path=.env.enc, command="npx @better-age/cli")
+# @setValuesBulk(betterAgeLoad(), format=env)
+```
+
+## Install the Varlock plugin
+
+Install `@better-age/varlock` in the project that has the `.env.schema` file.
+
+<Tabs groupId="package-manager" items={["npm", "pnpm", "yarn", "bun"]}>
+  <Tab value="npm">
+
+```sh
+npm install -D @better-age/varlock varlock
+```
+
+  </Tab>
+  <Tab value="pnpm">
+
+```sh
+pnpm add -D @better-age/varlock varlock
+```
+
+  </Tab>
+  <Tab value="yarn">
+
+```sh
+yarn add -D @better-age/varlock varlock
+```
+
+  </Tab>
+  <Tab value="bun">
+
+```sh
+bun add -d @better-age/varlock varlock
+```
+
+  </Tab>
+</Tabs>
+
+## Advanced: project-scoped CLI
+
+Only install `@better-age/cli` as a project dependency when you intentionally want that shape, usually for a dev container or controlled project toolchain.
+
+```sh
+npm install -D @better-age/cli
+```
+
+Then Varlock usually needs a launcher prefix:
+
+```txt
+# @initBetterAge(path=.env.enc, command="npm exec bage")
+```
+
+This is not the default recommendation because **better-age** identity state still lives in the user home directory unless your container or shell changes that home.
+
+## Updates
+
+Global installs need manual updates:
+
+```sh
+npm install -g @better-age/cli@latest
+```
+
+Project plugin updates follow your package manager and lockfile.
+
+## Uninstall
+
+Remove the global CLI if you installed it:
+
+```sh
+npm uninstall -g @better-age/cli
+```
+
+Then decide what to do with local state.
+
+<Callout type="warning">
+  Deleting `~/.better-age` deletes your local identity, encrypted private keys, known identities, retired keys, and preferences. If no other granted identity can read a payload, that payload may become unreadable.
+</Callout>
+
+Read [Local state](/docs/guides/local-state) before deleting anything.
