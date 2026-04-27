@@ -1,0 +1,38 @@
+---
+title: setup
+description: Create the local self identity and protect it with a passphrase.
+---
+
+## Purpose
+
+`setup` creates the local self identity used by the rest of the workflow.
+
+It asks for:
+
+- an alias or display name
+- a passphrase
+
+If no alias is provided, the command tries to prompt with a host-based default.
+
+## Examples
+
+```sh
+bage setup
+```
+
+```sh
+bage setup --alias isaac@workstation
+```
+
+## What it writes
+
+- current public key
+- active fingerprint
+- passphrase-protected private key
+- display name
+- local home state
+
+## Notes
+
+- if a user key already exists, setup fails instead of silently replacing it
+- in non-interactive environments, you should provide what the command needs instead of relying on prompts

@@ -1,0 +1,84 @@
+---
+title: Quickstart
+description: "Reach first success with the narrow better-age workflow: setup, create, grant, view, and load."
+---
+
+This is the compact happy path.
+
+If you have not read the product stance yet, read [Vision](/docs/getting-started/vision) first. If you have not set up a local identity yet, finish [Installation](/docs/getting-started/installation) first.
+
+## 1. Setup your local identity
+
+```sh
+npx @better-age/cli setup
+```
+
+Then export your identity string:
+
+```sh
+bage me
+```
+
+## 2. Create an encrypted payload
+
+```sh
+bage create .env.prod.enc
+```
+
+That creates one caller-owned encrypted payload file.
+
+## 3. Edit it locally
+
+```sh
+bage edit .env.prod.enc
+```
+
+Payload truth lives in the payload itself: recipients, payload metadata, and encrypted env text.
+
+## 4. Grant another identity
+
+First save a teammate identity string locally:
+
+```sh
+bage add-identity 'better-age://identity/v1/<base64url-json>'
+```
+
+Then grant that identity on the payload:
+
+```sh
+bage grant .env.prod.enc teammate#0123abcd
+```
+
+Known identities are local address-book entries. Grant is the payload mutation that actually gives access.
+
+## 5. Read secrets as a human
+
+```sh
+bage view .env.prod.enc
+```
+
+`view` is the human plaintext path. It uses the secure in-process viewer and must not fall back to plaintext `stdout`.
+
+## 6. Load secrets for a machine
+
+```sh
+bage load --protocol-version=1 .env.prod.enc
+```
+
+`load` is the machine plaintext path. It writes raw `.env` text to `stdout` for another process to consume.
+
+## 7. Update access later
+
+Use:
+
+- `bage grant` to add or refresh a recipient
+- `bage revoke` to remove a recipient from future rewritten payload versions
+- `bage update` for explicit maintenance when a payload needs a rewrite
+
+## Where to go next
+
+- For a fuller setup explanation, read [First-time setup](/docs/guides/first-time-setup)
+- For payload lifecycle, read [Create and edit](/docs/guides/create-and-edit)
+- For access changes, read [Grant access](/docs/guides/grant-access) and [Revoke access](/docs/guides/revoke-access)
+- For automation, read [Load for machines](/docs/guides/load-for-machines)
+- For exact syntax and command contracts, use the [CLI reference](/docs/reference/cli)

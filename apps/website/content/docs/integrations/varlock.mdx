@@ -1,0 +1,54 @@
+---
+title: Varlock
+description: The varlock plugin stays thin and treats the CLI load protocol as the source of truth.
+---
+
+`@better-age/varlock` is a thin varlock adapter for better-age.
+
+Design constraints:
+
+- plugin stays thin
+- CLI stays source of truth
+- plugin shells out to `bage load --protocol-version=1 <path>`
+- one varlock process caches one load result in memory
+
+## Where varlock fits
+
+Varlock is an integration surface, not a peer product.
+
+The better-age CLI stays the source of truth for decryption, passphrase handling, and load protocol compatibility. The plugin only adapts that machine path into a varlock-friendly shape.
+
+## Minimal usage
+
+```txt
+# @plugin(./packages/varlock/dist/plugin.cjs)
+# @initBetterAge(path=.env.enc)
+# @setValuesBulk(betterAgeLoad(), format=env)
+```
+
+## Custom launcher
+
+If `bage` is not directly invokable, pass a launcher prefix:
+
+```txt
+# @plugin(./packages/varlock/dist/plugin.cjs)
+# @initBetterAge(path=.env.enc, command="pnpm exec bage")
+# @setValuesBulk(betterAgeLoad(), format=env)
+```
+
+The plugin still appends the fixed `load --protocol-version=1 <path>` arguments itself.
+
+## Runtime behavior
+
+- stdout from `bage load` becomes env text for varlock
+- stderr stays attached to the invoking shell
+- plugin errors if the launcher cannot start
+- plugin errors if `bage load` exits non-zero
+
+## Reference pages
+
+For exact surface docs, see:
+
+- [@initBetterAge(...)](/docs/reference/varlock/init-better-age)
+- [betterAgeLoad()](/docs/reference/varlock/better-age-load)
+- [Runtime contract](/docs/reference/varlock/runtime-contract)

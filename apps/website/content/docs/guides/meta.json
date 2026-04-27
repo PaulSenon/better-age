@@ -1,0 +1,11 @@
+{
+  "title": "Guides",
+  "pages": [
+    "index",
+    "first-time-setup",
+    "create-and-edit",
+    "grant-access",
+    "revoke-access",
+    "load-for-machines"
+  ]
+}
