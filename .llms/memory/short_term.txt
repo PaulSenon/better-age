@@ -1,0 +1,519 @@
+2026-04-25 Phase 6 complete:
+- New CLI identity slice implemented in `packages/cli`.
+- Public runner: `src/cli/runCli.ts`; presenter: `src/cli/presenter.ts`; real adapter wiring: `src/cli/nodeCli.ts`.
+- CLI contract tests cover setup exact/guided/headless, passphrase confirmation retry, identity export/import/list/forget, stdout/stderr/exit codes.
+- Core `importKnownIdentity` now preserves existing alias when alias omitted.
+- `@better-age/cli` depends on `@better-age/core`; core exposes explicit package entrypoint.
+- No `bage` bin yet.
+- `@effect/cli` is installed/locked, but command tree/parser integration still pending before final packaging/help/completions.
+- Verification passed: `pnpm test`, `pnpm check`, `git diff --check`.
+
+2026-04-25 Phase 7 complete:
+- New CLI payload create/read/edit slice implemented in `packages/cli/src/cli/runCli.ts`.
+- Added contracts for `create`, `inspect`, `view`, `load --protocol-version=1`, and `edit`.
+- `createNodeCli` now passes real payload existence preflight.
+- `load` stdout is raw env text only; warnings go stderr.
+- `view` plaintext only goes through `terminal.openViewer`.
+- `edit` uses `terminal.openEditor`, covering cancel/unchanged/invalid retry/changed save.
+- Shared payload context handles path preflight, headless no-prompt failure, passphrase retry, and notices.
+- Core `decryptPayload` success result typing tightened to literal success/code.
+- Verification passed: `pnpm test`, `pnpm check`, `git diff --check`.
+- Next phase: Phase 8 sharing/maintenance (`grant`, `revoke`, `update`).
+
+2026-04-25 Phase 8 complete:
+- New CLI sharing/maintenance slice implemented in `packages/cli/src/cli/runCli.ts`.
+- Added `grant`, `revoke`, and `update`.
+- Exact grant resolves known refs, payload recipient refs, and identity strings via injected parser.
+- Guided grant/revoke use `terminal.selectOne`; self/already-granted disabled states covered.
+- Outdated write gate applies to exact/guided mutation flows; guided update-now resumes.
+- Idempotent grant/revoke/update outcomes render as success.
+- Core `PayloadRecipientSummary` now includes `publicKey` and `identityUpdatedAt`.
+- Verification passed: `pnpm test`, `pnpm check`, `git diff --check`.
+- Next phase: Phase 9 identity security (`identity rotate`, `identity passphrase`).
+
+2026-04-25 Phase 9 complete:
+- New CLI identity security slice implemented in `packages/cli/src/cli/runCli.ts`.
+- Added `identity rotate`, `identity passphrase`, `identity pass`, and `identity pw`.
+- Rotate prompts passphrase, retries wrong passphrase, calls `commands.rotateSelfIdentity`, and warns to run `bage update`.
+- Passphrase change verifies current passphrase before prompting new/confirm, retries wrong current and confirmation mismatch, then calls `commands.changeIdentityPassphrase`.
+- Core gained `queries.verifySelfIdentityPassphrase` for non-mutating current-key credential checks.
+- Specs updated: boundary API and CLI command contract now include passphrase verification query.
+- Verification passed: `pnpm test`, `pnpm check`, `git diff --check`.
+- Next phase: Phase 10 varlock/load protocol integration.
+
+2026-04-25 Phase 10 complete:
+- Varlock load protocol slice hardened in `packages/varlock/src/runtime/createBetterAgeRuntime.ts`.
+- Runtime spawns `bage load --protocol-version=1 <path>` by default.
+- Custom launcher still goes through shell with quoted load args.
+- Stdio contract remains stdin inherit, stdout pipe, stderr inherit.
+- Added tests for non-zero load exit, missing stdout pipe, and synchronous launcher/setup throw.
+- Sync launcher/setup throw now maps to adapter start-failure remediation instead of surfacing raw error.
+- Varlock still does not import core or handle passphrases.
+- Verification passed: `pnpm -F @better-age/varlock test:unit`, `pnpm -F @better-age/varlock check`, `pnpm test`, `pnpm check`, `git diff --check`.
+- Next phase: Phase 11 final contract hardening.
+
+2026-04-25 Phase 11 complete:
+- Added `interactive` / `i` command routing in `packages/cli/src/cli/runCli.ts`.
+- Added `INTERACTIVE_UNAVAILABLE` presenter text.
+- Added CLI package contract tests proving new `bage` bin and legacy private/no-bin state.
+- Added `packages/cli/src/bin/bage.ts` binary entrypoint.
+- Added `packages/cli/src/cli/nodeTerminal.ts` basic stdin/stderr terminal adapter.
+- Added `packages/cli/tsconfig.build.json` and `build` script.
+- Added core `queries.parseIdentityString` and wired node CLI grant identity-string parsing through it.
+- Updated `packages/cli/README.md` with command surface and stdout/stderr policy.
+- Verification passed: `pnpm -F @better-age/cli test:unit`, `pnpm -F @better-age/cli check`, `pnpm -F @better-age/core test:unit`, `pnpm test`, `pnpm check`, `git diff --check`.
+
+2026-04-26 Runtime CLI release readiness Phase 1 start:
+- Plan source: `.llms/projects/4-cli-core-boundary-hardening/plans/runtime-cli-release-readiness.md`.
+- Current phase: Grammar Tracer Bullet.
+- Scope: introduce release-facing command grammar/help/parse-error seam using `@effect/cli` concepts while delegating command execution into existing `runCli` flows.
+- Must preserve guided behavior: promptable operands optional, protocol operands strict.
+- Progress target: add grammar tests, implement minimal grammar parser/help layer, keep `runCli` flow tests passing, then full `pnpm test`, `pnpm check`, `git diff --check`.
+
+2026-04-26 Runtime CLI release readiness Phase 1 complete:
+- Added `packages/cli/src/cli/commandGrammar.ts` with release command tree metadata, help rendering, parse-error presentation, and delegation to existing `runCli` flows.
+- Added `packages/cli/src/cli/commandGrammar.test.ts` covering root help, command help, aliases, load protocol help, parse errors, flow delegation, optional promptable operands, and strict load protocol behavior.
+- Wired `createNodeCli().run` through `runCliWithGrammar`; `runCli` remains the business flow seam and existing flow tests still cover it.
+- Added `presentParseFailure` for stderr-only grammar failures with exit 2.
+- Aligned `@better-age/core` `effect` dependency to `^3.21.2` via pnpm so CLI imports of `@effect/cli` do not create duplicate Effect package warnings.
+- Verification passed: `pnpm test`, `pnpm check`, `git diff --check`.
+- Next phase: Phase 2 Home State v2 + Home Status.
+
+2026-04-26 Runtime CLI release readiness Phase 2 start:
+- Plan source: `.llms/projects/4-cli-core-boundary-hardening/plans/runtime-cli-release-readiness.md`.
+- Current phase: Home State v2 + Home Status.
+- Scope: add nullable `preferences.editorCommand`, migrate v1 to v2, expose core home status query for future interactive setup gating.
+- TDD target: artifact parse/encode/migration tests, core query tests, CLI boundary type support if needed, then `pnpm test`, `pnpm check`, `git diff --check`.
+
+2026-04-26 Runtime CLI release readiness Phase 2 complete:
+- Added `HomeStateDocumentV2` with `preferences.editorCommand: string | null`; core now creates/saves home state version 2.
+- `parseHomeStateDocument` accepts v1 and v2; `migrateHomeStateDocument` upgrades v1 to v2 with `editorCommand: null`.
+- Core `loadCurrentHomeState` persists migrated v1 docs before returning current state.
+- Added `queries.getHomeStatus()` returning success `not-setup` or `setup` with self identity summary, avoiding missing-home failure control flow for future interactive menu gating.
+- CLI `CliCore` boundary type now includes `getHomeStatus`; test fakes updated.
+- Specs updated in persistence/test strategy/boundary docs; Phase 2 checklist marked complete.
+- Verification passed: `pnpm test`, `pnpm check`, `git diff --check`.
+- Next phase: Phase 3 Hidden Secret Prompt.
+
+2026-04-26 Runtime CLI release readiness Phase 3 start:
+- Plan source: `.llms/projects/4-cli-core-boundary-hardening/plans/runtime-cli-release-readiness.md`.
+- Current phase: Hidden Secret Prompt.
+- Scope: replace echoing readline passphrase prompt in `packages/cli/src/cli/nodeTerminal.ts` with TTY-only hidden raw-mode secret prompt, keep text prompt/readline for non-secret input.
+- TDD target: state-machine unit tests for hidden input, enter, backspace, Ctrl-C, EOF; terminal factory tests for TTY preflight; existing `runCli` passphrase retry tests must remain passing; then `pnpm test`, `pnpm check`, `git diff --check`.
+
+2026-04-26 Runtime CLI release readiness Phase 3 complete:
+- Added `packages/cli/src/cli/secretPrompt.ts`: local raw-mode hidden secret prompt runtime plus pure reducer for input, backspace, submit, Ctrl-C, and EOF.
+- Added `secretPrompt.test.ts` proving typed secret characters are captured but not written, backspace works, Ctrl-C/EOF cancel with newline.
+- `createNodeTerminal` now accepts injectable streams, exposes prompts only when stdin and stderr are TTYs, and uses `readHiddenSecret` for `promptSecret`; no prompts are exposed in headless mode.
+- Added `nodeTerminal.test.ts` for TTY preflight.
+- Added `CliPromptCancelledError` mapping in `runCli` so secret prompt Ctrl-C/EOF returns `[ERROR] CANCELLED` exit 130 instead of rejecting.
+- Existing passphrase retry tests still pass; CLI unit test count now 33.
+- Verification passed: `pnpm test`, `pnpm check`, `git diff --check`.
+- Next phase: Phase 4 Editor Runtime.
+
+2026-04-26 Runtime CLI release readiness Phase 4 start:
+- Plan source: `.llms/projects/4-cli-core-boundary-hardening/plans/runtime-cli-release-readiness.md`.
+- Current phase: Editor Runtime.
+- Scope: implement release editor adapter for `edit`: `$VISUAL`/`$EDITOR`, saved home preference, picker with one-time/remember, attached editor spawn, temp file lifecycle, no plaintext stdout.
+- TDD target: core editor preference query/command tests, node editor resolution/launch/temp tests, wire `createNodeCli` to provide `openEditor` when terminal is interactive, keep existing edit flow tests passing, then `pnpm test`, `pnpm check`, `git diff --check`.
+
+2026-04-26 Runtime CLI release readiness Phase 4 complete:
+- Core gained `queries.getEditorPreference()` and `commands.setEditorPreference({ editorCommand })` backed by Home State v2 `preferences.editorCommand`.
+- Added `packages/cli/src/cli/nodeEditor.ts` release editor adapter: `$VISUAL` then `$EDITOR`, saved editor preference, PATH availability check, common-editor picker, one-time/remember, temp file create/read/cleanup, attached `spawn(..., { stdio: "inherit" })`.
+- `createNodeCli` wires `openEditor` for interactive terminals using the core preference methods; headless terminals still have no editor and fail `EDITOR_UNAVAILABLE`.
+- `runCli` now handles editor adapter failures and maps non-zero editor exit to `EDITOR_EXIT_NON_ZERO`.
+- Tests added/updated: core editor preference test, `nodeEditor.test.ts`, edit failure contract in `runCli.test.ts`; CLI unit test count now 39.
+- Specs updated: core boundary includes editor preference query/command; Phase 4 checklist marked complete.
+- Verification passed: `pnpm test`, `pnpm check`, `git diff --check`.
+- Next phase: Phase 5 Secure Viewer.
+
+2026-04-26 Runtime CLI release readiness Phase 5 start:
+- Plan source: `.llms/projects/4-cli-core-boundary-hardening/plans/runtime-cli-release-readiness.md`.
+- Current phase: Secure Viewer.
+- Scope: add isolated in-process stderr/TTY viewer behind terminal adapter; scrolling, quit, headless unavailable; no stdout plaintext.
+- TDD target: viewer state/navigation tests, node viewer runtime tests, wire `createNodeTerminal.openViewer`, keep `runCli` view tests passing, then `pnpm test`, `pnpm check`, `git diff --check`.
+
+2026-04-26 Runtime CLI release readiness Phase 5 complete:
+- Added `packages/cli/src/cli/secureViewer.ts`: isolated in-process viewer state/rendering/runtime with alternate screen, stderr rendering, scrolling, resize, raw-mode keyboard quit, and explicit TTY unavailable error.
+- `createNodeTerminal` now exposes `openViewer(envText, path)` only for interactive TTY runtimes with viewer capabilities.
+- `runCli view` now passes payload path to viewer; stdout remains empty and missing viewer maps to `VIEWER_UNAVAILABLE`.
+- Added tests for viewer viewport/rendering, navigation clamps, key mapping, runtime open/scroll/quit cleanup, terminal wiring, and view path/no-stdout contract.
+- Phase 5 checklist marked complete in runtime CLI release readiness plan.
+- Verification passed: `pnpm -F @better-age/cli test:unit`, `pnpm test`, `pnpm check`, `git diff --check`.
+- Next phase: Phase 6 Real Interactive Loop.
+
+2026-04-26 Runtime CLI release readiness Phase 6 start:
+- Plan source: `.llms/projects/4-cli-core-boundary-hardening/plans/runtime-cli-release-readiness.md`.
+- Current phase: Real Interactive Loop.
+- Scope: replace one-shot interactive router with setup-aware root/files/identities menus, back/quit, direct flow delegation, and repeat-after-action behavior.
+- TDD target: `runCli` interactive-session behavior tests through terminal `selectOne`; keep business logic in existing direct command flows; then `pnpm test`, `pnpm check`, `git diff --check`.
+
+2026-04-26 Runtime CLI release readiness Phase 6 complete:
+- Replaced one-shot interactive command picker with setup-aware loop in `packages/cli/src/cli/runCli.ts`.
+- Before setup: menu shows setup/quit only; successful setup re-queries home status and transitions to normal root menu.
+- After setup: root shows Files/Identities/Quit; Files submenu exposes create/edit/grant/inspect/revoke/update/view plus back/quit; Identities exposes export/import/list/forget/passphrase/rotate plus back/quit.
+- `load` and `interactive` are excluded from menus; selected actions delegate back into direct `runCli` flows and return to active submenu after completion.
+- Added `runCli` tests for setup gating, action delegation, loop-back behavior, menu exclusions, and headless unavailable behavior.
+- Phase 6 checklist marked complete in runtime CLI release readiness plan.
+- Verification passed: `pnpm -F @better-age/cli test:unit`, `pnpm -F @better-age/cli check`, `pnpm test`, `pnpm check`, `git diff --check`.
+- Next phase: Phase 7 Styling + Presenter Polish.
+
+2026-04-26 Runtime CLI release readiness Phase 7 start:
+- Plan source: `.llms/projects/4-cli-core-boundary-hardening/plans/runtime-cli-release-readiness.md`.
+- Current phase: Styling + Presenter Polish.
+- Scope: add minimal ANSI styling for human stderr only, gated by TTY capability and `NO_COLOR`; keep machine stdout raw for `load` and `identity export`; no emoji.
+- TDD target: presenter tests for plain/styled modes plus `runCli` contracts proving machine stdout remains unstyled; then `pnpm test`, `pnpm check`, `git diff --check`.
+
+2026-04-26 Runtime CLI release readiness Phase 7 complete:
+- Added `PresentationStyle`, `styleHumanStderr`, and `styleRunCliResult` in `packages/cli/src/cli/presenter.ts`.
+- Styling is final-boundary only: stdout is never styled; stderr labels `[OK]`, `[WARN]`, `[ERROR]` and error codes get minimal ANSI when enabled.
+- `createNodeTerminal` now sets `presentation.color` from interactive stderr TTY capability and disables color when `NO_COLOR` exists; headless terminals set color false.
+- `runCli` applies presentation styling after command execution; grammar parse failures apply the same styling path.
+- Added presenter tests for plain/styled/no-emoji/stdout-safe behavior, terminal NO_COLOR test, grammar styled parse failure test, and `load` raw stdout under styled stderr.
+- Phase 7 checklist marked complete in runtime CLI release readiness plan.
+- Verification passed: `pnpm -F @better-age/cli test:unit`, `pnpm -F @better-age/cli check`, `pnpm test`, `pnpm check`, `git diff --check`.
+- Next phase: Phase 8 Standalone Bundle.
+
+2026-04-26 Runtime CLI release readiness Phase 8 start:
+- Plan source: `.llms/projects/4-cli-core-boundary-hardening/plans/runtime-cli-release-readiness.md`.
+- Current phase: Standalone Bundle.
+- Scope: switch `@better-age/cli` build from multi-file TypeScript output to one esbuild bundled executable `dist/bage`, preserving shebang and bundling core/CLI runtime.
+- TDD target: package contract tests for bin/build config; bundle smoke tests for shebang, single output file, help startup, parse failure; keep varlock launcher contract tests passing; then `pnpm test`, `pnpm check`, `git diff --check`.
+
+2026-04-26 Runtime CLI release readiness Phase 8 complete:
+- Added `packages/cli/esbuild.config.mjs` for one-file ESM bundle output at `dist/bage`.
+- Bundle config preserves shebang via banner, defines `require` with `createRequire` for bundled CJS dependencies, bundles core/CLI runtime, externalizes nothing, disables sourcemaps, and chmods output executable.
+- `@better-age/cli` package bin now points to `./dist/bage`; build script is `rimraf ./dist && node ./esbuild.config.mjs`; added `esbuild` and `rimraf` dev deps through pnpm.
+- Removed source shebang from `src/bin/bage.ts`; generated bundle owns executable shebang.
+- Added bundle smoke tests that build into ignored `dist/`, assert single executable `bage`, shebang, no `@better-age/core` external import, root help startup, and parse-failure stdout/stderr policy.
+- Package contract tests updated for bundled bin/build/deps; varlock unit tests still prove `bage load --protocol-version=1 <path>` launcher contract.
+- Phase 8 checklist marked complete in runtime CLI release readiness plan.
+- Verification passed: `pnpm -F @better-age/cli test:unit`, `pnpm -F @better-age/cli check`, `pnpm -F @better-age/varlock test:unit`, `pnpm test`, `pnpm check`, `git diff --check`.
+- Next phase: Phase 9 Release Docs + Manual QA.
+
+2026-04-26 Runtime CLI release readiness Phase 9 start:
+- Plan source: `.llms/projects/4-cli-core-boundary-hardening/plans/runtime-cli-release-readiness.md`.
+- Current phase: Release Docs + Manual QA.
+- Scope: update release-facing CLI/varlock/repo docs and add manual QA checklist for terminal behaviors not covered by pseudo-TTY/Docker E2E.
+- TDD target: docs contract tests for required sections and command/output policy, then update docs, run package/full tests/checks and `git diff --check`.
+
+2026-04-26 Runtime CLI release readiness Phase 9 complete:
+- Expanded `packages/cli/README.md` with install/build, standalone artifact, command list, examples, machine output policy, runtime behavior, known limitations, development, and manual QA links.
+- Expanded `packages/varlock/README.md` with `bage` launcher assumption, custom `command=` launcher prefix behavior, inherited stdin/stderr and piped stdout contract, minimal usage, runtime behavior, and manual QA link.
+- Updated root `README.md` package roles for core/cli/varlock and clarified `@better-age/cli-legacy` is a private reference package, not a releasable product.
+- Added `docs/manual-qa.md` covering hidden passphrase prompt, editor and remembered preference, secure viewer scrolling/quit, interactive menu loop, clean stdout for `load` and `identity export`, varlock smoke, and deferred Docker/pseudo-TTY E2E.
+- Added `packages/cli/src/cli/releaseDocs.test.ts` to keep release docs and manual QA checklist from regressing.
+- Phase 9 checklist marked complete in runtime CLI release readiness plan; all phases in that plan are now complete.
+- Verification passed: `pnpm -F @better-age/cli test:unit`, `pnpm -F @better-age/cli check`, `pnpm test`, `pnpm check`, `git diff --check`.
+
+2026-04-26 Final MVP release-readiness audit:
+- Checked project plans, release readiness plan, command grammar, command/core implementation surface, tests, docs, and known TODO/deferred markers.
+- Found only stale unchecked boxes in older MVP reimplementation plan phases 1-5; code/tests/docs already evidenced completion, so marked those acceptance criteria complete.
+- Runtime CLI release readiness plan remains fully complete.
+- No missing MVP command or accepted release-readiness feature found in static/spec audit.
+- Known accepted gaps remain non-MVP/deferred: Docker/pseudo-TTY E2E, headless passphrase injection, prototype schema compatibility, future payload identity import flow.
+- Final verification after doc cleanup passed: `pnpm test`, `pnpm check`, `git diff --check`.
+
+2026-04-26 User QA overturned release-readiness result:
+- User reports severe release-blocking CLI UX regressions vs legacy prototype.
+- Examples: menus are numbered readline prompts instead of keyboard-navigable selects; help is custom/manual instead of proper `@effect/cli` behavior; interactive session buffers command output until quit; invalid identity import appears silent during session; Ctrl-C navigates/backtracks instead of exiting; guided path/identity suggestions regressed; payload file should likely be human/comment envelope plus BEGIN/END armored block.
+- Current conclusion: not release ready. Core may be structurally OK, but CLI runtime/parity/polish needs a dedicated release UX parity hardening track.
+
+2026-04-26 CLI IO stack realignment phases 1-6 complete:
+- New normal prompt stack is `@effect/cli` for command grammar/help/parser and `@inquirer/prompts` behind `nodePromptAdapter` for select/text/password/confirm/pause.
+- Removed normal prompt dependency on custom raw-key select/readline code; raw terminal handling is isolated to secure viewer and strict stdout/stderr output.
+- Editor picker uses shared select; remember decision uses shared confirm. Inquirer `editor` prompt intentionally not adopted because Better Age needs explicit editor discovery plus saved preference behavior.
+- Release UX parity plan now gates Phase 4 Payload File Envelope behind this IO realignment; manual QA covers redraw-in-place, keyboard navigation, disabled rows, Ctrl-C/cancellation, password hiding, immediate output, and raw stdout.
+- No markdown/spec tests added; prior docs test remains deleted.
+- Verification passed: `pnpm test`, `pnpm check`, `git diff --check`.
+- Next: resume Release UX Parity Hardening Phase 4, Payload File Envelope.
+
+2026-04-26 Release UX Parity Phase 4 complete:
+- Added `packages/core/src/persistence/PayloadFileEnvelope.ts` for Better Age file envelope formatting/parsing.
+- Core payload create/edit/grant/revoke/update now persist comments + one `BETTER AGE PAYLOAD` block around inner age armor.
+- Core payload reads extract the inner age armor and reject missing/duplicate/malformed/non-age-armored envelopes as `PAYLOAD_INVALID`.
+- Real adapter integration now asserts outer Better Age wrapper plus inner age armor.
+- Verification passed after one stale integration assertion fix: `pnpm test`, `pnpm check`, `git diff --check`.
+- Next: Release UX Parity Phase 5, Guided Payload UX.
+
+2026-04-26 Release UX Parity Phase 5 complete:
+- Existing payload guided flows now discover `.env.*.enc` in cwd via Node CLI adapter.
+- Missing existing payload path behavior: zero candidates prompts path; one/many candidates use Inquirer select with candidates, Enter Path, Cancel.
+- Create flow now defaults empty interactive input to `.env.enc`.
+- Create collisions in interactive mode show Override, Change Name, Cancel; override calls core create with `overwrite: true`.
+- Core create supports explicit `overwrite: true` while preserving duplicate guard by default.
+- Verification passed: `pnpm test`, `pnpm check`, `git diff --check`.
+- Next: Release UX Parity Phase 6, Guided Identity UX.
+
+2026-04-26 Release UX Parity Phase 6 complete:
+- Identity picker rows now render compactly as alias/name + handle + contextual tag, without full public-key dumping.
+- Guided grant picker keeps self/already-granted disabled and supports custom identity string.
+- Custom guided grant string now retries invalid input, imports the identity, then grants it.
+- Guided `identity import` now retries invalid identity strings in interactive mode; duplicate alias retry remains covered.
+- Guided `identity forget` now uses a picker over known identities only, with Cancel; it does not show self or payload identities.
+- Revoke picker remains payload-recipient-only and has no arbitrary identity-string entry.
+- Verification passed: `pnpm test`, `pnpm check`, `git diff --check`.
+- Next: Release UX Parity Phase 7 docs/final QA.
+
+2026-04-26 Release UX Parity Phase 7 complete:
+- `packages/cli/README.md` now documents `@effect/cli` grammar, Inquirer prompt stack, guided payload UX, guided identity UX, payload envelope, and machine stdout policy.
+- `packages/core/README.md` now documents core ownership of Better Age payload envelope parsing/formatting.
+- `docs/manual-qa.md` remains the release QA gate and records current human result as pending.
+- Automated verification passed: `pnpm test`, `pnpm check`, `git diff --check`.
+- Release readiness is not claimed until the user runs and passes manual QA.
+
+2026-04-26 QA follow-up fixes:
+- Fixed Node payload discovery: `.env.enc` now matches alongside `.env.*.enc`.
+- Compact identity output now avoids key/fingerprint fields in normal list, inspect, grant/revoke/forget picker rows; rows use display/alias + owner id + contextual tags.
+- Invalid edit save now logs `PAYLOAD_ENV_INVALID`, then shows Reopen Editor / Cancel while preserving edited text for reopen.
+- Specs/docs updated to clarify `.env.enc` discovery and invalid edit recovery.
+- Verification passed: `pnpm test`, `pnpm check`, `git diff --check`.
+
+2026-04-26 QA follow-up: immediate recoverable feedback:
+- Wrong passphrase retries now emit feedback immediately through `terminal.writeResult` in interactive sessions instead of buffering until menu return.
+- Invalid edit `.env` feedback now emits before the Reopen Editor / Cancel recovery menu.
+- Same immediate-feedback helper is used for guided invalid identity-string/alias retries and identity security passphrase retry/mismatch loops.
+- Direct/non-session callers without `writeResult` still receive buffered stderr in the returned result.
+- Verification passed: `pnpm test`, `pnpm check`, `git diff --check`.
+- Suggested next: use `domain-model` to re-grill target as "legacy feature parity unless explicitly deprecated", build parity matrix from legacy tests/specs/user QA, then implement with TDD plus real terminal/manual or PTY coverage.
+
+2026-04-26 Release UX parity hardening PRD:
+- Created `.llms/projects/4-cli-core-boundary-hardening/0-GRILL-ME-release-ux-parity-hardening.md`.
+- Created `.llms/projects/4-cli-core-boundary-hardening/13-PRD_RELEASE_UX_PARITY_HARDENING.md`.
+- Updated `CONTEXT.md` with terms for UX Parity Floor, Parity Matrix, Keyboard Select, Interactive Result Pause, Abort Signal, Payload Path Picker, Payload Creation Target, Identity Picker, Compact Identity Line, Guided Retry, Payload File Envelope.
+- Locked key release blockers: real `@effect/cli`; keyboard select everywhere; immediate interactive output; Ctrl-C abort 130; guided payload/identity pickers; visible guided retries; Better Age payload file envelope wrapping untouched age armor; manual QA as primary E2E gate.
+
+2026-04-26 Release UX parity hardening Phase 1 complete:
+- Created approved tracer plan at `.llms/projects/4-cli-core-boundary-hardening/plans/release-ux-parity-hardening.md`.
+- Added release UX parity matrix at `.llms/projects/4-cli-core-boundary-hardening/14-RELEASE_UX_PARITY_MATRIX.md`.
+- Expanded `docs/manual-qa.md` with release-blocking UX QA gate: keyboard navigation, Ctrl-C abort, immediate interactive feedback, guided suggestions, guided identity flows, payload envelope, machine stdout.
+- Removed markdown/docs contract testing after user correction; specs, PRDs, plans, and manual QA are review artifacts, not code-test targets.
+- Phase 1 acceptance criteria marked complete.
+
+2026-04-26 Release UX parity hardening Phase 2 complete:
+- Replaced the new CLI hand-rendered command/help/parser gate with a real `@effect/cli` command tree in `packages/cli/src/cli/commandGrammar.ts`.
+- `runCliWithGrammar` now lets `@effect/cli` own root/command help and parse validation, captures its stdout/stderr through `Console.withConsole`, provides `NodeContext.layer`, maps parser failures through the presenter, and delegates grammar-accepted commands to existing flow routing.
+- Promptable operands remain optional in the grammar for guided flows; strict `load --protocol-version` still fails before prompts.
+- Added explicit CLI dependencies on `@effect/platform` and `@effect/platform-node` through `pnpm`.
+- Updated command grammar and bundle smoke tests; removed the duplicate custom command-spec renderer.
+- Phase 2 acceptance criteria marked complete.
+
+2026-04-26 Release UX parity hardening Phase 3 complete:
+- Added `writeResult` and `waitForEnter` hooks to `CliTerminal`; interactive sessions now flush each command result immediately when a terminal writer exists instead of buffering until quit.
+- Interactive sessions pause only after primary stdout screens (for example guided identity export/list-style output), not after simple success/status stderr messages.
+- Interactive menu Ctrl-C is caught as `CliPromptCancelledError` and returns `[ERROR] CANCELLED` with exit code 130; it is not treated as Back.
+- Replaced `createNodeTerminal.selectOne` numbered readline UX with raw keypress selection using up/down/j/k, Enter to select, Escape/Ctrl-C to cancel, and raw-mode cleanup.
+- Node terminal now writes interactive command results directly to stdout/stderr; final CLI result remains empty for already-written interactive output to avoid delayed/duplicate messages.
+- Editor picker and update-required choices already flow through the same `selectOne` adapter, so they inherit keyboard navigation.
+- Phase 3 acceptance criteria marked complete.
+
+2026-04-26 CLI IO stack realignment PRD:
+- User caught that the custom raw-key select from Phase 3 redraws by appending frames instead of clearing/redrawing in place.
+- Research showed legacy used `@effect/cli/Prompt.select`; official `@inquirer/prompts` also provides polished prompt primitives and runtime context/cancel support.
+- Decision: stop before Phase 4 and write a new PRD to clean CLI implementation structure around `@effect/cli` for grammar, `@effect/platform/Terminal` for Effect terminal integration, and `@inquirer/prompts` for normal interactive IO.
+- Added `.llms/projects/4-cli-core-boundary-hardening/15-PRD_CLI_IO_STACK_REALIGNMENT.md`.
+- Direction: delete custom select renderer, centralize prompt adapter, keep raw stdout policies and isolated secure viewer, avoid fighting tools.
+
+2026-04-26 CLI IO stack realignment plan:
+- Added `.llms/projects/4-cli-core-boundary-hardening/plans/cli-io-stack-realignment.md`.
+- Six phases: Prompt Boundary And Dependency Spine; Inquirer Select As The Only Normal Picker; Inquirer Text/Password/Pause; Editor Flow Realignment; Secure Viewer And Machine Output Isolation; Release Plan Rebase And Cleanup.
+- This plan blocks returning to release UX parity Phase 4 Payload File Envelope.
+
+2026-04-26 Security release hardening grill opened:
+- User provided audit covering core/CLI/varlock security and maintainability risks.
+- New append-only log: `.llms/projects/7-security-release-hardening/0-GRILL-ME-security-release-hardening.md`.
+- No implementation yet; goal is deciding release blockers vs hardening vs separate identity signing project.
+- Initial likely release blockers: all-or-nothing passphrase change, typed corrupt-state failures, no-echo/no-length secret prompt, strict key/home permissions, viewer sanitization, editor temp hardening, passphrase policy, varlock rejected-promise retry, precise failure presentation, remove `Date.now()` fallback.
+- Major fork to grill first: whether full signed Identity V2 blocks MVP, or MVP can ship unsigned/TOFU with explicit key-update trust gate.
+
+2026-04-26 Security grill decision:
+- Full signed Identity V2 is out of scope for current release-hardening pass.
+- Current MVP can keep V1 unsigned/TOFU identities.
+- Small explicit trust gate for same-owner identity key/recipient updates is acceptable only if it fits cleanly; otherwise defer to V2 project.
+
+2026-04-26 Security grill constraint:
+- User rejected default generation-dir passphrase change if it needs deferred GC or changes stable key paths.
+- Main key path should be stable; passphrase change should preferably not mutate home state.
+- Need all-or-nothing design without hidden trash. Candidate: single stable encrypted local keyring artifact atomically replaced.
+
+2026-04-26 Security grill constraint update:
+- User also rejects a single keyring wrapper artifact.
+- Each private key must remain an individual age-protected key file for age interoperability.
+- Candidate now becomes bounded passphrase-change transaction/recovery around stable key paths, with temp/new/backup files cleaned synchronously or by explicit recovery before key use.
+
+2026-04-26 Security grill passphrase transaction direction:
+- User proposed naive backup/restore transaction with crash recovery.
+- Accepted concept, with safer ordering: prepare/write/verify all `.new` key files before moving stable files to `.bak`.
+- Recovery before any key read should restore `.bak` over stable paths, delete `.new`, remove marker, or fail closed with explicit transaction-incomplete error.
+
+2026-04-26 Security grill decision:
+- Passphrase change contract accepted: bounded backup/restore transaction.
+- Preserve individual age-encrypted key files and stable final paths.
+- No keyring wrapper, no generation directories, no deferred GC.
+- New files are prepared and verified before stable files move; transaction marker enables rollback before any future key read.
+
+2026-04-26 Security grill clarification:
+- Corrupt-state error topic maps to audit report item 2.
+- Report suggested `HOME_STATE_INVALID`, `PRIVATE_KEY_INVALID`, `ARTIFACT_UNSUPPORTED_VERSION`.
+- `KEY_TRANSACTION_INCOMPLETE` is new only because passphrase-change transaction/recovery now needs a typed fail-closed error when rollback cannot safely complete.
+
+2026-04-26 Security grill decision:
+- Add explicit `KEY_TRANSACTION_INCOMPLETE` typed failure.
+- Hardening corrupt-artifact set: `HOME_STATE_INVALID`, `PRIVATE_KEY_INVALID`, `ARTIFACT_UNSUPPORTED_VERSION`, `KEY_TRANSACTION_INCOMPLETE`.
+
+2026-04-26 Security grill decision:
+- Keep Inquirer for passphrase prompts; do not use custom `readHiddenSecret`.
+- Installed `@inquirer/password` supports `mask?: boolean | string`; `mask: false` gives transparent/no visible length echo.
+- Current CLI adapter type should be widened from `mask: string` to `boolean | string` or hidden behind adapter config.
+
+2026-04-26 Security grill decision:
+- Filesystem permissions auto-repair accepted.
+- Create/chmod home dir `0700`; key/temp files `0600`.
+- Existing loose home/key permissions should auto-chmod and emit warning/notice.
+- If chmod/repair fails, fail closed with typed storage/permission failure.
+
+2026-04-26 Security grill decision:
+- Secure viewer must escape/render control sequences visibly, not interpret or strip them.
+- Payload bytes remain unchanged; sanitization is display-only.
+- Newlines remain line breaks; ANSI/OSC/C0/DEL controls render as visible escapes like `\\x1b`, `\\r`, `\\x07`.
+
+2026-04-26 Security grill decision:
+- MVP editor hardening scope accepted: temp dir `0700`, temp file `0600`, random temp name, delete file on close, best-effort remove dir, document residual editor swap/backup/plugin risk.
+- Strict editor flags/in-process editor/encrypted temp file are deferred.
+
+2026-04-26 Security grill decision:
+- Passphrase policy: hard reject empty and length `< 8`.
+- Applies to setup and identity passphrase new passphrase flows.
+- No strength meter/warning-only path for MVP.
+
+2026-04-26 Security grill payload temp constraint:
+- User does not want `<payload>.tmp` style files living beside encrypted payloads.
+- Payload post-encrypt verification should be in-memory; temp only needed for atomic commit.
+- Candidate commit design: hidden staging dir in target parent, stage encrypted bytes only, rename to final, clean synchronously/best-effort.
+
+2026-04-26 Security grill payload temp constraint update:
+- User rejects any payload temp/staging files in cwd or subdirectories near payload, including hidden `.better-age-tmp`.
+- Portable atomic replace normally requires same-directory/same-filesystem staging; OS temp is not reliably atomic and Linux `O_TMPFILE` is not portable.
+- Likely MVP direction: in-memory post-encrypt verification only; do not add project-local staging for payload commits.
+
+2026-04-26 Security grill decision:
+- Payload writes get in-memory encrypt/decrypt/parse verification only.
+- No payload temp/staging files in user project/cwd/subdirs.
+- No `.better-age-tmp`, no `<payload>.tmp`, no atomic payload replace claim for MVP.
+
+2026-04-26 Security grill decision:
+- Payload decrypt/read should try current key first, then retired keys only if needed.
+- Corrupt/missing retired key should warn, not falsely return `PASSPHRASE_INCORRECT` or block current-key payload access.
+- If no usable key decrypts payload, return normal payload decrypt failure.
+
+2026-04-26 Security grill remaining defaults:
+- Keep load protocol plaintext stdout with required `--protocol-version=1`, stderr only for warnings/errors.
+- Fix varlock rejected-promise memoization now.
+- Document varlock custom `command` as trusted local config; structured command/args later.
+- Fix failure presenter fallback now.
+- Fix `Date.now()` fallback now.
+- Defer branded IDs and core export-path split unless trivial.
+
+2026-04-26 Security PRD/plan:
+- Created `.llms/projects/7-security-release-hardening/1-PRD_SECURITY_RELEASE_HARDENING.md`.
+- Created `.llms/projects/7-security-release-hardening/plans/security-release-hardening.md`.
+- Double-checked V1 identity key-update gate: fits via core `importKnownIdentity` plus CLI interactive retry/exact flag.
+- Updated backlog with deferred signed Identity V2, structured varlock launcher, strict editor mode, in-process editor, branded IDs, core export split, and rejected/deferred payload atomic staging.
+
+2026-04-26 Security Release Hardening Phase 1 complete:
+- Core now maps corrupt home state to `HOME_STATE_INVALID` and unsupported home-state versions to `ARTIFACT_UNSUPPORTED_VERSION` instead of leaking raw exceptions.
+- Core preserves `PRIVATE_KEY_INVALID` from private-key artifact parsing instead of collapsing it into `PASSPHRASE_INCORRECT`.
+- Core command/query boundaries catch known local artifact failures and return typed failures.
+- Payload creation no longer falls back to `Date.now()`; missing payload id port returns `PAYLOAD_ID_UNAVAILABLE`.
+- CLI presenter has explicit messages for new security/storage failures and unknown failure fallback now says `unmapped failure code <CODE>`.
+- Tests added for corrupt home state, unsupported version, invalid private key artifact, missing payload id port, CLI corrupt-state rendering, and unknown presenter fallback.
+
+2026-04-26 Security Release Hardening Phase 2 complete:
+- Inquirer password prompt now uses `mask: false`, preserving the prompt library while avoiding length echo.
+- New passphrases shorter than 8 chars are rejected in setup and identity passphrase flows with interactive retry feedback.
+- Node home repository enforces/repairs private home/key permissions: home/key dirs `0700`, key temp/final files `0600`.
+- Existing loose home/key permissions are auto-repaired and surfaced as `LOCAL_PERMISSIONS_REPAIRED` notices.
+- Permission repair failure is mapped as `LOCAL_PERMISSION_REPAIR_FAILED` and has CLI presenter text.
+- Real adapter integration tests cover strict created modes and loose permission repair before key read.
+
+2026-04-26 Security Release Hardening Phase 3 complete:
+- Passphrase change now decrypts all old key files, re-encrypts all new blobs, and verifies the new blobs before any key write.
+- Core commits prepared passphrase-change keys through `replaceEncryptedPrivateKeys`, then re-reads stable files and verifies they decrypt with the new passphrase.
+- Node home repository implements key transaction commit with `.new` files, `.bak` backups, and `keys/.passphrase-change.json` marker.
+- Recovery runs before home/key reads and restores `.bak` over stable paths, removes `.new`, and deletes the marker.
+- Successful passphrase change removes marker/backups/new files synchronously.
+- Unit/integration tests cover no write before decrypt-all, rollback on storage failure, crash-marker recovery, and no transaction leftovers.
+
+2026-04-26 Security Release Hardening Phase 4 complete:
+- Payload create/edit/grant/revoke/update now encrypt next state in memory and decrypt/parse the encrypted result before writing.
+- Verification failure returns `PAYLOAD_WRITE_VERIFICATION_FAILED` and writes nothing.
+- Payload repository no longer writes `<payload>.tmp`; MVP payload writes are direct after in-memory verification only.
+- Payload reads try current key first, then retired keys lazily.
+- Corrupt/missing retired keys emit `RETIRED_KEY_UNREADABLE` warnings and do not become false `PASSPHRASE_INCORRECT`.
+- Verification passed: `pnpm -F @better-age/core test:unit -- BetterAgeCore.payload.test.ts`, `pnpm -F @better-age/core check`.
+
+2026-04-26 Security Release Hardening Phase 5 complete:
+- V1 identity reimport with same owner id + changed public key now fails with `IDENTITY_KEY_UPDATE_REQUIRES_TRUST` unless explicitly trusted.
+- Failure details include owner id plus old/new fingerprints for CLI confirmation.
+- Alias-only and unchanged-key imports continue without trust.
+- CLI supports `--trust-key-update` for exact/headless import.
+- Interactive import confirms old/new key fingerprints and retries with trust; custom guided grant identity import uses same gate.
+- Verification passed: `pnpm -F @better-age/cli test:unit -- runCli.test.ts commandGrammar.test.ts`, `pnpm -F @better-age/core check`, `pnpm -F @better-age/cli check`.
+
+2026-04-26 Security Release Hardening Phase 6 complete:
+- Secure viewer now renders C0/DEL/C1 control characters visibly (for example `\\x1b`, `\\x07`, `\\r`) before writing frames to stderr.
+- Viewer sanitization is display-only at viewer state/render boundary; payload content is not mutated.
+- Default editor temp creation now uses a private temp dir, random temp filename, `0600` file mode, and existing cleanup still removes file/dir after editor exit.
+- CLI docs now describe external-editor plaintext residual risk.
+- Varlock runtime clears cached load promise on rejection, preserving only successful per-process memoization.
+- Varlock docs now state plaintext stdout/stderr policy, retry behavior, and trusted-local `command=` assumption.
+- Verification passed: `pnpm -F @better-age/cli test:unit -- secureViewer.test.ts nodeEditor.test.ts`, `pnpm -F @better-age/varlock test:unit -- createBetterAgeRuntime.test.ts`, `pnpm -F @better-age/cli check`, `pnpm -F @better-age/varlock check`.
+
+2026-04-26 Security Release Hardening Phase 7 complete:
+- `docs/manual-qa.md` now includes security QA for editor temp cleanup/risk, viewer control-character escaping, V1 identity trust gate, and varlock failed-load retry.
+- Security release hardening plan checkboxes are complete.
+- Deferred/off-scope work remains parked in `.llms/memory/backlog.txt`, including signed Identity V2, structured varlock launcher, strict/in-process editor, branded IDs, core export split, and payload atomic replace.
+- Full verification passed: `pnpm test`, `pnpm check`, `git diff --check`.
+- Release readiness is still pending user manual QA; do not claim released/ready until user QA passes.
+
+2026-04-27 Security review follow-up:
+- Fixed `replaceEncryptedPrivateKeys` mixed-passphrase risk during backup cleanup.
+- Transaction marker deletion is now the commit point; `.bak` cleanup runs best-effort afterward and cannot trigger rollback.
+- Added adapter regression test proving backup cleanup failure still leaves all stable keys on the new committed blobs and marker removed.
+- Verification passed: `pnpm -F @better-age/core test:unit -- RealCoreAdapters.transaction.test.ts`, `pnpm -F @better-age/core check`, `git diff --check`.
+
+2026-04-27 Security review follow-up:
+- Fixed private key ref path traversal risk.
+- Home-state schema now accepts only `keys/<safe>.age` private key refs and rejects traversal, absolute paths, nested paths, spaces, and wrong extensions.
+- Node home repository also validates direct port refs before read/write/replace/recovery path joins.
+- Added parser and adapter regression tests for malicious refs.
+- Verification passed: `pnpm -F @better-age/core test:unit -- ArtifactDocument.test.ts RealCoreAdapters.transaction.test.ts`, `pnpm -F @better-age/core check`, `git diff --check`.
+
+2026-04-27 Security review follow-up:
+- Added deferred backlog item for future `identity health` / repair command to inspect missing/corrupt key refs and explicitly forget missing retired-key refs.
+- Fixed missing key file handling: missing current key now returns `LOCAL_KEY_MISSING` instead of crashing or becoming `PASSPHRASE_INCORRECT`.
+- Node home repository maps missing key file `ENOENT` to `LOCAL_KEY_MISSING`.
+- Core maps `LOCAL_KEY_MISSING` as known failure and preserves it through passphrase/decrypt helper paths.
+- Tests cover rotate, verify passphrase, passphrase change, and direct adapter missing-key reads.
+- Verification passed: `pnpm -F @better-age/core test:unit -- RealCoreAdapters.transaction.test.ts BetterAgeCore.test.ts BetterAgeCore.payload.test.ts`, `pnpm -F @better-age/core check`, `git diff --check`.
+
+2026-04-27 Security review follow-up:
+- Fixed untrusted identity display-name terminal injection in CLI human output.
+- Added `sanitizeTerminalText` at presenter boundary for identity lists, payload inspect, success/warning/error/parse messages.
+- Interactive `selectOne` labels and identity row labels are sanitized before reaching prompt adapters.
+- Tests cover malicious identity display names in identity list, payload inspect, and guided grant picker labels.
+- Verification passed: `pnpm -F @better-age/cli test:unit -- runCli.test.ts presenter.test.ts`, `pnpm -F @better-age/cli check`, `git diff --check`.
+
+2026-04-27 Security review follow-up:
+- Fixed non-atomic encrypted payload writes.
+- Payload repository now writes encrypted output to same-directory `<target>.tmp`, then renames over the target.
+- If rename/write fails, temp cleanup is best-effort and the old payload remains untouched when rename fails.
+- No plaintext temp file is introduced; temp contains the final encrypted wrapper.
+- Tests cover write-temp-then-rename and cleanup after rename failure.
+- Verification passed: `pnpm -F @better-age/core test:unit -- RealCoreAdapters.transaction.test.ts`, `pnpm -F @better-age/core check`, `git diff --check`.
+
+2026-04-27 Documentation alignment pass:
+- Updated root/package docs, context, ubiquitous language, contributor schema guide, manual QA, ADR note, notices, and legacy disclaimers.
+- Docs now reflect current commands (`bage identity export/import`, `better-age://identity/v1/...`), Effect CLI/Inquirer stack, hidden no-length passphrase prompts, 8-char passphrase minimum, V1 trusted key update gate, payload `.env.enc` discovery, encrypted `<payload>.tmp` rename writes, key transaction recovery, key ref guard, terminal-safe rendering, and private file permissions.
+- Schema-change guide now points to current core files/tests instead of old `packages/cli/src/domain`/`app` paths.
+- Verification passed: `pnpm check`, `git diff --check`.
