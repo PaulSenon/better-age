@@ -145,6 +145,34 @@ Lists your self identity, known identities, and retired keys.
 bage identity list
 ```
 
+### List local key files
+
+Lists the local current and retired key files.
+
+```sh
+bage identity keys [--current | --retired] [--path]
+```
+
+By default, this prints a human-readable view:
+
+```txt
+Current key
+  fp_current  /home/you/.better-age/keys/fp_current.age
+
+Retired keys
+  fp_old  2026-04-25T12:00:00.000Z  /home/you/.better-age/keys/fp_old.age
+```
+
+Use `--current` or `--retired` to filter the list.
+
+Use `--path` when a shell command needs only paths:
+
+```sh
+bage identity keys --current --path
+```
+
+`--path` writes absolute paths to stdout, one per line. `--current --retired` is invalid because the filters are mutually exclusive.
+
 ### Forget identity
 
 Removes a known identity from local home state.
@@ -209,4 +237,4 @@ Interactive mode excludes `load`; use `load` directly when a machine needs stdou
 - Passphrases are prompted interactively.
 - `NO_COLOR` disables ANSI color.
 - Human messages, prompts, warnings, errors, editor UI, and viewer UI stay off stdout.
-- `load` and `identity export` are the main machine-readable stdout surfaces.
+- `load`, `identity export`, and `identity keys --path` are the main machine-readable stdout surfaces.
