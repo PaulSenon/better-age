@@ -1,4 +1,7 @@
 export const appName = "better-age";
+export const siteUrl = "https://bage.paulsenon.com";
+export const siteDescription =
+  "Local-first encrypted .env sharing for small teams.";
 export const docsRoute = "/docs";
 export const docsImageRoute = "/og/docs";
 export const docsContentRoute = "/llms.mdx/docs";
