@@ -1,6 +1,16 @@
 This project is built on:
 - [age](https://github.com/FiloSottile/age), is licensed under the [BSD 3-Clause License](https://github.com/FiloSottile/age/blob/main/LICENSE)
 - [effect](https://effect.website/), licensed under the [MIT License](https://github.com/Effect-TS/effect/blob/main/LICENSE)
+- [@effect/cli](https://github.com/Effect-TS/effect), licensed under the MIT License
+- [@effect/platform](https://github.com/Effect-TS/effect), licensed under the MIT License
+- [@effect/platform-node](https://github.com/Effect-TS/effect), licensed under the MIT License
+- [@inquirer/prompts](https://github.com/SBoudrias/Inquirer.js), licensed under the MIT License
+- [varlock](https://github.com/dmno-dev/varlock), licensed under the MIT License
+- [esbuild](https://github.com/evanw/esbuild), licensed under the MIT License
+- [vitest](https://github.com/vitest-dev/vitest), licensed under the MIT License
+- [Biome](https://biomejs.dev/), licensed under MIT OR Apache-2.0
+- [TypeScript](https://www.typescriptlang.org/), licensed under Apache-2.0
+- [rimraf](https://github.com/isaacs/rimraf), licensed under BlueOak-1.0.0
 - [node](https://nodejs.org/en), licensed under [This License](https://github.com/nodejs/node/blob/main/LICENSE)
 
 ## age license
