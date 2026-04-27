@@ -1,0 +1,37 @@
+{
+	"$schema": "./node_modules/@effect/language-service/schema.json",
+	"compilerOptions": {
+		"target": "ES2024",
+		"module": "NodeNext",
+		"moduleResolution": "NodeNext",
+		"plugins": [
+			{
+				"name": "@effect/language-service",
+				"diagnosticsName": true,
+				"includeSuggestionsInTsc": true,
+				"ignoreEffectErrorsInTscExitCode": false,
+				"ignoreEffectSuggestionsInTscExitCode": true,
+				"ignoreEffectWarningsInTscExitCode": false,
+				"namespaceImportPackages": ["effect", "@effect/*"]
+			}
+		],
+		"strict": true,
+		"noUncheckedIndexedAccess": true,
+		"exactOptionalPropertyTypes": true,
+		"skipLibCheck": true,
+		"declaration": false,
+		"sourceMap": true,
+		"esModuleInterop": true,
+		"allowSyntheticDefaultImports": true,
+		"resolveJsonModule": true,
+		"types": ["node", "vitest/globals"]
+	},
+	"include": [
+		"src/**/*.ts",
+		"test/**/*.ts",
+		"vitest.config.ts",
+		"vitest.unit.config.ts",
+		"vitest.integration.config.ts",
+		"vitest.e2e.config.ts"
+	]
+}
