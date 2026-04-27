@@ -1,0 +1,29 @@
+---
+title: me
+description: Print the shareable identity string for the current local identity.
+---
+
+## Purpose
+
+`me` exports the versioned identity string for the current local self identity.
+
+That string is what teammates can save with `add-identity`.
+
+## Example
+
+```sh
+bage me
+```
+
+## Output
+
+- writes the identity string to `stdout`
+- fails if local setup has not happened yet
+
+## Common use
+
+Typical flow:
+
+1. run `bage setup`
+2. run `bage me`
+3. send the resulting identity string to someone who will grant access on a payload
