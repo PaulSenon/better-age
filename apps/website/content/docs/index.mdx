@@ -1,0 +1,90 @@
+---
+title: Docs
+description: Start here for the product stance, installation path, workflows, integrations, and reference.
+---
+
+better-age is a local-first workflow for encrypted `.env` payloads.
+
+It is built around one narrow job:
+
+- create one visible encrypted payload file
+- edit and read it locally
+- grant or revoke recipients explicitly
+- keep machine loading explicit
+
+## Start here
+
+If you just want first success, start with setup:
+
+```sh
+npx @better-age/cli setup
+```
+
+Then move through:
+
+- [Vision](/docs/getting-started/vision)
+- [Installation](/docs/getting-started/installation)
+- [Quickstart](/docs/getting-started/quickstart)
+
+That path is the intended onboarding order. Read the why first, install second, then run the smallest end to end flow.
+
+The core happy path stays small:
+
+```sh
+bage create .env.prod.enc
+bage edit .env.prod.enc
+bage grant .env.prod.enc teammate#0123abcd
+bage view .env.prod.enc
+bage load --protocol-version=1 .env.prod.enc
+```
+
+## Main sections
+
+<Cards>
+  <Card
+    title="Getting Started"
+    href="/docs/getting-started"
+    description="Product stance, installation, and the shortest path to first success."
+  />
+  <Card
+    title="Guides"
+    href="/docs/guides"
+    description="Task-first workflow docs for create, grant, revoke, and machine loading."
+  />
+  <Card
+    title="Integrations"
+    href="/docs/integrations"
+    description="How better-age fits into adjacent tooling, especially varlock."
+  />
+  <Card
+    title="Reference"
+    href="/docs/reference"
+    description="Command groups, plugin contract, and granular lookup pages."
+  />
+</Cards>
+
+## Search and AI surfaces
+
+- search is built into the docs shell for fast page lookup
+- `/llms.txt` exposes the docs index for AI tooling
+- `/llms-full.txt` exposes a fuller concatenated text surface
+- each docs page also has a markdown-friendly export path
+
+These surfaces are intentionally part of the site contract, not incidental extras.
+
+## Product stance
+
+- `age` is the primitive
+- `better-age` is the UX layer
+- scope stays narrow on env files, not generic secret management
+- `view` is the human plaintext path
+- `load` is the machine plaintext path
+
+## What to read next
+
+1. If you want the why, read [Vision](/docs/getting-started/vision).
+2. If you want to install fast, read [Installation](/docs/getting-started/installation).
+3. If you want the end-to-end shape, read [Quickstart](/docs/getting-started/quickstart).
+4. If you want deeper task docs, continue into [Guides](/docs/guides).
+5. If you use varlock, jump to [Varlock integration](/docs/integrations/varlock).
+6. If you contribute docs, read [Editorial conventions](/docs/reference/editorial-conventions).

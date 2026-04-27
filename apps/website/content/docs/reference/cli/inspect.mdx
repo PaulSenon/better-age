@@ -1,0 +1,32 @@
+---
+title: inspect
+description: Read payload metadata, recipients, and env key names without opening plaintext content.
+---
+
+## Purpose
+
+`inspect` is the non-secret inspection path for a payload.
+
+## Example
+
+```sh
+bage inspect .env.prod.enc
+```
+
+## Output includes
+
+- payload path
+- payload version
+- payload id
+- created and rewritten timestamps
+- recipient list
+- env key names
+- whether update is required
+
+## Behavior
+
+- prompts for passphrase
+- warns on `stderr` when the payload should be updated
+- can guide path selection in interactive use
+
+Use `inspect` when you need metadata without opening plaintext env values.

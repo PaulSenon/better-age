@@ -1,0 +1,33 @@
+---
+title: load
+description: Decrypt a payload for machine consumption through the versioned load protocol.
+---
+
+## Purpose
+
+`load` is the machine plaintext path.
+
+It decrypts one payload and writes raw `.env` text to `stdout`.
+
+## Example
+
+```sh
+bage load --protocol-version=1 .env.prod.enc
+```
+
+## Required flag
+
+`load` requires `--protocol-version=1`.
+
+If the flag is missing or unsupported, the command fails instead of guessing.
+
+## Behavior
+
+- prompts for passphrase
+- writes env text to `stdout`
+- may warn on `stderr` when the payload should be updated
+- fails distinctly for invalid format, decrypt failure, or newer unsupported payload versions
+
+## Why this exists
+
+Other tools, especially the varlock plugin, depend on this explicit contract instead of the human viewer path.
