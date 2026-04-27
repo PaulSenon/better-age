@@ -5,7 +5,7 @@ export const docsContentRoute = "/llms.mdx/docs";
 
 // TODO: replace with the real repo once website work is published.
 export const gitConfig = {
-  user: "isaac",
+  user: "PaulSenon",
   repo: "better-age",
   branch: "main",
 };
