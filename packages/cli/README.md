@@ -1,160 +1,193 @@
 # @better-age/cli
 
-Main `better-age` CLI package. It exposes the `bage` command.
+Release-facing `bage` CLI for Better Age.
 
-For project pitch and rationale:
-- [../../README.md](../../README.md)
-- [../../VISION.md](../../VISION.md)
-- [../../UBIQUITOUS_LANGUAGE.md](../../UBIQUITOUS_LANGUAGE.md)
+Responsibilities:
 
-## What it does
+- exact and guided command execution
+- interactive/headless terminal policy
+- hidden passphrase prompts
+- editor, secure viewer, and picker flows
+- human stderr presentation
+- clean machine stdout for `load` and `identity export`
 
-`bage` is a local-first CLI for encrypted `.env` payloads.
+## Install / Build
 
-Core jobs:
-- create one encrypted env file
-- edit it safely
-- view secrets as a human through a secure viewer
-- load secrets for machines through an explicit protocol
-- grant and revoke recipients explicitly
-
-## Mental model
-
-There are 3 core things:
-- one local identity
-- one encrypted payload file
-- two separate plaintext paths: `view` for humans, `load` for machines
-
-Identity setup gives you:
-- stable `ownerId`
-- current keypair
-- passphrase-protected private key
-- display name
-- key mode `pq-hybrid`
-
-Payload truth lives in the payload itself:
-- recipients
-- payload metadata
-- encrypted env text
-
-## Command groups
-
-```txt
-# file related
-bage create
-bage edit
-bage grant
-bage inspect
-bage load --protocol-version=1
-bage revoke
-bage update
-bage view
-
-# identity related
-bage identity export
-bage identity forget
-bage identity import
-bage identity list
-bage identity passphrase # alias "pw" | "pass"
-bage identity rotate
-
-# first time setup
-bage setup
-
-# interractive mode
-bage interactive # alias "i"
-```
-
-## Quick start
-
-Examples assume `bage` is invokable in your shell.
+Install workspace dependencies from the repository root:
 
 ```sh
-bage setup
-bage create .env.prod.enc
-bage edit .env.prod.enc
-bage add-identity 'better-age://identity/v1/<base64url-json>'
-bage grant .env.prod.enc teammate#0123abcd
-bage view .env.prod.enc
-bage load --protocol-version=1 .env.prod.enc
+pnpm install
 ```
 
-## Command notes
-
-`setup`
-- creates local identity state
-- requires a passphrase
-- accepts optional `--alias`, which currently sets the display name
-
-`interactive`
-- guided keyboard-first entrypoint
-- good default for human usage
-
-`view`
-- human-only plaintext path
-- uses secure in-process viewer
-- must not fall back to plaintext `stdout`
-
-`load`
-- machine-only plaintext path
-- requires `--protocol-version=1`
-- prints raw `.env` to `stdout`
-- may warn on `stderr` when payload needs `update`
-
-`update`
-- explicit maintenance command
-- refreshes a stale self recipient entry and future schema migrations
-- should not hide mutation in non-interactive flows
-
-## Resolution rules
-
-Identity references resolve in this order:
-1. full identity string
-2. exact local alias
-3. exact handle
-4. exact display name if unique
-5. otherwise fail with candidate handles
-
-## Failure examples
-
-Missing setup:
-
-```txt
-No local self identity found
-Run: bage setup
-```
-
-Missing load protocol:
-
-```txt
-Missing required protocol version
-Run with: --protocol-version=1
-```
-
-Payload needs maintenance:
-
-```txt
-Warning: payload should be updated
-Run: bage update .env.prod.enc
-```
-
-Secure viewer unavailable:
-
-```txt
-Cannot open secure viewer in current environment
-Use an interactive terminal
-```
-
-## Development
-
-Repo-local commands:
+Build the standalone CLI artifact:
 
 ```sh
 pnpm -F @better-age/cli build
-pnpm -F @better-age/cli check
-pnpm -F @better-age/cli test
 ```
 
-Longer specs and plans:
-- [../../.llms/projects/0-cli-mvp/1-BETTER_AGE_V0_SPEC.md](../../.llms/projects/0-cli-mvp/1-BETTER_AGE_V0_SPEC.md)
-- [test/README.md](test/README.md)
+Build output:
+
+```txt
+packages/cli/dist/bage
+```
+
+The package `bin` points to that standalone bundled file.
+
+## Command List
+
+```txt
+bage create [payload]
+bage edit [payload]
+bage grant [payload] [identity-ref]
+bage inspect [payload]
+bage load [payload] --protocol-version=1
+bage revoke [payload] [identity-ref]
+bage update [payload]
+bage view [payload]
+
+bage identity export
+bage identity forget [identity-ref]
+bage identity import [identity-string] [--alias <alias>] [--trust-key-update]
+bage identity list
+bage identity passphrase
+bage identity pass
+bage identity pw
+bage identity rotate
+
+bage setup [--name <display-name>]
+bage interactive
+bage i
+```
+
+Promptable operands are optional in the grammar. In an interactive terminal,
+missing payloads, identities, and setup names can be requested by the command
+flow. Protocol inputs stay strict; `load` requires `--protocol-version=1`.
+
+Command grammar, help, and parser errors are owned by `@effect/cli`. Normal
+interactive prompts are backed by `@inquirer/prompts`; custom terminal handling
+is limited to the secure viewer and final stdout/stderr writing.
+
+## Examples
+
+```sh
+bage setup --name Isaac
+bage create .env.prod.enc
+bage edit .env.prod.enc
+bage identity import 'better-age://identity/v1/...' --alias ops
+bage identity import 'better-age://identity/v1/...' --trust-key-update
+bage grant .env.prod.enc ops
+bage inspect .env.prod.enc
+bage view .env.prod.enc
+bage load .env.prod.enc --protocol-version=1
+```
+
+Interactive launcher:
+
+```sh
+bage interactive
+```
+
+## Machine Output Policy
+
+- `bage load --protocol-version=1 <payload>` writes raw `.env` text to stdout.
+- `bage identity export` writes the public identity string to stdout.
+- Prompts, warnings, errors, success messages, viewer UI, and editor UI are not
+  written to stdout.
+- Human output goes to stderr and may use ANSI color when stderr is a TTY.
+- `NO_COLOR` disables ANSI color.
+
+## Runtime Behavior
+
+- Passphrases are prompted only in interactive terminals. Prompt input is hidden
+  without echoing mask characters, so passphrase length is not displayed.
+- New passphrases must be at least 8 characters.
+- Headless payload reads fail fast because MVP has no passphrase injection
+  mechanism.
+- Missing existing payload paths discover `.env.enc` and `.env.*.enc` in the current directory.
+- Payload creation suggests `.env.enc`; collisions offer Override, Change Name,
+  and Cancel in interactive mode.
+- Grant merges payload recipients, known identities, aliases, and self into one
+  picker. Self and already granted identities are visible but disabled.
+- Grant can import a pasted identity string before granting it.
+- Revoke lists only actual payload recipients and never offers arbitrary identity
+  string entry.
+- `identity forget` lists known identities only and never changes payload files.
+- Guided identity import retries invalid strings and duplicate aliases.
+- Reimporting a known owner with a changed public key requires explicit trust.
+  Interactive mode asks for confirmation with old/new fingerprints; exact mode
+  requires `--trust-key-update`.
+- Recoverable prompt-loop feedback, such as wrong passphrases or invalid edited
+  `.env` content, is printed immediately in interactive sessions instead of
+  being buffered until the command returns to the menu.
+- `edit` resolves `$VISUAL`, then `$EDITOR`, then remembered editor preference,
+  then interactive editor picker.
+- External editor mode necessarily writes plaintext to a private temp file while
+  the editor runs. Better Age uses a private temp directory, a random temp file
+  name, `0600` file permissions, and deletes the file afterward, but editor
+  swap files, backups, crash recovery, plugins, or shell tooling can still leave
+  residual plaintext outside Better Age's control.
+- Invalid edited `.env` content logs the validation failure, then offers Reopen
+  Editor or Cancel while preserving the edited text for retry.
+- `view` uses an in-process secure viewer with keyboard scrolling and quit.
+  Control characters are rendered visibly, not interpreted by the terminal.
+- `interactive` opens a setup-aware menu loop. It excludes `load` and
+  `interactive` from menus.
+
+## Local Security And Durability
+
+- Home state and encrypted private key files are written under private
+  filesystem permissions where supported.
+- Loose home/key permissions are repaired before use and surfaced as notices.
+- Private key refs are constrained to `keys/<safe-name>.age`.
+- Passphrase changes prepare and verify all replacement key blobs before
+  committing. A transaction marker lets the next read recover if a crash
+  interrupts the replace.
+- Payload writes encrypt and verify in memory, then write the encrypted wrapper
+  to `<payload>.tmp` in the same directory and rename it over the target.
+  Cleanup removes the temp file on failure when possible.
+- Human-rendered identity/display text is sanitized before terminal output.
+
+## Payload File Format
+
+Payload files are readable wrapper files around untouched age armor:
+
+```txt
+# better-age encrypted env payload
+# Docs: https://github.com/better-age/better-age
+# This file is safe to commit only if your policy allows encrypted secrets.
+# Do not edit the armored block manually.
+
+-----BEGIN BETTER AGE PAYLOAD-----
+-----BEGIN AGE ENCRYPTED FILE-----
+...
+-----END AGE ENCRYPTED FILE-----
+-----END BETTER AGE PAYLOAD-----
+```
+
+`load`, `view`, `inspect`, and write commands extract the inner age armor before
+decrypting. Missing, duplicated, malformed, or non-age-armored Better Age blocks
+fail clearly.
+
+## Known Limitations
+
+- Docker and pseudo-TTY E2E are deferred.
+- Interactive terminal behavior is covered by unit/contract tests plus the
+  repository manual QA checklist.
+- The MVP targets Unix-like terminals.
+- Headless secret injection is out of scope.
+
+## Development
+
+```sh
+pnpm -F @better-age/cli test
+pnpm -F @better-age/cli check
+pnpm -F @better-age/cli build
+```
+
+Manual QA:
+
+- [../../docs/manual-qa.md](../../docs/manual-qa.md)
+
+Implementation plan source:
+
+- [../../.llms/projects/4-cli-core-boundary-hardening/plans/runtime-cli-release-readiness.md](../../.llms/projects/4-cli-core-boundary-hardening/plans/runtime-cli-release-readiness.md)

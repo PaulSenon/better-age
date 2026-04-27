@@ -1,32 +1,29 @@
 {
-	"name": "@better-age/varlock",
+	"name": "@better-age/core",
 	"version": "0.0.1",
 	"type": "module",
-	"files": [
-		"dist"
-	],
 	"exports": {
-		"./plugin": "./dist/plugin.cjs"
+		".": "./src/index.ts"
 	},
 	"scripts": {
-		"build": "rimraf ./dist && node ./esbuild.config.mjs",
-		"clean": "rimraf ./dist",
 		"lint": "biome check .",
+		"lint:fix": "biome check . --write",
 		"typecheck": "tsc --noEmit",
 		"check": "pnpm run lint && pnpm run typecheck",
 		"test:unit": "vitest run -c vitest.unit.config.ts",
 		"test:integration": "vitest run -c vitest.integration.config.ts",
 		"test": "pnpm run test:unit && pnpm run test:integration"
 	},
+	"dependencies": {
+		"age-encryption": "^0.3.0",
+		"effect": "^3.21.2"
+	},
 	"devDependencies": {
 		"@biomejs/biome": "2.4.10",
-		"@types/node": "^25.5.2",
-		"esbuild": "^0.28.0",
-		"rimraf": "catalog:",
-		"typescript": "catalog:",
+		"@effect/language-service": "^0.85.1",
+		"@effect/vitest": "^0.29.0",
+		"@types/node": "^25.6.0",
+		"typescript": "^6.0.3",
 		"vitest": "^3.2.4"
-	},
-	"dependencies": {
-		"varlock": "^0.9.0"
 	}
 }

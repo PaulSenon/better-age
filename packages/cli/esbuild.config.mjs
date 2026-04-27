@@ -1,16 +1,25 @@
+import { chmod } from "node:fs/promises";
 import { build } from "esbuild";
 
+const outfile = "dist/bage";
+
 await build({
-	entryPoints: ["src/cli/main.ts"],
-	outfile: "dist/cli.cjs",
-	bundle: true,
-	platform: "node",
-	minify: true,
-	format: "cjs",
-	target: "node24",
-	sourcemap: true,
 	banner: {
-		js: "#!/usr/bin/env node",
+		js: [
+			"#!/usr/bin/env node",
+			'import { createRequire as __createRequire } from "node:module";',
+			"const require = __createRequire(import.meta.url);",
+		].join("\n"),
 	},
+	bundle: true,
+	entryPoints: ["src/bin/bage.ts"],
 	external: [],
+	format: "esm",
+	minify: true,
+	outfile,
+	platform: "node",
+	sourcemap: false,
+	target: "node24",
 });
+
+await chmod(outfile, 0o755);
