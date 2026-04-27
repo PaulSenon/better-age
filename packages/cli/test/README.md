@@ -1,22 +1,11 @@
 # Tests
 
-This package uses 3 test tiers.
+Target test tiers for the new CLI package:
 
-- `src/**/*.test.ts`
-  - colocated unit tests
-  - pure domain tests and narrow app-service tests
-  - fast, deterministic, no built artifact
-- `test/integration/**/*.integration.test.ts`
-  - source-level integration tests across real adapters and layers
-  - no built CLI artifact
-- `test/e2e/**/*.e2e.test.ts`
-  - black-box CLI tests
-  - must execute `dist/cli.cjs`
-  - must execute in the `rivetkit/agent-os` VM harness
-  - must build before running
+- command contract tests
+- stdout/stderr routing tests
+- exact/guided/headless behavior tests
+- prompt/editor/viewer port tests
+- presenter message and style-intent tests
 
-Rules:
-- unit fixtures live next to the unit tests that own them
-- integration fixtures live under `test/integration/**/fixtures`
-- e2e fixtures live under `test/e2e/**/fixtures`
-- do not recreate a generic `test/support` bucket
+Prefer message ids and semantic style tokens over brittle raw ANSI snapshots.
