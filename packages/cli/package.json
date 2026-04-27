@@ -5,8 +5,14 @@
 	"bin": {
 		"bage": "./dist/bage"
 	},
+	"files": [
+		"dist"
+	],
 	"scripts": {
+		"pack": "pnpm pack --pack-destination ./dist",
 		"build": "rimraf ./dist && node ./esbuild.config.mjs",
+		"clean": "rimraf ./dist",
+		"prepare": "effect-language-service patch",
 		"lint": "biome check .",
 		"lint:fix": "biome check . --write",
 		"typecheck": "tsc --noEmit",
@@ -14,15 +20,14 @@
 		"test:unit": "vitest run -c vitest.unit.config.ts",
 		"test": "pnpm run test:unit"
 	},
-	"dependencies": {
+	"dependencies": {},
+	"devDependencies": {
 		"@better-age/core": "workspace:*",
 		"@effect/cli": "^0.75.1",
 		"@effect/platform": "^0.96.0",
 		"@effect/platform-node": "^0.106.0",
 		"@inquirer/prompts": "^8.4.2",
-		"effect": "^3.21.2"
-	},
-	"devDependencies": {
+		"effect": "^3.21.2",
 		"@biomejs/biome": "2.4.10",
 		"@effect/language-service": "^0.85.1",
 		"@effect/vitest": "^0.29.0",
