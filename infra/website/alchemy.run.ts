@@ -19,7 +19,7 @@ export const website = await Website("doc", {
 	assets: ".output/public",
 	spa: true,
 	adopt: true,
-	domains: isProd ? ["bage.isaaac.dev"] : undefined,
+	domains: isProd ? ["bage.paulsenon.com"] : undefined,
 	url: !isProd,
 });
 
