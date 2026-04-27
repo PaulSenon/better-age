@@ -3,6 +3,11 @@
 	"version": "0.0.1",
 	"type": "module",
 	"private": true,
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/PaulSenon/better-age.git",
+		"directory": "packages/core"
+	},
 	"exports": {
 		".": "./src/index.ts"
 	},

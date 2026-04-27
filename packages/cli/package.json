@@ -5,6 +5,11 @@
 	"bin": {
 		"bage": "./dist/bage"
 	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/PaulSenon/better-age.git",
+		"directory": "packages/cli"
+	},
 	"files": [
 		"dist"
 	],
