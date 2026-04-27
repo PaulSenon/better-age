@@ -12,6 +12,9 @@ const protocolVersion = Options.text("protocol-version");
 const optionalAlias = Options.optional(Options.text("alias"));
 const optionalName = Options.optional(Options.text("name"));
 const trustKeyUpdate = Options.boolean("trust-key-update");
+const currentKeyOnly = Options.boolean("current");
+const retiredKeysOnly = Options.boolean("retired");
+const keyPathsOnly = Options.boolean("path");
 
 const noOp = () => Effect.void;
 
@@ -59,6 +62,11 @@ const identityCommand = Command.make("identity").pipe(
 		Command.make("list", {}, noOp).pipe(
 			Command.withDescription("List self, known identities, and retired keys."),
 		),
+		Command.make(
+			"keys",
+			{ current: currentKeyOnly, retired: retiredKeysOnly, path: keyPathsOnly },
+			noOp,
+		).pipe(Command.withDescription("List local identity key files.")),
 		Command.make("passphrase", {}, noOp).pipe(
 			Command.withDescription("Change the identity key passphrase."),
 		),

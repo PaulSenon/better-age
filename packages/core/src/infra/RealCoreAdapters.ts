@@ -520,9 +520,24 @@ export const createAgeIdentityCrypto = (): IdentityCryptoPort => ({
 			age.armor.decode(encryptedKey),
 			"text",
 		);
-		const parsed = parsePrivateKeyPlaintext(parseJson(decrypted));
+		const parsed = parsePrivateKeyPlaintext(decrypted);
 
 		if (Either.isLeft(parsed)) {
+			throw new Error("PRIVATE_KEY_INVALID");
+		}
+
+		let publicKey: string;
+
+		try {
+			publicKey = await age.identityToRecipient(parsed.right.privateKey);
+		} catch (cause) {
+			throw new Error("PRIVATE_KEY_INVALID", { cause });
+		}
+
+		if (
+			publicKey !== parsed.right.publicKey ||
+			fingerprintFromPublicKey(publicKey) !== parsed.right.fingerprint
+		) {
 			throw new Error("PRIVATE_KEY_INVALID");
 		}
 

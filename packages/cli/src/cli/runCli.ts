@@ -1,8 +1,11 @@
 import {
 	type PresentationStyle,
 	presentFailure,
+	presentIdentityKeyPaths,
+	presentIdentityKeys,
 	presentIdentityList,
 	presentIdentityString,
+	presentParseFailure,
 	presentPayloadInspect,
 	presentSuccess,
 	presentWarning,
@@ -64,6 +67,20 @@ type HomeStatus =
 type RetiredKey = {
 	readonly fingerprint: string;
 	readonly retiredAt: string;
+};
+
+type LocalKeys = {
+	readonly current: {
+		readonly fingerprint: string;
+		readonly encryptedPrivateKeyRef: string;
+		readonly createdAt: string;
+	};
+	readonly retired: ReadonlyArray<{
+		readonly fingerprint: string;
+		readonly encryptedPrivateKeyRef: string;
+		readonly createdAt: string;
+		readonly retiredAt: string;
+	}>;
 };
 
 type PayloadRecipient = {
@@ -211,6 +228,7 @@ export type CliCore = {
 		readonly listRetiredKeys: () => Promise<
 			CoreResponse<ReadonlyArray<RetiredKey>>
 		>;
+		readonly listLocalKeys: () => Promise<CoreResponse<LocalKeys>>;
 	};
 };
 
@@ -248,6 +266,7 @@ export type RunCliInput = {
 		identityString: string,
 	) => Promise<PublicIdentity | null>;
 	readonly discoverPayloadPaths?: () => Promise<ReadonlyArray<string>>;
+	readonly keyPathFromRef?: (ref: string) => string;
 	readonly payloadPathExists?: (path: string) => Promise<boolean>;
 	readonly terminal: CliTerminal;
 };
@@ -1586,6 +1605,53 @@ const runIdentityList = async (core: CliCore): Promise<RunCliResult> => {
 	});
 };
 
+const runIdentityKeys = async (
+	args: ParsedArgs,
+	input: RunCliInput,
+): Promise<RunCliResult> => {
+	const currentOnly = args.options.current === "true";
+	const retiredOnly = args.options.retired === "true";
+	const pathOnly = args.options.path === "true";
+
+	if (currentOnly && retiredOnly) {
+		return presentParseFailure(
+			"COMMAND_PARSE",
+			"choose --current or --retired, not both",
+		);
+	}
+
+	const listed = await input.core.queries.listLocalKeys();
+
+	if (listed.result.kind === "failure") {
+		return presentFailure(listed.result.code);
+	}
+
+	const keyPathFromRef = input.keyPathFromRef ?? ((ref: string) => ref);
+	const current = {
+		fingerprint: listed.result.value.current.fingerprint,
+		path: keyPathFromRef(listed.result.value.current.encryptedPrivateKeyRef),
+	};
+	const retired = listed.result.value.retired.map((key) => ({
+		fingerprint: key.fingerprint,
+		retiredAt: key.retiredAt,
+		path: keyPathFromRef(key.encryptedPrivateKeyRef),
+	}));
+
+	if (pathOnly) {
+		const paths = [
+			...(retiredOnly ? [] : [current.path]),
+			...(currentOnly ? [] : retired.map((key) => key.path)),
+		];
+
+		return presentIdentityKeyPaths(paths);
+	}
+
+	return presentIdentityKeys({
+		current: retiredOnly ? null : current,
+		retired: currentOnly ? [] : retired,
+	});
+};
+
 const runIdentityForget = async (
 	args: ParsedArgs,
 	input: RunCliInput,
@@ -1786,6 +1852,7 @@ const identitiesMenuChoices = [
 	choice("identity export"),
 	choice("identity import"),
 	choice("identity list"),
+	choice("identity keys"),
 	choice("identity forget"),
 	choice("identity passphrase"),
 	choice("identity rotate"),
@@ -1948,6 +2015,10 @@ const runCliUnstyled = async (input: RunCliInput): Promise<RunCliResult> => {
 
 	if (command === "identity" && subcommand === "list") {
 		return runIdentityList(input.core);
+	}
+
+	if (command === "identity" && subcommand === "keys") {
+		return runIdentityKeys(args, input);
 	}
 
 	if (command === "identity" && subcommand === "forget") {

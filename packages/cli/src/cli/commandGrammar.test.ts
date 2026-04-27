@@ -141,6 +141,15 @@ const makeCore = () => {
 				}),
 			listKnownIdentities: async () => success("KNOWN_IDENTITIES_LISTED", []),
 			listRetiredKeys: async () => success("RETIRED_KEYS_LISTED", []),
+			listLocalKeys: async () =>
+				success("LOCAL_KEYS_LISTED", {
+					current: {
+						fingerprint: "fp_self",
+						encryptedPrivateKeyRef: "keys/fp_self.age",
+						createdAt: "2026-04-25T10:00:00.000Z",
+					},
+					retired: [],
+				}),
 		},
 	};
 

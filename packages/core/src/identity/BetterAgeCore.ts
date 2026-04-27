@@ -75,6 +75,20 @@ export type RetiredKeySummary = {
 	readonly retiredAt: IsoUtcTimestamp;
 };
 
+export type LocalKeySummary = {
+	readonly current: {
+		readonly fingerprint: KeyFingerprint;
+		readonly encryptedPrivateKeyRef: EncryptedPrivateKeyRef;
+		readonly createdAt: IsoUtcTimestamp;
+	};
+	readonly retired: ReadonlyArray<{
+		readonly fingerprint: KeyFingerprint;
+		readonly encryptedPrivateKeyRef: EncryptedPrivateKeyRef;
+		readonly createdAt: IsoUtcTimestamp;
+		readonly retiredAt: IsoUtcTimestamp;
+	}>;
+};
+
 export type PayloadRecipientSummary = {
 	readonly ownerId: OwnerId;
 	readonly displayName: DisplayName;
@@ -1448,6 +1462,28 @@ export const createBetterAgeCore = (ports: BetterAgeCorePorts) => {
 		);
 	};
 
+	const listLocalKeys = async () => {
+		const homeState = await loadCurrentHomeState(ports.homeRepository);
+
+		if (homeState === null) {
+			return failure("HOME_STATE_NOT_FOUND", undefined);
+		}
+
+		return success("LOCAL_KEYS_LISTED", {
+			current: {
+				fingerprint: homeState.currentKey.fingerprint,
+				encryptedPrivateKeyRef: homeState.currentKey.encryptedPrivateKeyRef,
+				createdAt: homeState.currentKey.createdAt,
+			},
+			retired: homeState.retiredKeys.map((retiredKey) => ({
+				fingerprint: retiredKey.fingerprint,
+				encryptedPrivateKeyRef: retiredKey.encryptedPrivateKeyRef,
+				createdAt: retiredKey.createdAt,
+				retiredAt: retiredKey.retiredAt,
+			})),
+		} satisfies LocalKeySummary);
+	};
+
 	const forgetKnownIdentity = async (input: { readonly ownerId: OwnerId }) => {
 		const homeState = await loadCurrentHomeState(ports.homeRepository);
 
@@ -1715,6 +1751,10 @@ export const createBetterAgeCore = (ports: BetterAgeCorePorts) => {
 			),
 			listRetiredKeys: withKnownCoreFailures(
 				listRetiredKeys,
+				consumeHomeRepositoryNotices,
+			),
+			listLocalKeys: withKnownCoreFailures(
+				listLocalKeys,
 				consumeHomeRepositoryNotices,
 			),
 			parseIdentityString: withKnownCoreFailures(

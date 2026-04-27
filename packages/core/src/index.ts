@@ -6,6 +6,7 @@ export type {
 	HomeStatus,
 	IdentityCryptoPort,
 	KnownIdentitySummary,
+	LocalKeySummary,
 	RandomIdsPort,
 	RetiredKeySummary,
 	SelfIdentitySummary,

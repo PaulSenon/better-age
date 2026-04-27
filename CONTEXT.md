@@ -18,6 +18,10 @@ _Avoid_: Home state document, setup error, storage probe
 The shareable string encoding of an **Identity Snapshot** used for import/export.
 _Avoid_: Generic identity model, whole identity entity
 
+**Local Key File**:
+A passphrase-encrypted age identity file referenced by **Home State**. Its decrypted plaintext starts with Better Age metadata comments and contains exactly one age identity line.
+_Avoid_: JSON key blob, proprietary key file, current symlink
+
 **Payload Envelope**:
 The decrypted structured payload body containing metadata plus `envText`.
 _Avoid_: Payload json, inner blob, container
@@ -25,6 +29,10 @@ _Avoid_: Payload json, inner blob, container
 **Payload File Envelope**:
 The human-readable outer file format around an age-armored encrypted payload, using `BETTER AGE PAYLOAD` begin/end markers plus explanatory comments.
 _Avoid_: Raw JSON payload file, opaque binary file, replacing age armor
+
+**Payload Age Block**:
+The inner `-----BEGIN AGE ENCRYPTED FILE-----` armor inside a **Payload File Envelope**. It can be extracted for age CLI transparency, but Better Age commands remain the supported UX.
+_Avoid_: Whole payload file, stripped payload format, alternate payload schema
 
 **Encrypted Payload Temp**:
 The same-directory `<payload>.tmp` file containing final encrypted payload bytes before rename-over-target commit.
@@ -55,6 +63,10 @@ _Avoid_: Canonical stored field, separate migration concern
 **Derived Fingerprint**:
 The runtime fingerprint computed from `publicKey`, not a persisted public identity field.
 _Avoid_: Canonical stored field, duplicated key identity
+
+**Identity Keys Command**:
+The command `bage identity keys`, which reports current and retired **Local Key File** paths. `--path` is machine stdout for ad hoc age CLI interop.
+_Avoid_: Key export, raw secret dump, identity list alias
 
 **Load Protocol**:
 The versioned stdout/stderr/exit-code contract used by external tools to invoke `load`.
@@ -244,6 +256,9 @@ _Avoid_: Key generation directory, garbage-collector queue
 - Identity evolution is centered on one canonical **Identity Snapshot** schema.
 - The shared canonical identity shape is the **Public Identity Snapshot**.
 - **Identity String**, payload recipients, and known identities must all map to the same **Public Identity Snapshot** without information loss.
+- A **Local Key File** uses age-compatible identity plaintext after passphrase decryption; Better Age metadata lives in age comment lines.
+- **Home State** decides current vs retired key status; key paths stay stable under `keys/<fingerprint>.age`.
+- A **Payload Age Block** is extractable for transparency, but direct `age -d <payload>` is not a supported payload UX because the payload file keeps a Better Age wrapper.
 - **Self Identity** reuses the same **Public Identity Snapshot** as its public core.
 - A **Local Alias Overlay** belongs only to home-local managed state and is not part of the **Public Identity Snapshot**.
 - A **Local Alias Overlay** is resolved by **Owner Id** semantics.
