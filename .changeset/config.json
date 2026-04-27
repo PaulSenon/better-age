@@ -7,7 +7,7 @@
 		}
 	],
 	"commit": false,
-	"fixed": [["@better-age/cli", "@better-age/varlock"]],
+	"fixed": [["@better-age/cli", "@better-age/varlock", "@better-age/core"]],
 	"linked": [],
 	"access": "public",
 	"baseBranch": "main",

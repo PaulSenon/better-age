@@ -184,6 +184,9 @@ pnpm -F @better-age/cli check
 pnpm -F @better-age/cli build
 ```
 
+> [!NOTE]
+> @better-age/cli package is meant to be a standalone bin. So do not install any npm deps. Only devDependencies.
+
 Manual QA:
 
 - [../../docs/manual-qa.md](../../docs/manual-qa.md)

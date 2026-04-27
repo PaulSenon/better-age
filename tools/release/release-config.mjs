@@ -15,14 +15,12 @@ export const publishedPackages = Object.freeze([
 		name: "@better-age/varlock",
 		path: "packages/varlock",
 	},
+	// TODO: enable when public
+	// {
+	// 	name: "@better-age/core",
+	// 	path: "packages/core",
+	// },
 ]);
 
 export const stableDistTag = "latest";
 export const prereleaseDistTag = "next";
-
-export const publishedPackageNames = Object.freeze(
-	publishedPackages.map((publishedPackage) => publishedPackage.name),
-);
-
-export const isPublishedPackage = (packageName) =>
-	publishedPackageNames.includes(packageName);
