@@ -20,6 +20,7 @@ export default defineConfig({
         prerender: {
           enabled: true,
           crawlLinks: true,
+          outputPath: "/index",
         },
       },
 
