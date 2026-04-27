@@ -1,0 +1,118 @@
+---
+title: Varlock runtime
+description: Use better-age as a local secret provider for Varlock.
+---
+
+**better-age** is the simple local-but-shareable secret provider for Varlock.
+
+Varlock owns schema, validation, and process launch. **better-age** owns the encrypted payload and passphrase-gated load.
+
+## Install the plugin
+
+<Tabs groupId="package-manager" items={["npm", "pnpm", "yarn", "bun"]}>
+  <Tab value="npm">
+
+```sh
+npm install -D @better-age/varlock varlock
+```
+
+  </Tab>
+  <Tab value="pnpm">
+
+```sh
+pnpm add -D @better-age/varlock varlock
+```
+
+  </Tab>
+  <Tab value="yarn">
+
+```sh
+yarn add -D @better-age/varlock varlock
+```
+
+  </Tab>
+  <Tab value="bun">
+
+```sh
+bun add -d @better-age/varlock varlock
+```
+
+  </Tab>
+</Tabs>
+
+The default plugin path assumes `bage` is available on `PATH`. The easiest way is the global CLI install:
+
+```sh
+npm install -g @better-age/cli
+```
+
+## Add **better-age** to `.env.schema`
+
+```txt
+# @plugin(@better-age/varlock)
+# @initBetterAge(path=.env.enc)
+# @setValuesBulk(betterAgeLoad(), format=env)
+```
+
+Then run your app through Varlock:
+
+```sh
+varlock run -- npm run dev
+```
+
+The flow is:
+
+```txt
+varlock run
+  -> @better-age/varlock
+  -> bage load --protocol-version=1 .env.enc
+  -> passphrase prompt
+  -> raw env text back to Varlock
+  -> app starts with secrets
+```
+
+## Use a different payload
+
+Point `path` at the payload for that project or run shape:
+
+```txt
+# @plugin(@better-age/varlock)
+# @initBetterAge(path=.env.dev.enc)
+# @setValuesBulk(betterAgeLoad(), format=env)
+```
+
+Use names like:
+
+```txt
+.env.enc
+.env.dev.enc
+.env.prod.enc
+```
+
+Keep the mental model simple: one **better-age** payload for the Varlock process.
+
+<Callout type="info">
+  `@better-age/varlock` v0 supports one `@initBetterAge(...)` config per process. Layering multiple encrypted payloads through the plugin is not supported yet. [Open an issue](https://github.com/PaulSenon/better-age/issues/new/choose) if that workflow matters for you.
+</Callout>
+
+## Use npx instead of global `bage`
+
+If you use the no-install CLI path, pass a launcher prefix:
+
+```txt
+# @plugin(@better-age/varlock)
+# @initBetterAge(path=.env.enc, command="npx @better-age/cli")
+# @setValuesBulk(betterAgeLoad(), format=env)
+```
+
+The plugin still appends the fixed load arguments:
+
+```txt
+load --protocol-version=1 .env.enc
+```
+
+## Learn Varlock itself
+
+**better-age** only provides env text. For schema syntax, imports, validation, and `varlock run`, use the official Varlock docs:
+
+- [Varlock documentation](https://varlock.dev/)

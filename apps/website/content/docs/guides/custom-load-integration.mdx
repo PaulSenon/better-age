@@ -1,0 +1,58 @@
+---
+title: Custom load integration
+description: Use bage load with tools that can consume plaintext env text.
+---
+
+Varlock is the recommended runtime path.
+
+If you need to integrate with another tool, the primitive is `bage load`.
+
+```sh
+bage load --protocol-version=1 .env.enc
+```
+
+## Contract
+
+`load` is the machine-output boundary.
+
+- stdout is raw `.env` text only
+- stderr contains prompts, warnings, and errors
+- exit code `0` means stdout is usable env text
+- non-zero means do not use stdout
+- the protocol version is currently `1`
+- the command prompts for a passphrase in an interactive terminal
+
+Example stdout:
+
+```txt
+DATABASE_URL=postgres://localhost:5432/app
+API_TOKEN=dev-token
+```
+
+## Simple shell adapter
+
+For tools that accept an env file path, write to a private temp file and clean it up:
+
+```sh
+tmp="$(mktemp)"
+trap 'rm -f "$tmp"' EXIT
+
+bage load --protocol-version=1 .env.enc > "$tmp"
+your-tool --env-file "$tmp"
+```
+
+## Direct pipe
+
+For tools that read env text from stdin:
+
+```sh
+bage load --protocol-version=1 .env.enc | your-tool --env-stdin
+```
+
+## Interactive only for now
+
+`load` still prompts for a **better-age** passphrase. That makes it useful for local tools, but not a CI/CD secret path today.
+
+<Callout type="info">
+  If you are adapting this for a real tool, preserve stdout. Do not print logs, prompts, or debug text to stdout between `bage load` and the consumer.
+</Callout>

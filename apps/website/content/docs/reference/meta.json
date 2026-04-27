@@ -1,9 +1,4 @@
 {
   "title": "Reference",
-  "pages": [
-    "index",
-    "cli",
-    "varlock",
-    "editorial-conventions"
-  ]
+  "pages": ["index", "cli", "varlock-plugin"]
 }

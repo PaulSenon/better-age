@@ -686,4 +686,4 @@ That is enough to validate the foundation.
 - package name final? `better-age`?
 - CJS-first bundle ok?
 - use Inquirer for non-secret prompts, yes/no?
-- allow hidden test-only flags for passphrase stdin, yes? 
+- allow hidden test-only flags for passphrase stdin, yes?

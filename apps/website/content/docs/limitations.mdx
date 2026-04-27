@@ -1,0 +1,60 @@
+---
+title: Limitations
+description: What better-age does not solve yet.
+---
+
+**better-age** is intentionally narrow.
+
+It gives small teams a much better local default than sharing plaintext `.env` files. It does not remove every secret-management risk.
+
+## Local-first, not cloud sync
+
+**better-age** does not distribute payload files or identity strings for you.
+
+You still choose how Alice sends Bob the identity string, how Bob sends Alice the encrypted payload back, and where your team stores encrypted files.
+
+## Interactive-first
+
+`bage load` prompts for a passphrase. For now, the CLI targets interactive environments only.
+
+That means **better-age** cannot load encrypted payload from an headless terminal, and therefore is not a CI/CD secret-storage solution today. Most CI/CD platforms already have their own secret stores, and **better-age** is not trying to replace those yet.
+
+<Callout type="info" title="You really need a headless mode ?">
+  If you really need a passphrase-less mode, for machine/headless use only, I was thinking adding that, but removed it from MVP scope. Feel free to [open an issue](https://github.com/PaulSenon/better-age/issues/new/choose) if this is something you would need, explaining your usecase in details !
+</Callout>
+
+## Plaintext still exists while used
+
+Viewing, editing, and running a process necessarily exposes plaintext to that surface.
+
+**better-age** tries to minimize where that happens:
+
+- for process read, plaintext is written to stdout only by `bage load` _(do not use to read secrets)_
+- for human read `bage view` displays plaintext in a terminal viewer instead of stdout
+- plaintext is written temporarily to the filesystem only by `bage edit`
+
+## Editor caveat
+
+`bage edit` uses a temporary plaintext file while your editor is open.
+
+**better-age** uses a private temp directory, restrictive permissions where supported, and cleanup afterward. Your editor may still create swap files, backups, crash recovery files, plugin caches, shell history, or other traces outside **better-age**'s control.
+
+## Revocation is future-only
+
+Revoking Bob removes Bob from future rewritten versions of the payload.
+
+It cannot erase old files Bob already received, old process environments, screenshots, terminal scrollback, or memories.
+
+## Not enterprise secret management
+
+**better-age** is not a giant enterprise secret-management system.
+
+It does not provide:
+
+- organization SSO
+- KMS policy engines
+- audit logs
+- fine-grained authorization
+- central cloud distribution
+
+That is intentional. **better-age** is the local default you can start with before you need that class of system.

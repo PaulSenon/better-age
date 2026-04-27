@@ -1,0 +1,62 @@
+---
+title: Why better-age?
+description: A small, opinionated layer for teams that already share .env files.
+---
+
+Small teams still pass `.env` files around.
+
+Usually not because they love bad security. It is just fast. A file is easy to edit, easy to send, easy to understand, and easy to plug into local dev.
+
+**better-age** tries to keep that workflow, but remove the worst default: long-lived shared plaintext secret files.
+
+## The target workflow
+
+The mental model stays boring:
+
+```txt
+create env file
+edit env file
+share env file
+run app with env file
+```
+
+The difference is that the file is encrypted, access is attached to identities, and the runtime path goes through Varlock.
+
+```sh
+bage create .env.enc
+bage edit .env.enc
+bage grant .env.enc bob
+varlock run -- npm run dev
+```
+
+## Why not just age?
+
+[`age`](https://age-encryption.org/) is the primitive. It is small, readable, and exactly the kind of crypto tooling **better-age** wants underneath.
+
+But the default `age` CLI is intentionally low-level. It does not manage your team identity workflow, remember known teammates, handle local aliases, guide grant/revoke flows, or give Varlock a neat secret-provider contract. You manually deal with keys and recipients.
+
+**better-age** is the convenience layer around that primitive.
+
+## Why not SOPS?
+
+[`SOPS`](https://github.com/getsops/sops) is powerful and useful. It supports more formats, more key providers, and broader config-encryption workflows.
+
+**better-age** intentionally does less. It is a simpler, opinionated subset for one job: encrypted `.env` payloads with age.
+
+That means there is less to learn. You get one encrypted env file shape, local identities, explicit grants, simple rotation/update flows, and a runtime path that still feels close to normal local development. SOPS is the better fit when you need its broader system; **better-age** is for avoiding that steeper learning curve when your team mostly wants safer `.env` sharing.
+
+## Why Varlock?
+
+Varlock already has the shape **better-age** wants to plug into: env schema, runtime loading, and local dev ergonomics.
+
+**better-age** is the encrypted local secret provider behind that. Varlock asks for env values; **better-age** decrypts one granted payload and hands back env text through the `load` protocol.
+
+## The tradeoff
+
+**better-age** is not a cloud manager yet. It is not CI secret storage yet. It is not trying to become an enterprise KMS/SSO/audit-log/fine-grained-authorization system.
+
+It is a better local default for the phase where a team is still small, still moving fast, and would otherwise share plaintext `.env` files.
+
+<Callout type="info">
+  The project may grow toward better sharing UX later, possibly with an OSS secret-hosting layer. It still should not become a giant enterprise secret-management platform.
+</Callout>

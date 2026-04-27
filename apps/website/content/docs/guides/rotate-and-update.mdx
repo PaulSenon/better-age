@@ -1,0 +1,64 @@
+---
+title: Rotate and update
+description: Rotate your local identity and refresh payloads that still reference the old key.
+---
+
+**better-age** identities have a stable owner id and a current age recipient key.
+
+Rotation changes the current key while keeping the same owner id. That means teammates can still recognize the same identity, but older payloads may still contain your old recipient snapshot until you update them.
+
+## Rotate your identity
+
+```sh
+bage identity rotate
+```
+
+**better-age** asks for your passphrase and rotates your local identity key.
+
+After rotation, existing payloads may need an update:
+
+```sh
+bage update .env.enc
+```
+
+## Update a payload
+
+```sh
+bage update .env.enc
+```
+
+Think of `update` as "open this encrypted file and save it again with today's **better-age** identity info."
+
+The common case is after rotation: your local identity has a new current key, but an older payload may still point at your previous key. `update` refreshes your own recipient entry so future versions use the current key.
+
+It does not decide to share the payload with new people. The intended access list stays the same.
+
+## Teammate key updates
+
+When Bob rotates, Alice may later import Bob's new identity string.
+
+```sh
+bage identity import 'better-age://identity/v1/...' --alias bob --trust-key-update
+```
+
+If **better-age** already knows Bob and the new identity string contains a different public key, **better-age** treats it as a sensitive change. In a prompted flow, it asks you to confirm. If you run the full command directly, add `--trust-key-update` to say "yes, I trust this key change."
+
+Then Alice can grant Bob again to refresh his recipient entry:
+
+```sh
+bage grant .env.enc bob
+```
+
+## Revoke is separate
+
+Rotation is not revocation.
+
+To remove Bob from future rewritten versions:
+
+```sh
+bage revoke .env.enc bob
+```
+
+<Callout type="warning">
+  Revocation cannot erase old encrypted payload copies Bob already received. It only changes future payload versions.
+</Callout>

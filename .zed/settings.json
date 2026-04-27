@@ -1,5 +1,5 @@
 {
-	"soft_wrap": "prefer_line",
+	"soft_wrap": "editor_width",
 	"tab_size": 2,
 	"formatter": {
 		"external": {

@@ -1,0 +1,118 @@
+---
+title: Quickstart
+description: Create one encrypted env payload and run it through Varlock.
+---
+
+This is the shortest useful path: install the CLI globally, create one encrypted payload, edit it, then let Varlock load it when your app runs.
+
+## 1. Install the CLI
+
+```sh
+npm install -g @better-age/cli
+```
+
+Check the command is available:
+
+```sh
+bage --help
+```
+
+## 2. Set up your local identity
+
+```sh
+bage setup --name Alice
+```
+
+This creates your local **better-age** identity in `~/.better-age` and protects your private key with a passphrase.
+
+<Callout type="warning">
+  Your passphrase unlocks the private key in `~/.better-age`. To decrypt a payload, you need both: the local identity files and the passphrase. If you delete `~/.better-age` or forget the passphrase, make sure another teammate is already granted on the payload before you lose access.
+</Callout>
+
+## 3. Create an encrypted payload
+
+```sh
+bage create .env.enc
+```
+
+The payload is the encrypted file you can keep next to your project. It is visible, caller-owned, and safe to handle like an encrypted artifact.
+
+## 4. Edit secrets
+
+```sh
+bage edit .env.enc
+```
+
+Your editor opens a normal env file shape:
+
+```txt
+DATABASE_URL=postgres://localhost:5432/app
+API_TOKEN=dev-token
+```
+
+When the editor closes, **better-age** validates the env text, encrypts it, and writes the encrypted payload back to `.env.enc`.
+
+## 5. Check it locally
+
+```sh
+bage view .env.enc
+```
+
+`view` is the human reading path. It opens a terminal viewer and does not print plaintext secrets to stdout.
+
+## 6. Wire Varlock
+
+Install Varlock and the **better-age** plugin in your project:
+
+<Tabs groupId="package-manager" items={["npm", "pnpm", "yarn", "bun"]}>
+  <Tab value="npm">
+
+```sh
+npm install -D varlock @better-age/varlock
+```
+
+  </Tab>
+  <Tab value="pnpm">
+
+```sh
+pnpm add -D varlock @better-age/varlock
+```
+
+  </Tab>
+  <Tab value="yarn">
+
+```sh
+yarn add -D varlock @better-age/varlock
+```
+
+  </Tab>
+  <Tab value="bun">
+
+```sh
+bun add -d varlock @better-age/varlock
+```
+
+  </Tab>
+</Tabs>
+
+Add this to `.env.schema`:
+
+```txt
+# @plugin(@better-age/varlock)
+# @initBetterAge(path=.env.enc)
+# @setValuesBulk(betterAgeLoad(), format=env)
+```
+
+Then run your app through Varlock:
+
+```sh
+varlock run -- npm run dev
+```
+
+Varlock starts, **better-age** asks for your passphrase, and your process receives the decrypted env values.
+
+## 7. Share later
+
+Team sharing is a separate step. Bob exports an identity string, Alice imports it, Alice grants Bob on `.env.enc`, then Alice sends Bob the encrypted payload.
+
+Read [Share with a teammate](/docs/guides/share-with-teammate) when you need that flow.

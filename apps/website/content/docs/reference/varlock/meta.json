@@ -1,9 +1,0 @@
-{
-  "title": "Varlock Plugin",
-  "pages": [
-    "index",
-    "init-better-age",
-    "better-age-load",
-    "runtime-contract"
-  ]
-}

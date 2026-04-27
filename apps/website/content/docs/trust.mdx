@@ -1,0 +1,51 @@
+---
+title: Trusting better-age
+description: What you need to trust, what age handles, and what is still open.
+---
+
+A CLI that manages decryption identities for secrets deserves skepticism.
+
+**better-age** is built to reduce how much you need to trust **better-age** itself. The crypto is delegated to age tooling. The workflow stays local. The payload file stays yours.
+
+## Crypto
+
+**better-age** does not implement cryptographic primitives manually.
+
+It relies on Typage, the official TypeScript implementation listed in the age ecosystem. The Go `age` CLI remains the reference implementation; **better-age** uses the same age model and format through Typage.
+
+**better-age** is not an official age project and is not affiliated with the age maintainers.
+
+Useful links:
+
+- [age](https://age-encryption.org/)
+- [age reference implementation](https://github.com/FiloSottile/age)
+- [Typage / age-encryption](https://github.com/FiloSottile/typage)
+- [**better-age** source](https://github.com/PaulSenon/better-age)
+
+## What reduces how much you need to trust **better-age**
+
+- **better-age** uses age for encryption instead of custom crypto.
+- **better-age** has no network behavior by design.
+- Your encrypted payload remains a normal caller-owned file.
+- Local identity state lives under `~/.better-age`.
+- Machine plaintext output is isolated to `bage load`.
+- Human reading uses `bage view`, not `cat` on stdout.
+- The source is [open](https://github.com/PaulSenon/better-age).
+
+<Callout type="info" title="Try the age interop yourself">
+  **better-age** payloads are built around age-compatible encrypted material and remain interoperable with the official age CLI. You can try it yourself by following this little [age CLI interop guide](/docs/guides/age-cli-interop) and read an encrypted env payload without **better-age**.
+</Callout>
+
+## What this does not prove
+
+Open source does not automatically mean audited.
+
+There is no formal security audit yet. npm package authenticity and release provenance are still supply-chain concerns. A compromised local machine still wins. Plaintext must exist when a process receives secrets, when the viewer displays them, or when your editor edits them.
+
+Read [Limitations](/docs/limitations) for the practical boundary list.
+
+## Help improve this
+
+If you know how to improve auditability, signed delivery, provenance, reproducible builds, authenticity checks, or publishing hardening, please [open an issue](https://github.com/PaulSenon/better-age/issues/new/choose).
+
+This project is early. The goal is to be honest about that while making the default local workflow much better than plaintext `.env` sharing.

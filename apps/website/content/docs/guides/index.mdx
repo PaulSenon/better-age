@@ -1,42 +1,58 @@
 ---
 title: Guides
-description: Task-first workflow docs for the jobs better-age is intentionally built to handle.
+description: Practical workflows for local env files, Varlock, sharing, rotation, local state, and custom loading.
 ---
 
-Guides teach the concrete workflow, not just the commands.
+Guides teach the workflow, not just the command list.
 
 Read these in roughly this order:
 
-1. First-time setup
-2. Create and edit
-3. Grant access
-4. Revoke access
-5. Load for machines
+1. [Age 101](/docs/guides/age-101)
+2. [Local env file](/docs/guides/local-env-file)
+3. [Varlock runtime](/docs/guides/varlock-runtime)
+4. [Share with a teammate](/docs/guides/share-with-teammate)
+5. [Rotate and update](/docs/guides/rotate-and-update)
+6. [Internals and local state](/docs/guides/local-state)
+7. [Custom load integration](/docs/guides/custom-load-integration)
+8. [Age CLI interop](/docs/guides/age-cli-interop)
 
 <Cards>
   <Card
-    title="First-time setup"
-    href="/docs/guides/first-time-setup"
-    description="Set up once, export your identity string, and understand local home state."
+    title="Age 101"
+    href="/docs/guides/age-101"
+    description="The simple mental model behind age keys, recipients, and encrypted files."
   />
   <Card
-    title="Create and edit"
-    href="/docs/guides/create-and-edit"
-    description="Create a payload and keep the encrypted file visible and caller-owned."
+    title="Local env file"
+    href="/docs/guides/local-env-file"
+    description="Create, edit, inspect, and view one encrypted env payload."
   />
   <Card
-    title="Grant access"
-    href="/docs/guides/grant-access"
-    description="Add or refresh recipients explicitly on the payload."
+    title="Varlock runtime"
+    href="/docs/guides/varlock-runtime"
+    description={
+      <>
+        Use <strong>better-age</strong> as a local secret provider for Varlock.
+      </>
+    }
   />
   <Card
-    title="Revoke access"
-    href="/docs/guides/revoke-access"
-    description="Remove recipients from future rewritten payload versions."
+    title="Share with a teammate"
+    href="/docs/guides/share-with-teammate"
+    description="Make the Bob-to-Alice identity flow explicit."
   />
   <Card
-    title="Load for machines"
-    href="/docs/guides/load-for-machines"
-    description="Use the machine path safely through the versioned load protocol."
+    title="Custom load integration"
+    href="/docs/guides/custom-load-integration"
+    description="Adapt `bage load` to non-Varlock tools that accept env text."
+  />
+  <Card
+    title="Age CLI interop"
+    href="/docs/guides/age-cli-interop"
+    description={
+      <>
+        Placeholder for checking <strong>better-age</strong> payloads against the age CLI.
+      </>
+    }
   />
 </Cards>
