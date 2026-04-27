@@ -16,13 +16,7 @@ for (const publishedPackage of publishedPackages) {
 	// environments, so publish through npm even though the repo uses pnpm.
 	const result = spawnSync(
 		"npm",
-		[
-			"publish",
-			"--tag",
-			tag,
-			"--access",
-			"public",
-		],
+		["publish", "--tag", tag, "--access", "public"],
 		{
 			cwd: publishedPackage.path,
 			stdio: "inherit",
