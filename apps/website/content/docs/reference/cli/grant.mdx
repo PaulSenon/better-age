@@ -1,0 +1,34 @@
+---
+title: grant
+description: Add or refresh one recipient on a payload.
+---
+
+## Purpose
+
+`grant` mutates a payload so a chosen identity can decrypt it.
+
+## Example
+
+```sh
+bage grant .env.prod.enc teammate#0123abcd
+```
+
+## Inputs
+
+- payload path
+- identity reference
+
+Both can be guided in interactive use.
+
+## Behavior
+
+- fails if the identity ref is ambiguous
+- fails if the identity is not known locally
+- may require `update` first if the payload is stale
+- fails distinctly if the payload version is newer than the CLI can open
+
+## Mental model
+
+- a known identity is local address-book state
+- a recipient is that identity granted on one payload
+- `grant` is the operation that turns the first into the second

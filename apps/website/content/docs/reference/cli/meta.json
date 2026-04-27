@@ -1,0 +1,22 @@
+{
+  "title": "CLI",
+  "pages": [
+    "index",
+    "setup",
+    "interactive",
+    "me",
+    "add-identity",
+    "forget-identity",
+    "identities",
+    "rotate",
+    "change-passphrase",
+    "create",
+    "edit",
+    "inspect",
+    "grant",
+    "revoke",
+    "view",
+    "load",
+    "update"
+  ]
+}
