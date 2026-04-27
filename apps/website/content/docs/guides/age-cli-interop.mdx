@@ -1,19 +1,115 @@
 ---
 title: Age CLI interop
-description: Placeholder guide for verifying better-age payloads with the age CLI.
+description: Verify the age-shaped parts of a better-age payload with the official age CLI.
 ---
 
-This guide is intentionally a placeholder for now.
+This guide is for transparency and debugging.
 
-The goal will be simple: show that **better-age** is a workflow layer around age-compatible encrypted material, not a separate crypto system.
-
-When this page is written, it should walk through a small local check with:
-
-- one **better-age** payload
-- the official `age` CLI
-- the extracted age armor
-- a clear explanation of what is interoperable and what still belongs to **better-age** metadata
+The goal is simple: show that **better-age** is a workflow layer around age-compatible encrypted material, not a separate crypto system.
 
 <Callout type="info">
-  This page exists so the trust docs can link to the future verification path. Full interop instructions are coming later.
+  For normal tooling, use `bage load --protocol-version=1 <payload>`. That is the supported path for raw `.env` stdout. The commands below are for ad hoc inspection.
+</Callout>
+
+## What interoperates
+
+**better-age** uses age-compatible encrypted material, but a `.env.enc` file is not just a naked age file.
+
+A payload keeps a small **better-age** wrapper around the inner age armor:
+
+```txt
+-----BEGIN BETTER AGE PAYLOAD-----
+-----BEGIN AGE ENCRYPTED FILE-----
+...
+-----END AGE ENCRYPTED FILE-----
+-----END BETTER AGE PAYLOAD-----
+```
+
+That means this is not expected to work:
+
+```sh
+age -d .env.enc
+```
+
+The age CLI expects the age armored block directly. **better-age** first extracts that inner block, then decrypts it.
+
+## Find your local age identity file
+
+**better-age** local key files are passphrase-encrypted age identity files.
+
+Ask the CLI for your current key path:
+
+```sh
+bage identity keys --current --path
+```
+
+That prints one absolute path:
+
+```txt
+/home/you/.better-age/keys/fp_current.age
+```
+
+You can also list current and retired keys:
+
+```sh
+bage identity keys
+```
+
+Retired keys are useful when you are inspecting older payloads that were encrypted before a rotation.
+
+## Decrypt the inner age block
+
+First, do it as separate steps.
+
+Get the current key path:
+
+```sh
+bage identity keys --current --path > key.age
+```
+
+Extract the inner age armor to a temporary file:
+
+```sh
+sed -n '/^-----BEGIN AGE ENCRYPTED FILE-----$/,/^-----END AGE ENCRYPTED FILE-----$/p' .env.enc > payload.age
+```
+
+Run the official age CLI with that key and stripped payload:
+
+```sh
+age -d -i key.age payload.age
+```
+
+That is all the age CLI needs: an age identity file and an age payload.
+
+Once the shape is clear, the same thing can be written as a pipe:
+
+```sh
+sed -n '/^-----BEGIN AGE ENCRYPTED FILE-----$/,/^-----END AGE ENCRYPTED FILE-----$/p' .env.enc \
+  | age -d -i "$(bage identity keys --current --path)"
+```
+
+Portable-ish `awk` variant:
+
+```sh
+awk '
+  /^-----BEGIN AGE ENCRYPTED FILE-----$/ { on=1 }
+  on { print }
+  /^-----END AGE ENCRYPTED FILE-----$/ { on=0 }
+' .env.enc | age -d -i "$(bage identity keys --current --path)"
+```
+
+The age CLI will prompt for the key passphrase.
+
+## What you should see
+
+This decrypts the raw **better-age** payload plaintext structure.
+
+It does not print the clean `.env` text expected by app tooling. That final env text is still the job of:
+
+```sh
+bage load --protocol-version=1 .env.enc
+```
+
+<Callout type="warning">
+  Do not build your runtime integration around the extraction snippets. They intentionally bypass the **better-age** payload reader and are meant for proving the shape of the encrypted material.
 </Callout>

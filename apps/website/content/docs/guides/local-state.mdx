@@ -38,6 +38,27 @@ That is also why the CLI is normally installed globally. Your **better-age** ide
 
 The important part: the private keys are not stored as raw plaintext. They are encrypted key files protected by your passphrase.
 
+If one of those key files is unlocked, the decrypted text is age-compatible identity-file text:
+
+```txt
+# better-age-key-metadata/v1 <metadata>
+AGE-SECRET-KEY-PQ-1...
+```
+
+The comment stores the **better-age** metadata needed to reconnect the key to your local identity. The age identity line is what lets the official age CLI read the key after passphrase unlock.
+
+You can list those local key file paths with:
+
+```sh
+bage identity keys
+```
+
+For shell interop, path-only output is available:
+
+```sh
+bage identity keys --current --path
+```
+
 ## The local identity model
 
 Your **better-age** identity has:
