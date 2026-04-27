@@ -12,7 +12,7 @@ const infraDir = path.dirname(thisFile);
 const repoRoot = path.resolve(infraDir, "../..");
 const websiteDir = path.join(repoRoot, "apps/website");
 
-export const website = await Website("website", {
+export const website = await Website("doc", {
 	cwd: websiteDir,
 	build: "pnpm build",
 	dev: "pnpm dev",
@@ -23,9 +23,19 @@ export const website = await Website("website", {
 	url: !isProd,
 });
 
-console.log({
-	stage: app.stage,
-	url: website.url,
-});
+if (isProd) {
+	console.log("Blog urls: ");
+	for (const domain of website.domains ?? []) {
+		console.log("\t- ", `https://${domain.name}`);
+	}
+	if (website.url) {
+		console.log("\t- ", website.url);
+	}
+} else {
+	console.log({
+		stage: app.stage,
+		url: website.url,
+	});
+}
 
 await app.finalize();

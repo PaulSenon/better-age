@@ -3,9 +3,11 @@
 	"private": true,
 	"type": "module",
 	"scripts": {
-		"deploy": "alchemy deploy ./alchemy.run.ts",
-		"dev": "alchemy dev ./alchemy.run.ts",
-		"destroy": "alchemy destroy ./alchemy.run.ts"
+		"deploy:prod": "alchemy deploy ./alchemy.run.ts --stage prod",
+		"deploy:staging": "alchemy deploy ./alchemy.run.ts --stage staging",
+		"dev": "alchemy dev ./alchemy.run.ts --stage dev",
+		"destroy:prod": "alchemy destroy ./alchemy.run.ts --stage prod",
+		"destroy:staging": "alchemy destroy ./alchemy.run.ts --stage staging"
 	},
 	"dependencies": {
 		"alchemy": "catalog:"
