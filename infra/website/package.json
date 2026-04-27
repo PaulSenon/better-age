@@ -1,0 +1,13 @@
+{
+	"name": "@infra/website",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"deploy": "alchemy deploy ./alchemy.run.ts",
+		"dev": "alchemy dev ./alchemy.run.ts",
+		"destroy": "alchemy destroy ./alchemy.run.ts"
+	},
+	"dependencies": {
+		"alchemy": "catalog:"
+	}
+}
