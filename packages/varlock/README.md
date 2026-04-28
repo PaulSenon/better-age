@@ -2,6 +2,61 @@
 
 Thin varlock adapter for Better Age.
 
+User docs:
+
+- [Install](https://bage.paulsenon.com/docs/install)
+- [Quickstart](https://bage.paulsenon.com/docs/quickstart)
+- [Varlock plugin reference](https://bage.paulsenon.com/docs/reference/varlock-plugin)
+
+## Install
+
+Install the Better Age CLI globally:
+
+```sh
+npm install -g @better-age/cli
+```
+
+Install Varlock and the plugin in the project that owns the `.env.schema` file:
+
+```sh
+npm install -D varlock @better-age/varlock
+```
+
+The default plugin config expects the `bage` command from `@better-age/cli` to be
+available on `PATH`.
+
+## Happy Path
+
+Set up your local Better Age identity:
+
+```sh
+bage setup --name Alice
+```
+
+Create and edit the encrypted payload:
+
+```sh
+bage create .env.enc
+bage edit .env.enc
+```
+
+Add this to `.env.schema`:
+
+```txt
+# @plugin(@better-age/varlock)
+# @initBetterAge(path=.env.enc)
+# @setValuesBulk(betterAgeLoad(), format=env)
+```
+
+Run your app through Varlock:
+
+```sh
+varlock run -- npm run dev
+```
+
+Varlock starts, Better Age asks for your passphrase, and your process receives
+the decrypted env values.
+
 Design constraints:
 
 - plugin stays thin
@@ -100,7 +155,3 @@ pnpm -F @better-age/varlock build
 pnpm -F @better-age/varlock check
 pnpm -F @better-age/varlock test
 ```
-
-Manual QA:
-
-- [../../docs/manual-qa.md](../../docs/manual-qa.md)

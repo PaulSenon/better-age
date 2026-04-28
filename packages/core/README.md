@@ -1,6 +1,10 @@
 # @better-age/core
 
-Core package for the Better Age MVP.
+Internal core package for Better Age.
+
+This package is private to the monorepo. It owns persisted artifacts,
+cryptographic ports, identity/payload lifecycle rules, migrations, and typed
+outcomes. It must not depend on the CLI or Varlock adapter.
 
 Responsibilities:
 
@@ -38,8 +42,7 @@ overwrite/update behavior used by the CLI.
 - Payload decrypt tries the current key first, then retired keys lazily.
   Corrupt retired keys warn; missing/corrupt current keys fail typed.
 
-This package should not depend on the CLI or varlock packages.
+## Contributing
 
-Implementation plan source:
-
-- `../../.llms/projects/4-cli-core-boundary-hardening/plans/better-age-mvp-reimplementation.md`
+- Package check: `pnpm -F @better-age/core check`
+- Package tests: `pnpm -F @better-age/core test`

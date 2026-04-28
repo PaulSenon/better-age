@@ -1,3 +1,9 @@
+2026-04-28 README refresh:
+- Root README rewritten as public landing/index: reused website OG image, added npm/license/docs badges, quickstart, official docs links, package table, monorepo map, contribution index.
+- Updated package READMEs for `@better-age/cli`, `@better-age/core`, `@better-age/varlock`; ignored `cli-legacy`.
+- Updated `apps/website/README.md` away from generated placeholder; references docs content and OG asset.
+- Verification: web research checked README/contributing best practices; `git diff --check` passed. No dev/build/deploy commands run.
+
 2026-04-25 Phase 6 complete:
 - New CLI identity slice implemented in `packages/cli`.
 - Public runner: `src/cli/runCli.ts`; presenter: `src/cli/presenter.ts`; real adapter wiring: `src/cli/nodeCli.ts`.
