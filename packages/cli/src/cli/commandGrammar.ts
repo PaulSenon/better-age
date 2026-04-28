@@ -4,6 +4,13 @@ import { Console, Effect } from "effect";
 import { presentParseFailure, styleRunCliResult } from "./presenter.js";
 import { type RunCliInput, type RunCliResult, runCli } from "./runCli.js";
 
+declare const __BETTER_AGE_CLI_VERSION__: string | undefined;
+
+const cliVersion =
+	typeof __BETTER_AGE_CLI_VERSION__ === "string"
+		? __BETTER_AGE_CLI_VERSION__
+		: "0.0.0-dev";
+
 const optionalPayload = Args.optional(Args.text({ name: "payload" }));
 const optionalIdentityReference = Args.optional(
 	Args.text({ name: "identity-ref" }),
@@ -186,13 +193,15 @@ const makeCaptureConsole = () => {
 	};
 };
 
-const grammarRunner = Command.run(releaseCommandGrammar, {
-	name: "bage",
-	version: "0.0.1",
-});
+const makeGrammarRunner = (version: string) =>
+	Command.run(releaseCommandGrammar, {
+		name: "bage",
+		version,
+	});
 
 const runGrammar = async (
 	argv: ReadonlyArray<string>,
+	version = cliVersion,
 ): Promise<
 	| {
 			readonly kind: "accepted";
@@ -209,7 +218,7 @@ const runGrammar = async (
 
 	try {
 		await Effect.runPromise(
-			grammarRunner(["node", "bage", ...argv]).pipe(
+			makeGrammarRunner(version)(["node", "bage", ...argv]).pipe(
 				Console.withConsole(capture.console),
 				Effect.provide(NodeContext.layer),
 			),
@@ -230,8 +239,9 @@ const runGrammar = async (
 
 export const runCliWithGrammar = async (
 	input: RunCliInput,
+	options: { readonly version?: string } = {},
 ): Promise<RunCliResult> => {
-	const grammarResult = await runGrammar(input.argv);
+	const grammarResult = await runGrammar(input.argv, options.version);
 
 	if (grammarResult.kind === "rejected") {
 		const message =

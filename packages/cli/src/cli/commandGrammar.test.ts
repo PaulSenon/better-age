@@ -1,3 +1,5 @@
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { runCliWithGrammar } from "./commandGrammar.js";
 import type { CliCore } from "./runCli.js";
@@ -157,6 +159,26 @@ const makeCore = () => {
 };
 
 describe("release command grammar", () => {
+	it("renders the package version", async () => {
+		const { core } = makeCore();
+		const packageJson = JSON.parse(
+			await readFile(join(process.cwd(), "package.json"), "utf8"),
+		) as { readonly version: string };
+
+		const result = await runCliWithGrammar(
+			{
+				argv: ["--version"],
+				core,
+				terminal: { mode: "headless" },
+			},
+			{ version: packageJson.version },
+		);
+
+		expect(result.exitCode).toBe(0);
+		expect(result.stderr).toBe("");
+		expect(result.stdout.trim()).toBe(packageJson.version);
+	});
+
 	it("renders root help with the full release command surface", async () => {
 		const { core } = makeCore();
 

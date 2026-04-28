@@ -1,7 +1,8 @@
-import { chmod } from "node:fs/promises";
+import { chmod, readFile } from "node:fs/promises";
 import { build } from "esbuild";
 
 const outfile = "dist/bage";
+const packageJson = JSON.parse(await readFile("package.json", "utf8"));
 
 await build({
 	banner: {
@@ -12,6 +13,9 @@ await build({
 		].join("\n"),
 	},
 	bundle: true,
+	define: {
+		__BETTER_AGE_CLI_VERSION__: JSON.stringify(packageJson.version),
+	},
 	entryPoints: ["src/bin/bage.ts"],
 	external: [],
 	format: "esm",
