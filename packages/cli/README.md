@@ -2,6 +2,12 @@
 
 Release-facing `bage` CLI for Better Age.
 
+User docs:
+
+- [Install](https://bage.paulsenon.com/docs/install)
+- [Quickstart](https://bage.paulsenon.com/docs/quickstart)
+- [CLI reference](https://bage.paulsenon.com/docs/reference/cli)
+
 Responsibilities:
 
 - exact and guided command execution
@@ -12,13 +18,28 @@ Responsibilities:
 - clean machine stdout for `load` and `identity export`
 - age interop transparency for local key paths
 
-## Install / Build
+## Install
 
-Install workspace dependencies from the repository root:
+For normal use:
+
+```sh
+npm install -g @better-age/cli
+```
+
+Then:
+
+```sh
+bage setup --name Alice
+```
+
+For local repository work, install workspace dependencies from the repository root:
+
 
 ```sh
 pnpm install
 ```
+
+## Build
 
 Build the standalone CLI artifact:
 
@@ -218,6 +239,12 @@ awk '
 - The MVP targets Unix-like terminals.
 - Headless secret injection is out of scope.
 
+## Contributing
+
+- Root contribution guide: [CONTRIBUTING.md](../../CONTRIBUTING.md)
+- Package check: `pnpm -F @better-age/cli check`
+- Package tests: `pnpm -F @better-age/cli test`
+
 ## Development
 
 ```sh
@@ -228,11 +255,3 @@ pnpm -F @better-age/cli build
 
 > [!NOTE]
 > @better-age/cli package is meant to be a standalone bin. So do not install any npm deps. Only devDependencies.
-
-Manual QA:
-
-- [../../docs/manual-qa.md](../../docs/manual-qa.md)
-
-Implementation plan source:
-
-- [../../.llms/projects/4-cli-core-boundary-hardening/plans/runtime-cli-release-readiness.md](../../.llms/projects/4-cli-core-boundary-hardening/plans/runtime-cli-release-readiness.md)
