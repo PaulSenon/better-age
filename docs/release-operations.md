@@ -27,12 +27,17 @@ Everything else in the monorepo is release-isolated:
 - release boundary: [tools/release/release-config.mjs](../tools/release/release-config.mjs)
 - version/tag reader: [tools/release/read-release-version.mjs](../tools/release/read-release-version.mjs)
 - prerelease version derivation: [tools/release/derive-prerelease-version.mjs](../tools/release/derive-prerelease-version.mjs)
-- publish script: [tools/release/publish-packages.mjs](../tools/release/publish-packages.mjs)
+- trusted publishing runtime guard: [tools/release/assert-trusted-publishing-runtime.mjs](../tools/release/assert-trusted-publishing-runtime.mjs)
+- package build runner: [tools/release/run-published-package-script.mjs](../tools/release/run-published-package-script.mjs)
+- tarball packer: [tools/release/pack-packages.mjs](../tools/release/pack-packages.mjs)
+- tarball publisher: [tools/release/publish-tarballs.mjs](../tools/release/publish-tarballs.mjs)
 - changesets config: [.changeset/config.json](../.changeset/config.json)
 
 Important constraint:
 - npm trusted publishing currently allows one trusted publisher config per package
 - because of that, stable publish and prerelease publish must share one workflow file: `publish-release.yml`
+- `publishedPackages[*].expectedPackedFiles` is the strict npm tarball allowlist;
+  update it when intentionally changing public package files
 
 ## One-time GitHub setup
 
@@ -70,11 +75,12 @@ Use it to gate manual release operations:
 - manual `next` publishes in `Publish Release`
 
 Recommended environment settings:
-- required reviewers: admins or a dedicated release-maintainers team
-- prevent self-review: enabled
+- required reviewers: `PaulSenon`
+- prevent self-review: disabled while this is a solo-maintainer project
 - optional branch restriction: `main`
 
-This keeps manual release entrypoints admin/maintainer-gated without adding a second approval gate to stable publish after merging the release PR.
+This gates the jobs that can mint npm trusted-publishing OIDC tokens while
+still allowing a solo maintainer to approve releases.
 
 Official docs:
 - environments: <https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/manage-environments>
@@ -94,7 +100,7 @@ Packages to bootstrap:
 First-publish notes:
 - scoped packages default to private/restricted on first publish
 - first public publish must use `--access public`
-- repo automation already does this in [tools/release/publish-packages.mjs](../tools/release/publish-packages.mjs)
+- repo automation already does this in [tools/release/publish-tarballs.mjs](../tools/release/publish-tarballs.mjs)
 - you must own the scope or have org publish permission before bootstrapping
 
 Recommended bootstrap order:
@@ -113,7 +119,7 @@ For each published package, configure npm trusted publishing:
 - provider: GitHub Actions
 - repository: `PaulSenon/better-age`
 - workflow filename: `publish-release.yml`
-- environment: leave blank
+- environment: `release-control`, if npm asks for environment
 
 Why one file:
 - npm registry currently supports one trusted publisher config per package
@@ -122,6 +128,8 @@ Why one file:
 Trusted publishing requirements to preserve:
 - GitHub-hosted runners
 - workflow has `id-token: write`
+- Node version is `22.14.0` or newer
+- npm CLI version is `11.5.1` or newer
 - package `repository.url` points at this GitHub repository
 
 Official docs:
@@ -173,10 +181,12 @@ Stable release path is PR-centered:
 3. workflow creates or updates one canonical release PR
 4. release PR contains shared version bumps + package changelog updates
 5. maintainer reviews and merges that release PR
-6. merged release PR triggers stable publish from that exact merge commit
-7. packages publish to npm `latest`
-8. only after publish succeeds, workflow creates git tag
-9. only after tag succeeds, workflow creates GitHub Release
+6. merged release PR triggers `build_stable` from that exact merge commit
+7. `build_stable` installs, builds, and packs npm tarballs without OIDC permission
+8. `publish_stable` waits for `release-control` approval
+9. `publish_stable` downloads the tarballs and publishes them to npm `latest`
+10. only after publish succeeds, `create_stable_release_metadata` creates git tag
+11. only after tag succeeds, `create_stable_release_metadata` creates GitHub Release
 
 ### How to run it
 
@@ -194,8 +204,12 @@ Stable release path is PR-centered:
 
 - stable source of truth is the merged release PR commit
 - both packages stay on one shared version line
+- build and publish are separate jobs
+- only the minimal publish job has `id-token: write`
+- only the metadata job has `contents: write`
 - publish happens before tag and GitHub Release
 - stable publish uses npm dist-tag `latest`
+- npm publishes prebuilt tarballs with `--ignore-scripts`
 - changelog output comes from changesets
 - tag format is `vX.Y.Z`
 - GitHub Release is convenience metadata, not changelog source of truth
@@ -209,6 +223,8 @@ Stable release path is PR-centered:
 It does:
 - manual trigger only
 - derive prerelease version from current shared package version
+- build and pack npm tarballs without OIDC permission
+- publish the prebuilt tarballs from a minimal approved OIDC job
 - publish both packages to dist-tag `next`
 
 It does not:
@@ -231,6 +247,10 @@ It does not:
 
 - version shape is `X.Y.Z-next.<run>.<attempt>`
 - version bump is runner-local only; repo files are not committed back
+- build and publish are separate jobs
+- only the minimal publish job has `id-token: write`
+- `next` publish only needs `contents: read`
+- npm publishes prebuilt tarballs with `--ignore-scripts`
 - publish target is npm dist-tag `next`
 - stable users still get `latest`
 
@@ -256,6 +276,7 @@ Recovery:
 
 Examples:
 - install/build failure
+- tarball packing failure
 - npm auth/OIDC failure before first successful `npm publish`
 
 Recovery:
