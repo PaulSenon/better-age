@@ -13,6 +13,14 @@ Already handled in code:
 - stable publish now waits on GitHub environment `release-control`.
 - stable publish only runs for merged same-repo `changeset-release/main` PRs.
 - publish jobs do not restore dependency caches.
+- build jobs install dependencies, build packages, and upload npm tarballs without
+  `id-token: write`.
+- publish jobs only download prebuilt tarballs and run `npm publish --ignore-scripts`
+  with `id-token: write`.
+- stable release metadata runs in a separate job with `contents: write` and no
+  `id-token: write`.
+- publish jobs assert Node `22.14.0+` and npm `11.5.1+`, matching npm trusted
+  publishing requirements.
 - release actions are pinned by commit SHA.
 - published packages set `publishConfig.registry` and `publishConfig.access`.
 - pnpm install policy uses a 3-day package age gate and explicit build allowlist.
@@ -235,24 +243,25 @@ Why:
 
 - confirms users can trace published package back to this repo workflow.
 
-### 9. Add release tarball inspection
+### 9. Review release tarball output
 
-Where: repo workflow or manual release checklist.
+Where: GitHub Actions logs or manual release checklist.
 
 Procedure:
 
-1. After build, before publish, run per published package:
+1. After build, release workflow runs:
 
 ```sh
-npm pack --dry-run --json
+pnpm release:pack
 ```
 
-2. Inspect output file list.
+2. Inspect `npm pack` JSON output in workflow logs when release contents matter.
 3. Expected payload:
    - `package.json`
+   - `README.md`
+   - `LICENSE`
    - `dist/**`
-   - standard npm files if present, like `README.md` or `LICENSE`
-4. Fail release if unexpected files appear.
+4. Treat unexpected files as release blockers.
 
 Why:
 

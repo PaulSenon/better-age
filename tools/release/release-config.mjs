@@ -10,10 +10,18 @@ export const publishedPackages = Object.freeze([
 	{
 		name: "@better-age/cli",
 		path: "packages/cli",
+		expectedPackedFiles: ["LICENSE", "README.md", "dist/bage", "package.json"],
 	},
 	{
 		name: "@better-age/varlock",
 		path: "packages/varlock",
+		expectedPackedFiles: [
+			"LICENSE",
+			"README.md",
+			"dist/plugin.cjs",
+			"dist/plugin.cjs.map",
+			"package.json",
+		],
 	},
 	// TODO: enable when public
 	// {
@@ -24,3 +32,6 @@ export const publishedPackages = Object.freeze([
 
 export const stableDistTag = "latest";
 export const prereleaseDistTag = "next";
+
+export const releaseTarballDirectory = ".release-tarballs";
+export const releaseTarballManifestPath = `${releaseTarballDirectory}/manifest.json`;
