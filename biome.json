@@ -11,7 +11,8 @@
 			"!!**/dist",
 			"!!**/.astro",
 			"!!.llms/references",
-			"!!**/node_modules"
+			"!!**/node_modules",
+			"!!**/test/fixtures"
 		]
 	},
 	"formatter": {

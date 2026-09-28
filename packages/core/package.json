@@ -9,7 +9,15 @@
 		"directory": "packages/core"
 	},
 	"exports": {
-		".": "./src/index.ts"
+		"./CoreLayer": "./src/CoreLayer.ts",
+		"./Errors": "./src/Errors.ts",
+		"./Home": "./src/Home.ts",
+		"./Identities": "./src/Identities.ts",
+		"./Notices": "./src/Notices.ts",
+		"./Payloads": "./src/Payloads.ts",
+		"./domain/Identity": "./src/domain/Identity.ts",
+		"./domain/Payload": "./src/domain/Payload.ts",
+		"./test-support/*": "./test/support/*.ts"
 	},
 	"scripts": {
 		"lint": "biome check .",
@@ -21,15 +29,17 @@
 		"test": "pnpm run test:unit && pnpm run test:integration"
 	},
 	"dependencies": {
+		"@noble/hashes": "2.0.1",
 		"age-encryption": "^0.3.0",
-		"effect": "^3.21.2"
+		"effect": "4.0.0-rc.117"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "2.4.10",
-		"@effect/language-service": "^0.85.1",
-		"@effect/vitest": "^0.29.0",
+		"@effect/language-service": "0.87.2",
+		"@effect/platform-node": "4.0.0-rc.117",
+		"@effect/vitest": "4.0.0-rc.117",
 		"@types/node": "^25.6.0",
 		"typescript": "^6.0.3",
-		"vitest": "^3.2.4"
+		"vitest": "5.0.1"
 	}
 }
