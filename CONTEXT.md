@@ -271,7 +271,7 @@ _Avoid_: Key generation directory, garbage-collector queue
 - **Fingerprint** is a **Derived Fingerprint**, not a stored field of the **Public Identity Snapshot**.
 - The current target persisted fields of **Public Identity Snapshot** are `ownerId`, `publicKey`, `displayName`, and `identityUpdatedAt`.
 - A **Load Protocol** is a **Compatibility Gate**, not a persisted artifact schema.
-- A **Command Grammar** owns command shape and parse-time behavior through `@effect/cli`, and delegates execution to command flows.
+- A **Command Grammar** owns command shape and parse-time behavior through Effect v4 `effect/unstable/cli`, and delegates execution to command flows.
 - A **Standalone CLI Bundle** is the primary MVP release artifact.
 - `@better-age/core` may remain an internal dependency bundled into the **Standalone CLI Bundle** for MVP.
 - **Human Output Styling** is presentation-only and never applies to machine stdout.

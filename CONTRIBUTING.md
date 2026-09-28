@@ -68,12 +68,11 @@ Rotation is local state. Payload rewrites stay explicit.
 ## Tech stack
 
 - TypeScript
-- Effect
-- `@effect/cli`
-- `@effect/platform`
+- Effect v4 (`effect@4.0.0-rc.117`, pinned exactly while in RC), including
+  `effect/unstable/cli` and `effect/unstable/process`
 - `@effect/platform-node`
-- `@inquirer/prompts`
-- `@effect/vitest`
+- `@inquirer/prompts` (stderr prompts)
+- `@effect/vitest` + vitest 5
 - `age-encryption`
 - esbuild
 - varlock

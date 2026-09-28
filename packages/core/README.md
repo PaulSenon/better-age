@@ -11,8 +11,27 @@ Responsibilities:
 - artifact codecs and migrations
 - identity and key lifecycle
 - payload lifecycle
-- core ports/adapters contracts
-- typed semantic errors, notices, and success outcomes
+- typed semantic errors and notices
+
+## Architecture (Effect v4)
+
+```txt
+src/artifacts/   Schema codecs for every persisted format (pure)
+src/domain/      identity + payload rules as plain functions returning Result
+src/services/    the only effectful boundaries:
+                   HomeStore     ~/.better-age files, modes, key transaction
+                   PayloadFiles  caller-owned payload files (temp + rename)
+                   AgeCrypto     age-encryption (keys, passphrases, payloads)
+src/Home.ts, Identities.ts, Payloads.ts   use cases (Effect.fn)
+src/Errors.ts    tagged errors; `_tag` is the public error code
+src/Notices.ts   warnings reported while succeeding (CLI renders them)
+src/CoreLayer.ts live services for a home dir (needs FileSystem/Path/Crypto)
+```
+
+Use cases are plain functions; callers provide `CoreLayer.layer({ homeDir })`
+plus a platform layer (`NodeServices.layer`). Tests swap in an in-memory
+`FileSystem` and a fake `AgeCrypto` (`test/support`), and prove on-disk
+compatibility against real pre-V2 artifacts (`test/fixtures/pre-v2`).
 
 Payload files use a human-readable `BETTER AGE PAYLOAD` wrapper around untouched
 age armor. Core owns formatting, extraction, validation, and the explicit
