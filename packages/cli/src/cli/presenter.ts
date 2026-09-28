@@ -135,8 +135,6 @@ const failureMessage = (code: string) => {
 			return "payload id generator is unavailable";
 		case "PAYLOAD_NOT_FOUND":
 			return "payload not found";
-		case "PAYLOAD_ENV_INVALID":
-			return "invalid .env content";
 		case "PAYLOAD_PATH_MISSING":
 			return "pass a payload path or run interactively";
 		case "PAYLOAD_UPDATE_REQUIRED":

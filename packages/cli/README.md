@@ -151,8 +151,7 @@ bage interactive
   name, `0600` file permissions, and deletes the file afterward, but editor
   swap files, backups, crash recovery, plugins, or shell tooling can still leave
   residual plaintext outside Better Age's control.
-- Invalid edited `.env` content logs the validation failure, then offers Reopen
-  Editor or Cancel while preserving the edited text for retry.
+- Edited payload text is saved as-is; `edit` does not check `.env` syntax.
 - `view` uses an in-process secure viewer with keyboard scrolling and quit.
   Control characters are rendered visibly, not interpreted by the terminal.
 - `interactive` opens a setup-aware menu loop. It excludes `load` and
