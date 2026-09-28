@@ -33,6 +33,10 @@ for (const manifestPackage of manifestPackages) {
 	}
 }
 
+// Verify every tarball before publishing any, so one bad artifact cannot leave
+// a partial release on npm (versions are immutable once published).
+const verifiedTarballPaths = [];
+
 for (const publishedPackage of publishedPackages) {
 	const tarball = manifestPackages.find(
 		(manifestPackage) => manifestPackage.name === publishedPackage.name,
@@ -92,11 +96,15 @@ for (const publishedPackage of publishedPackages) {
 		process.exit(1);
 	}
 
+	verifiedTarballPaths.push(tarball.path);
+}
+
+for (const tarballPath of verifiedTarballPaths) {
 	const result = spawnSync(
 		"npm",
 		[
 			"publish",
-			tarball.path,
+			tarballPath,
 			"--tag",
 			tag,
 			"--access",

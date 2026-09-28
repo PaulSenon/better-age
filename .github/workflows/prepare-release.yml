@@ -3,9 +3,7 @@ name: Prepare Release
 on:
   workflow_dispatch:
 
-permissions:
-  contents: write
-  pull-requests: write
+permissions: {}
 
 concurrency:
   group: prepare-release
@@ -13,14 +11,20 @@ concurrency:
 
 jobs:
   prepare:
+    permissions:
+      contents: write # changesets/action commits the version bump via the API
+      pull-requests: write # changesets/action opens/updates the release PR
     runs-on: ubuntu-latest
     environment: release-control
 
     steps:
       - name: Checkout repo
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
+          # github-api commit mode pushes via REST, so install scripts never
+          # need a git credential on disk.
+          persist-credentials: false
 
       - name: Require main branch
         run: |
@@ -30,10 +34,10 @@ jobs:
           fi
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@6854221e62e0759fe8deffc48ccb9c91daf8f9b0
+        uses: pnpm/action-setup@739bfe42ca9233c5e6aca07c1a25a9d34aca49b0 # v6.0.7
 
       - name: Setup Node
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version: "24"
           package-manager-cache: false
@@ -41,25 +45,12 @@ jobs:
       - name: Enable Corepack
         run: corepack enable
 
-      - name: Configure pnpm store
-        run: |
-          pnpm config set store-dir ~/.pnpm-store
-          mkdir -p ~/.pnpm-store
-
-      - name: Restore pnpm store cache
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
-        with:
-          path: ~/.pnpm-store
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-store-
-
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
       - name: Create or update release PR
         id: changesets
-        uses: changesets/action@63a615b9cd06ba9a3e6d13796c7fbcb080a60a0b
+        uses: changesets/action@63a615b9cd06ba9a3e6d13796c7fbcb080a60a0b # v1.8.0
         with:
           version: pnpm changeset:version
           title: "chore(release): version packages"

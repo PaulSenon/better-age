@@ -34,8 +34,9 @@ Everything else in the monorepo is release-isolated:
 - changesets config: [.changeset/config.json](../.changeset/config.json)
 
 Important constraint:
-- npm trusted publishing currently allows one trusted publisher config per package
-- because of that, stable publish and prerelease publish must share one workflow file: `publish-release.yml`
+- stable publish and prerelease publish share one workflow file, `publish-release.yml`,
+  so each npm package needs a single trusted publisher entry
+  (npm allows up to 10 per package, but fewer entries = smaller trust surface)
 - `publishedPackages[*].expectedPackedFiles` is the strict npm tarball allowlist;
   update it when intentionally changing public package files
 
@@ -60,7 +61,8 @@ Expected baseline branch protection for `main`:
 - require conversation resolution
 - do not allow bypassing protection rules
 - restrict direct pushes to trusted maintainers only
-- if repo CI checks exist, make them required before merge
+- require the `check` and `workflow-audit` status checks from the `CI`
+  workflow ([.github/workflows/ci.yml](../.github/workflows/ci.yml)) before merge
 
 Official docs:
 - protected branches: <https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches>
@@ -119,11 +121,14 @@ For each published package, configure npm trusted publishing:
 - provider: GitHub Actions
 - repository: `PaulSenon/better-age`
 - workflow filename: `publish-release.yml`
-- environment: `release-control`, if npm asks for environment
+- environment: `release-control` (binds OIDC publishing to the approved environment)
+- allowed actions: enable direct `npm publish`
+  (configs created after 2026-09-03 default to `npm stage publish` only, and
+  `tools/release/publish-tarballs.mjs` runs `npm publish`)
 
 Why one file:
-- npm registry currently supports one trusted publisher config per package
-- this repo therefore uses one publish workflow file for both stable and `next`
+- one publish workflow file serves both stable and `next`, so one trusted
+  publisher entry per package covers both channels
 
 Trusted publishing requirements to preserve:
 - GitHub-hosted runners

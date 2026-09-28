@@ -29,3 +29,6 @@ pnpm-debug.log*
 # Alchemy
 **/.alchemy
 **/.alchemy_state
+
+# Release tarballs (tools/release/pack-packages.mjs)
+.release-tarballs

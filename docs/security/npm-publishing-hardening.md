@@ -17,11 +17,23 @@ Already handled in code:
   `id-token: write`.
 - publish jobs only download prebuilt tarballs and run `npm publish --ignore-scripts`
   with `id-token: write`.
+- `publish-tarballs.mjs` checks every tarball checksum before the first
+  `npm publish`, so one bad artifact cannot cause a partial release. The
+  checksum manifest ships in the same artifact, so it catches corruption and
+  mix-ups, not a compromised build job.
 - stable release metadata runs in a separate job with `contents: write` and no
   `id-token: write`.
 - publish jobs assert Node `22.14.0+` and npm `11.5.1+`, matching npm trusted
   publishing requirements.
-- release actions are pinned by commit SHA.
+- all actions are pinned by full commit SHA with a `# vX.Y.Z` comment;
+  `.github/dependabot.yml` keeps them updated after a 7-day cooldown.
+- every workflow defaults to `permissions: {}`; jobs opt in to what they need.
+- checkouts use `persist-credentials: false`, except the job that pushes the
+  release tag.
+- `run:` steps read workflow values from `env`, not inline `${{ }}`.
+- `CI` (`.github/workflows/ci.yml`) runs on PRs and `main` with a read-only
+  token. It runs check/test/build/pack and a zizmor workflow audit.
+- no workflow uses a dependency cache (avoids cache poisoning into release jobs).
 - published packages set `publishConfig.registry` and `publishConfig.access`.
 - pnpm install policy uses a 3-day package age gate and explicit build allowlist.
 
@@ -53,7 +65,9 @@ Procedure:
    - Repository owner: `PaulSenon`
    - Repository name: `better-age`
    - Workflow filename: `publish-release.yml`
-   - Environment: `release-control`, if npm asks for environment
+   - Environment: `release-control`
+   - Allowed actions: enable direct `npm publish` (configs created after
+     2026-09-03 default to `npm stage publish` only)
 5. Repeat for `@better-age/varlock`.
 
 Expected result:
@@ -189,6 +203,11 @@ Procedure:
    - push protection
    - Dependabot alerts
    - Dependabot security updates
+3. `Settings` -> `Actions` -> `General`:
+   - enable `Require actions to be pinned to a full-length commit SHA`
+   - set default `GITHUB_TOKEN` permissions to read-only
+   - keep `Allow GitHub Actions to create and approve pull requests` enabled
+     (needed by `Prepare Release`)
 3. If available, enable private vulnerability reporting.
 
 Expected result:
@@ -207,9 +226,12 @@ Where: GitHub + repo PRs.
 
 Procedure:
 
-1. Configure Renovate or Dependabot for GitHub Actions updates.
-2. Let it open PRs updating pinned SHAs.
-3. Review action changelogs before merge.
+1. `.github/dependabot.yml` opens weekly grouped PRs for GitHub Actions,
+   after a 7-day cooldown.
+2. Each PR updates both the SHA and its `# vX.Y.Z` comment.
+3. Review action changelogs before merge. CI plus zizmor must pass.
+4. Major bumps (for example `changesets/action` v1 -> v2) can change inputs.
+   Review them alone, not as part of a grouped merge.
 
 Expected result:
 
