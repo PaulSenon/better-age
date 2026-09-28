@@ -1,0 +1,18 @@
+# Keeps SHA-pinned actions current. Dependabot bumps the pin and its
+# `# vX.Y.Z` comment together; CI (incl. zizmor) must pass before merge.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    # Let fresh action releases age before proposing them, mirroring the
+    # pnpm minimumReleaseAge gate for npm dependencies.
+    cooldown:
+      default-days: 7
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+    commit-message:
+      prefix: ci

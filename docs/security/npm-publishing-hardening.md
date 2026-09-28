@@ -1,0 +1,359 @@
+# npm Publishing Hardening
+
+This checklist separates repo changes from account/provider settings. The repo
+can request OIDC, but npm and GitHub settings decide whether release publishing
+is actually locked down.
+
+## Current Repo State
+
+Already handled in code:
+
+- `publish-release.yml` requests `id-token: write` for npm trusted publishing.
+- stable and next publish through `.github/workflows/publish-release.yml`.
+- stable publish now waits on GitHub environment `release-control`.
+- stable publish only runs for merged same-repo `changeset-release/main` PRs.
+- publish jobs do not restore dependency caches.
+- build jobs install dependencies, build packages, and upload npm tarballs without
+  `id-token: write`.
+- publish jobs only download prebuilt tarballs and run `npm publish --ignore-scripts`
+  with `id-token: write`.
+- `publish-tarballs.mjs` checks every tarball checksum before the first
+  `npm publish`, so one bad artifact cannot cause a partial release. The
+  checksum manifest ships in the same artifact, so it catches corruption and
+  mix-ups, not a compromised build job.
+- stable release metadata runs in a separate job with `contents: write` and no
+  `id-token: write`.
+- publish jobs assert Node `22.14.0+` and npm `11.5.1+`, matching npm trusted
+  publishing requirements.
+- all actions are pinned by full commit SHA with a `# vX.Y.Z` comment;
+  `.github/dependabot.yml` keeps them updated after a 7-day cooldown.
+- every workflow defaults to `permissions: {}`; jobs opt in to what they need.
+- checkouts use `persist-credentials: false`, except the job that pushes the
+  release tag.
+- `run:` steps read workflow values from `env`, not inline `${{ }}`.
+- `CI` (`.github/workflows/ci.yml`) runs on PRs and `main` with a read-only
+  token. It runs check/test/build/pack and a zizmor workflow audit.
+- no workflow uses a dependency cache (avoids cache poisoning into release jobs).
+- published packages set `publishConfig.registry` and `publishConfig.access`.
+- pnpm install policy (`pnpm-workspace.yaml`): `minimumReleaseAge: 4320`
+  (3-day age gate), `trustPolicy: no-downgrade`, `blockExoticSubdeps: true`, and
+  an explicit `allowBuilds` allowlist for install scripts. An urgent security fix
+  younger than 3 days needs a temporary `minimumReleaseAgeExclude` entry.
+  Dependabot does not know about this gate, so its npm PRs for fresh versions
+  can fail install until the version ages.
+
+Still manual:
+
+- npm trusted publisher settings per package.
+- npm token restrictions per package.
+- GitHub environment protection rules.
+- GitHub branch/security settings.
+
+## P0 - Must Do
+
+### 1. Verify or create npm trusted publishers
+
+Where: npmjs.com.
+
+For each package:
+
+- `@better-age/cli`
+- `@better-age/varlock`
+
+Procedure:
+
+1. Open `https://www.npmjs.com/package/@better-age/cli`.
+2. Go to `Settings`.
+3. Find `Trusted Publisher`.
+4. If absent, add one:
+   - Provider: `GitHub Actions`
+   - Repository owner: `PaulSenon`
+   - Repository name: `better-age`
+   - Workflow filename: `publish-release.yml`
+   - Environment: `release-control`
+   - Allowed actions: enable direct `npm publish` (configs created after
+     2026-09-03 default to `npm stage publish` only)
+5. Repeat for `@better-age/varlock`.
+
+Expected result:
+
+- npm package accepts publishes from this repo workflow without an npm token.
+- published versions should show provenance when repo/package are public.
+
+Why:
+
+- OIDC credentials are short-lived and workflow-scoped.
+- A leaked long-lived npm token should not be part of the release path.
+
+### 2. Run one trusted-publishing release before disabling tokens
+
+Where: GitHub Actions + npmjs.com.
+
+Procedure:
+
+1. Merge a normal changeset release PR.
+2. Let `Publish Release` run.
+3. Approve `release-control` when GitHub asks.
+4. Confirm npm published the package successfully.
+5. On npm package page, check latest version provenance badge/details.
+
+Only continue to step 3 after this succeeds.
+
+Why:
+
+- npm does not fully prove trusted-publisher config until a real publish path
+  uses it.
+
+### 3. Disable token publishing on npm packages
+
+Where: npmjs.com.
+
+For each package:
+
+- `@better-age/cli`
+- `@better-age/varlock`
+
+Procedure:
+
+1. Open package page.
+2. Go to `Settings`.
+3. Find publishing access / 2FA settings.
+4. Select `Require two-factor authentication and disallow tokens`.
+5. Save.
+
+Then:
+
+1. Open npm account settings.
+2. Open access tokens.
+3. Revoke old automation/publish tokens not needed anymore.
+4. Keep account 2FA enabled.
+
+Expected result:
+
+- Manual publish still requires your npm account 2FA.
+- Classic/granular tokens cannot publish these packages.
+- GitHub trusted publishing still works.
+
+Why:
+
+- If your laptop, dotfiles, or old CI token leaks, attacker still cannot publish.
+
+### 4. Configure GitHub `release-control` environment
+
+Where: GitHub repo settings.
+
+Procedure:
+
+1. Open `PaulSenon/better-age`.
+2. Go to `Settings` -> `Environments`.
+3. Open or create `release-control`.
+4. Enable required reviewers:
+   - reviewer: `PaulSenon`
+5. Keep `Prevent self-review` disabled.
+6. Set deployment branches/tags to `No restriction`, or to selected
+   branches and tags with both `main` and `refs/pull/*/merge`
+   (`publish_stable` runs on the release PR's merge ref; `main` alone
+   blocks it).
+7. Save.
+
+Expected result:
+
+- `publish_next` waits for approval.
+- `publish_stable` waits for approval after release PR merge.
+- Approval happens before GitHub starts the job that has `id-token: write`.
+- You can approve your own release because solo maintainer.
+
+Why:
+
+- A compromised GitHub session still needs an explicit environment approval
+  moment before npm publish.
+- The OIDC token used by npm trusted publishing is only minted inside the
+  approved release job.
+
+### 5. Protect `main`
+
+Where: GitHub repo settings.
+
+Procedure:
+
+1. Open `Settings` -> `Rules` or `Branches`.
+2. Add/edit ruleset for `main`.
+3. Enable:
+   - require pull request before merge
+   - require status checks before merge
+   - require branches up to date before merge, if not too painful
+   - block force pushes
+   - block deletions
+4. Do not enable required code-owner review while solo maintainer.
+
+Expected result:
+
+- release-relevant changes land through PRs and CI.
+- direct destructive branch changes are harder.
+
+Why:
+
+- trusted publishing trusts the GitHub repo. Protect the repo path.
+
+## P1 - Strongly Recommended
+
+### 6. Enable GitHub security features
+
+Where: GitHub repo settings.
+
+Procedure:
+
+1. Open `Settings` -> `Code security and analysis`.
+2. Enable:
+   - secret scanning
+   - push protection
+   - Dependabot alerts
+   - Dependabot security updates
+3. `Settings` -> `Actions` -> `General`:
+   - enable `Require actions to be pinned to a full-length commit SHA`
+   - set default `GITHUB_TOKEN` permissions to read-only
+   - keep `Allow GitHub Actions to create and approve pull requests` enabled
+     (needed by `Prepare Release`)
+4. If available, enable private vulnerability reporting.
+
+Expected result:
+
+- GitHub blocks obvious secret commits.
+- vulnerable dependency alerts become visible.
+
+Why:
+
+- reduces chance of leaking npm/GitHub credentials or shipping known vulnerable
+  dependencies.
+
+### 7. Keep SHA-pinned actions updated
+
+Where: GitHub + repo PRs.
+
+Procedure:
+
+1. `.github/dependabot.yml` opens weekly grouped PRs for GitHub Actions,
+   after a 7-day cooldown.
+2. Each PR updates both the SHA and its `# vX.Y.Z` comment.
+3. Review action changelogs before merge. CI plus zizmor must pass.
+4. Major bumps (for example `changesets/action` v1 -> v2) can change inputs.
+   Review them alone, not as part of a grouped merge.
+
+Expected result:
+
+- workflows keep immutable action refs without becoming stale forever.
+
+Why:
+
+- SHA pins protect against mutable tags, but old actions can miss security fixes.
+
+### 8. Verify package provenance after releases
+
+Where: npmjs.com.
+
+Procedure:
+
+1. Open package page after release.
+2. Open latest version.
+3. Click provenance badge/details if present.
+4. Confirm:
+   - repository: `PaulSenon/better-age`
+   - workflow: `publish-release.yml`
+   - commit matches release commit
+
+Optional consumer-side check:
+
+```sh
+npm audit signatures
+```
+
+Why:
+
+- confirms users can trace published package back to this repo workflow.
+
+### 9. Review release tarball output
+
+Where: GitHub Actions logs or manual release checklist.
+
+Procedure:
+
+1. After build, release workflow runs:
+
+```sh
+pnpm release:pack
+```
+
+2. Inspect `npm pack` JSON output in workflow logs when release contents matter.
+3. Expected payload:
+   - `package.json`
+   - `README.md`
+   - `LICENSE`
+   - `dist/**`
+4. Treat unexpected files as release blockers.
+
+Why:
+
+- prevents accidental publication of source fixtures, local files, or secrets.
+
+## P2 - Nice To Have
+
+### 10. Commit signing
+
+Where: GitHub account settings + local git.
+
+Reality:
+
+- Not required for npm provenance.
+- OIDC/provenance proves the package came from configured GitHub workflow and
+  source commit.
+- Commit signing improves repo audit trail.
+
+Procedure, simplest path:
+
+1. GitHub -> `Settings` -> `SSH and GPG keys`.
+2. Add an SSH signing key or GPG key.
+3. Configure local git signing.
+4. Enable GitHub vigilant mode if desired.
+
+Use when:
+
+- you want GitHub UI to show `Verified` commits from your machine.
+- you later add external maintainers.
+
+Do not treat this as replacement for:
+
+- trusted publishing
+- branch protection
+- release environment approval
+
+### 11. Add `SECURITY.md`
+
+Where: repo root.
+
+Include:
+
+- vulnerability report contact
+- supported packages
+- expected response time
+- do-not-disclose-publicly note
+
+Why:
+
+- gives users a safer reporting path for crypto/security issues.
+
+### 12. Add a backup maintainer later
+
+Where: GitHub repo + npm package access.
+
+When project has real users:
+
+1. Add trusted backup maintainer.
+2. Require code-owner review for:
+   - `.github/workflows/**`
+   - `tools/release/**`
+   - package manifests
+3. Enable prevent self-review on `release-control`.
+
+Why:
+
+- reduces single-account compromise risk.

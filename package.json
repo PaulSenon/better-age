@@ -13,9 +13,11 @@
 		"changeset": "changeset",
 		"changeset:status": "changeset status --verbose",
 		"changeset:version": "changeset version",
-		"release:publish:next": "node tools/release/publish-packages.mjs --tag next",
+		"release:publish:next": "node tools/release/publish-tarballs.mjs --tag next",
 		"release:build": "node tools/release/run-published-package-script.mjs build",
-		"release:publish:stable": "node tools/release/publish-packages.mjs --tag latest",
+		"release:publish:stable": "node tools/release/publish-tarballs.mjs --tag latest",
+		"release:pack": "node tools/release/pack-packages.mjs",
+		"release:publish:tarballs": "node tools/release/publish-tarballs.mjs",
 		"release:version:prerelease": "node tools/release/derive-prerelease-version.mjs --channel next",
 		"release:version:read": "node tools/release/read-release-version.mjs",
 		"website:deploy:prod": "pnpm -F @infra/website run deploy:prod",
@@ -38,5 +40,5 @@
 		"rimraf": "catalog:",
 		"typescript": "catalog:"
 	},
-	"packageManager": "pnpm@10.33.2+sha512.a90faf6feeab71ad6c6e57f94e0fe1a12f5dcc22cd754db40ae9593eb6a3e0b6b12e3540218bb37ae083404b1f2ce6db2a4121e979829b4aff94b99f49da1cf8"
+	"packageManager": "pnpm@10.33.3+sha512.a19744364a7e248b92657a4ca5973f9354d21caf982579674b1c539f32c7420c47138ad8b1254df07aba9bc782d9b3029e3db34d5dbff974326eb74dac8ff489"
 }
