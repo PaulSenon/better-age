@@ -77,14 +77,19 @@ Official docs:
 Create GitHub environment:
 - name: `release-control`
 
-Use it to gate manual release operations:
+Jobs using it:
 - `Prepare Release`
-- manual `next` publishes in `Publish Release`
+- `publish_stable` (after the release PR merges)
+- `publish_next` (manual `next` publishes)
 
 Recommended environment settings:
 - required reviewers: `PaulSenon`
 - prevent self-review: disabled while this is a solo-maintainer project
-- optional branch restriction: `main`
+- deployment branches/tags: either `No restriction`, or `Selected branches and tags`
+  with **both** `main` and `refs/pull/*/merge`. `publish_stable` is started by a
+  `pull_request` closed event, so its `GITHUB_REF` is `refs/pull/<n>/merge`.
+  Allowing only `main` blocks stable publishes. The workflows already check `main`
+  and the `changeset-release/main` same-repo head themselves.
 
 This gates the jobs that can mint npm trusted-publishing OIDC tokens while
 still allowing a solo maintainer to approve releases.
@@ -336,7 +341,9 @@ Recovery path is simpler:
 - fix the issue
 - run `Publish Release` again with channel `next`
 
-Because prerelease version includes run number + attempt, reruns produce a fresh prerelease version instead of colliding with the failed publish version.
+The prerelease version (run number + attempt) is derived in `build_next`. For a
+fresh version, start a new dispatch or use `Re-run all jobs`. `Re-run failed jobs`
+reuses the old tarballs and fails on any package that already published.
 
 ## Operator checklist
 

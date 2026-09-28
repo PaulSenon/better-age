@@ -150,9 +150,10 @@ Procedure:
 4. Enable required reviewers:
    - reviewer: `PaulSenon`
 5. Keep `Prevent self-review` disabled.
-6. Set deployment branches/tags:
-   - selected branches only
-   - allow `main`
+6. Set deployment branches/tags to `No restriction`, or to selected
+   branches and tags with both `main` and `refs/pull/*/merge`
+   (`publish_stable` runs on the release PR's merge ref; `main` alone
+   blocks it).
 7. Save.
 
 Expected result:

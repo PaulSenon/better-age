@@ -538,3 +538,4 @@
 - publish-tarballs.mjs now verifies all tarballs before any publish.
 - npm facts (docs 2026-09-03): up to 10 trusted publishers/package; configs after 2026-09-03 default to `npm stage publish` only, so direct `npm publish` must be enabled.
 - Dependabot supports pnpm only up to v10; pnpm 11+ upgrade (V2 thread) breaks Dependabot npm updates.
+- 2026-09-28 later: #13/#14/#15 closed by coordinator (branches kept); #18 retargeted to main as self-contained PR (forward merge of main, no rewrite). Restored cli `prepare` script (#14 rename superseded). publish-release concurrency keyed per source to avoid cancelling queued stable run. release-control env: branch policy must allow `refs/pull/*/merge` or be unrestricted (publish_stable runs on PR merge ref).

@@ -16,8 +16,11 @@ on:
 
 permissions: {}
 
+# One queue per source (repo:branch for PRs): every closed PR starts a
+# (skipped) run, and GitHub keeps only one pending run per group, so a shared
+# group could cancel a queued stable release awaiting approval.
 concurrency:
-  group: publish-release
+  group: publish-release-${{ github.event_name == 'pull_request' && format('{0}:{1}', github.event.pull_request.head.repo.full_name, github.event.pull_request.head.ref) || github.ref }}
   cancel-in-progress: false
 
 jobs:
