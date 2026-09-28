@@ -208,7 +208,7 @@ Procedure:
    - set default `GITHUB_TOKEN` permissions to read-only
    - keep `Allow GitHub Actions to create and approve pull requests` enabled
      (needed by `Prepare Release`)
-3. If available, enable private vulnerability reporting.
+4. If available, enable private vulnerability reporting.
 
 Expected result:
 

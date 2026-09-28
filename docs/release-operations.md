@@ -63,6 +63,10 @@ Expected baseline branch protection for `main`:
 - restrict direct pushes to trusted maintainers only
 - require the `check` and `workflow-audit` status checks from the `CI`
   workflow ([.github/workflows/ci.yml](../.github/workflows/ci.yml)) before merge
+  - `Prepare Release` opens and updates the release PR with `GITHUB_TOKEN`, so
+    GitHub creates its CI runs in an approval-required state. In the release PR
+    merge box, select `Approve workflows to run` and wait for green before merging.
+    ([GITHUB_TOKEN docs](https://docs.github.com/en/actions/concepts/security/github_token))
 
 Official docs:
 - protected branches: <https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches>

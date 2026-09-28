@@ -67,6 +67,8 @@ jobs:
         with:
           name: npm-release-tarballs
           path: .release-tarballs
+          # The directory name starts with "." and would be skipped otherwise.
+          include-hidden-files: true
           if-no-files-found: error
           retention-days: 1
 
@@ -214,6 +216,8 @@ jobs:
         with:
           name: npm-release-tarballs
           path: .release-tarballs
+          # The directory name starts with "." and would be skipped otherwise.
+          include-hidden-files: true
           if-no-files-found: error
           retention-days: 1
 

@@ -56,6 +56,16 @@ jobs:
       - name: Pack publishable packages
         run: pnpm release:pack
 
+      # Exercises the release artifact upload (same inputs as publish-release).
+      - name: Upload release tarballs
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: npm-release-tarballs
+          path: .release-tarballs
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 1
+
   workflow-audit:
     permissions:
       contents: read
