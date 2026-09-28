@@ -2,6 +2,9 @@
 // operations Core uses, file modes, and per-call failure injection.
 import { Effect, FileSystem, Layer, PlatformError } from "effect";
 
+/** Relative paths resolve against this directory (the fake cwd). */
+export const memoryCwd = "/project";
+
 type Entry =
 	| { readonly type: "File"; contents: string; mode: number }
 	| { readonly type: "Directory"; mode: number };
@@ -18,6 +21,11 @@ export type MemoryFileSystem = {
 
 const parentOf = (path: string) => path.slice(0, path.lastIndexOf("/")) || "/";
 
+const resolve = (path: string) =>
+	(path.startsWith("/") ? path : `${memoryCwd}/${path}`)
+		.replace(/\/\.\/?$|\/\.(?=\/)/g, "")
+		.replace(/(.)\/$/, "$1");
+
 export const makeMemoryFileSystem = (
 	initial: Record<string, string> = {},
 ): MemoryFileSystem => {
@@ -28,12 +36,12 @@ export const makeMemoryFileSystem = (
 		entries,
 		failWhen: () => false,
 		file: (path) => {
-			const entry = entries.get(path);
+			const entry = entries.get(resolve(path));
 			return entry?.type === "File" ? entry.contents : undefined;
 		},
-		mode: (path) => entries.get(path)?.mode,
+		mode: (path) => entries.get(resolve(path))?.mode,
 		setMode: (path, mode) => {
-			const entry = entries.get(path);
+			const entry = entries.get(resolve(path));
 			if (entry === undefined) throw new Error(`No entry at ${path}`);
 			entry.mode = mode;
 		},
@@ -85,31 +93,68 @@ export const makeMemoryFileSystem = (
 		});
 	};
 
-	for (const [path, contents] of Object.entries(initial)) {
+	for (const [raw, contents] of Object.entries(initial)) {
+		const path = resolve(raw);
 		ensureParents(path);
 		writeFile(path, contents, 0o600);
 	}
+	ensureParents(`${memoryCwd}/x`);
+
+	let tempCounter = 0;
+	const makeTempDirectory = (options?: {
+		readonly prefix?: string | undefined;
+	}) =>
+		guard("makeTempDirectory", "/tmp", () => {
+			tempCounter += 1;
+			const path = `/tmp/${options?.prefix ?? "tmp-"}${tempCounter}`;
+			ensureParents(`${path}/x`, 0o700);
+			return path;
+		});
+	const remove = (
+		raw: string,
+		options?: { readonly force?: boolean | undefined },
+	) => {
+		const path = resolve(raw);
+		return guard("remove", path, () => {
+			if (!entries.has(path) && options?.force !== true) {
+				throw error("remove", path, "NotFound");
+			}
+			for (const key of [...entries.keys()]) {
+				if (key === path || key.startsWith(`${path}/`)) {
+					entries.delete(key);
+				}
+			}
+		});
+	};
 
 	const fs = FileSystem.makeNoop({
-		exists: (path) => guard("exists", path, () => entries.has(path)),
-		stat: (path) =>
-			guard("stat", path, () => {
+		exists: (raw) => {
+			const path = resolve(raw);
+			return guard("exists", path, () => entries.has(path));
+		},
+		stat: (raw) => {
+			const path = resolve(raw);
+			return guard("stat", path, () => {
 				const entry = entries.get(path);
 				if (entry === undefined) {
 					throw error("stat", path, "NotFound");
 				}
 				return { type: entry.type, mode: entry.mode } as FileSystem.File.Info;
-			}),
-		chmod: (path, mode) =>
-			guard("chmod", path, () => {
+			});
+		},
+		chmod: (raw, mode) => {
+			const path = resolve(raw);
+			return guard("chmod", path, () => {
 				const entry = entries.get(path);
 				if (entry === undefined) {
 					throw error("chmod", path, "NotFound");
 				}
 				entry.mode = mode;
-			}),
-		makeDirectory: (path, options) =>
-			guard("makeDirectory", path, () => {
+			});
+		},
+		makeDirectory: (raw, options) => {
+			const path = resolve(raw);
+			return guard("makeDirectory", path, () => {
 				if (options?.recursive === true) {
 					ensureParents(`${path}/x`, options.mode);
 				}
@@ -119,39 +164,50 @@ export const makeMemoryFileSystem = (
 						mode: options?.mode ?? 0o755,
 					});
 				}
-			}),
-		readFileString: (path) =>
-			guard("readFileString", path, () => {
+			});
+		},
+		makeTempDirectory,
+		makeTempDirectoryScoped: (options) =>
+			Effect.acquireRelease(makeTempDirectory(options), (path) =>
+				Effect.ignore(remove(path, { force: true })),
+			),
+		readDirectory: (raw) => {
+			const path = resolve(raw);
+			return guard("readDirectory", path, () =>
+				[...entries.keys()]
+					.filter((key) => key !== path && parentOf(key) === path)
+					.map((key) => key.slice(path.length + 1)),
+			);
+		},
+		readFileString: (raw) => {
+			const path = resolve(raw);
+			return guard("readFileString", path, () => {
 				const entry = entries.get(path);
 				if (entry?.type !== "File") {
 					throw error("readFileString", path, "NotFound");
 				}
 				return entry.contents;
-			}),
-		writeFileString: (path, contents, options) =>
-			guard("writeFileString", path, () =>
+			});
+		},
+		writeFileString: (raw, contents, options) => {
+			const path = resolve(raw);
+			return guard("writeFileString", path, () =>
 				writeFile(path, contents, options?.mode),
-			),
-		rename: (from, to) =>
-			guard("rename", from, () => {
+			);
+		},
+		rename: (rawFrom, rawTo) => {
+			const from = resolve(rawFrom);
+			const to = resolve(rawTo);
+			return guard("rename", from, () => {
 				const entry = entries.get(from);
 				if (entry === undefined) {
 					throw error("rename", from, "NotFound");
 				}
 				entries.set(to, entry);
 				entries.delete(from);
-			}),
-		remove: (path, options) =>
-			guard("remove", path, () => {
-				if (!entries.has(path) && options?.force !== true) {
-					throw error("remove", path, "NotFound");
-				}
-				for (const key of [...entries.keys()]) {
-					if (key === path || key.startsWith(`${path}/`)) {
-						entries.delete(key);
-					}
-				}
-			}),
+			});
+		},
+		remove,
 	});
 
 	return state;

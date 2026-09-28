@@ -1,11 +1,37 @@
-import { stderr, stdout } from "node:process";
-import { createNodeCli } from "../cli/nodeCli.js";
-import { createNodeTerminal } from "../cli/nodeTerminal.js";
+import { homedir } from "node:os";
+import { join } from "node:path";
+import * as CoreLayer from "@better-age/core/CoreLayer";
+import { NodeRuntime, NodeServices } from "@effect/platform-node";
+import { Effect, Layer } from "effect";
+import { noticesLayer, runBage } from "../main.js";
+import { error } from "../present.js";
+import { nodeUiLayer } from "../ui/nodeUi.js";
 
-const result = await createNodeCli({
-	terminal: createNodeTerminal(),
-}).run(process.argv.slice(2));
+declare const __BETTER_AGE_CLI_VERSION__: string | undefined;
 
-stdout.write(result.stdout);
-stderr.write(result.stderr);
-process.exitCode = result.exitCode;
+const version =
+	typeof __BETTER_AGE_CLI_VERSION__ === "string"
+		? __BETTER_AGE_CLI_VERSION__
+		: "0.0.0-dev";
+
+const layer = Layer.mergeAll(
+	CoreLayer.layer({ homeDir: join(homedir(), ".better-age") }),
+	noticesLayer,
+).pipe(Layer.provideMerge(Layer.mergeAll(NodeServices.layer, nodeUiLayer)));
+
+runBage(process.argv.slice(2), version).pipe(
+	Effect.tap((exitCode) =>
+		Effect.sync(() => {
+			process.exitCode = exitCode;
+		}),
+	),
+	// SIGINT/SIGTERM outside a prompt (e.g. during key derivation or while the
+	// editor runs): scopes close, then runMain exits 130.
+	Effect.onInterrupt(() =>
+		Effect.sync(() => {
+			process.stderr.write(error("CANCELLED", "command cancelled"));
+		}),
+	),
+	Effect.provide(layer),
+	NodeRuntime.runMain({ disableErrorReporting: true }),
+);

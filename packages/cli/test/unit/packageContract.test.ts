@@ -22,7 +22,7 @@ describe("package contracts", () => {
 		expect(packageJson.scripts?.build).toBe(
 			"rimraf ./dist && node ./esbuild.config.mjs",
 		);
-		expect(packageJson.dependencies).not.toHaveProperty(
+		expect(packageJson.dependencies ?? {}).not.toHaveProperty(
 			"@better-age/cli-legacy",
 		);
 		expect(packageJson.devDependencies).toHaveProperty("esbuild");

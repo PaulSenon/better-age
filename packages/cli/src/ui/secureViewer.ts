@@ -1,28 +1,15 @@
+// Secure viewer: plaintext is rendered on stderr in the alternate screen,
+// never on stdout, with control characters made visible. Pure state/render
+// functions below; the raw-mode runtime lives in nodeUi.ts.
+import { sanitize } from "../present.js";
+
 const minimumViewportHeight = 1;
 const reservedRows = 4;
 
-const enterAlternateScreen = "\u001B[?1049h";
-const exitAlternateScreen = "\u001B[?1049l";
-const hideCursor = "\u001B[?25l";
-const showCursor = "\u001B[?25h";
-
-export class SecureViewerUnavailableError extends Error {
-	readonly code = "VIEWER_UNAVAILABLE";
-	readonly name = "SecureViewerUnavailableError";
-
-	constructor() {
-		super("Secure viewer requires an interactive TTY");
-	}
-}
-
-export class SecureViewerDisplayError extends Error {
-	readonly code = "VIEWER_DISPLAY_FAILED";
-	readonly name = "SecureViewerDisplayError";
-
-	constructor(cause: unknown) {
-		super(`Secure viewer failed: ${String(cause)}`);
-	}
-}
+export const enterAlternateScreen = "\u001B[?1049h";
+export const exitAlternateScreen = "\u001B[?1049l";
+export const hideCursor = "\u001B[?25l";
+export const showCursor = "\u001B[?25h";
 
 export type ViewerAction =
 	| "down"
@@ -79,38 +66,14 @@ export type SecureViewerRuntime = {
 	readonly stdin: ViewerStdin;
 };
 
-const renderControlCharacter = (character: string) => {
-	switch (character) {
-		case "\t":
-			return "\\t";
-		case "\r":
-			return "\\r";
-		default:
-			return `\\x${character.charCodeAt(0).toString(16).padStart(2, "0")}`;
-	}
-};
-
-export const sanitizeViewerText = (text: string) =>
-	Array.from(text)
-		.map((character) => {
-			const code = character.charCodeAt(0);
-
-			return code < 0x20 || code === 0x7f || (code >= 0x80 && code <= 0x9f)
-				? renderControlCharacter(character)
-				: character;
-		})
-		.join("");
-
 export const createViewerState = (input: {
 	readonly envText: string;
 	readonly path: string;
 	readonly rows: number;
 }): ViewerState => ({
 	lines:
-		input.envText.length === 0
-			? [""]
-			: input.envText.split("\n").map(sanitizeViewerText),
-	path: sanitizeViewerText(input.path),
+		input.envText.length === 0 ? [""] : input.envText.split("\n").map(sanitize),
+	path: sanitize(input.path),
 	rows: input.rows,
 	scrollTop: 0,
 });
@@ -219,98 +182,3 @@ export const toViewerAction = (key: ViewerKey): ViewerAction => {
 			return key.sequence === "G" ? "end" : "noop";
 	}
 };
-
-const renderToScreen = (runtime: SecureViewerRuntime, frame: string) => {
-	runtime.stderr.write(enterAlternateScreen);
-	runtime.stderr.write(hideCursor);
-	runtime.stderr.cursorTo(0, 0);
-	runtime.stderr.clearScreenDown();
-	runtime.stderr.write(frame);
-};
-
-const restoreScreen = (runtime: SecureViewerRuntime) => {
-	runtime.stderr.write(showCursor);
-	runtime.stderr.write(exitAlternateScreen);
-};
-
-export const openSecureViewer = (
-	runtime: SecureViewerRuntime,
-	input: {
-		readonly envText: string;
-		readonly path: string;
-	},
-): Promise<void> =>
-	new Promise((resolve, reject) => {
-		if (!runtime.stdin.isTTY || !runtime.stderr.isTTY) {
-			reject(new SecureViewerUnavailableError());
-			return;
-		}
-
-		const { stderr, stdin } = runtime;
-		const previousRawMode = stdin.isRaw;
-		let closed = false;
-		let state = createViewerState({
-			envText: input.envText,
-			path: input.path,
-			rows: stderr.rows ?? 24,
-		});
-
-		const cleanup = () => {
-			if (closed) {
-				return;
-			}
-
-			closed = true;
-			stdin.off("keypress", onKeypress);
-			stderr.off("resize", onResize);
-			stdin.setRawMode(Boolean(previousRawMode));
-			stdin.pause();
-			restoreScreen(runtime);
-		};
-
-		const fail = (cause: unknown) => {
-			cleanup();
-			reject(new SecureViewerDisplayError(cause));
-		};
-
-		const render = () => {
-			renderToScreen(runtime, renderViewerFrame(state));
-		};
-
-		const onResize = () => {
-			state = { ...state, rows: stderr.rows ?? state.rows };
-			try {
-				render();
-			} catch (cause) {
-				fail(cause);
-			}
-		};
-
-		const onKeypress = (_input: string, key: ViewerKey) => {
-			const action = toViewerAction(key);
-
-			if (action === "quit") {
-				cleanup();
-				resolve();
-				return;
-			}
-
-			state = reduceViewerState(state, action);
-			try {
-				render();
-			} catch (cause) {
-				fail(cause);
-			}
-		};
-
-		try {
-			runtime.emitKeypressEvents(stdin);
-			stdin.setRawMode(true);
-			stdin.resume();
-			stdin.on("keypress", onKeypress);
-			stderr.on("resize", onResize);
-			render();
-		} catch (cause) {
-			fail(cause);
-		}
-	});
