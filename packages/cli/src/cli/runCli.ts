@@ -466,17 +466,6 @@ const importKnownIdentityWithTrustGate = async (input: {
 	});
 };
 
-const isValidEnvText = (envText: string): boolean =>
-	envText
-		.split(/\r?\n/)
-		.map((line) => line.trim())
-		.every(
-			(line) =>
-				line.length === 0 ||
-				line.startsWith("#") ||
-				/^[A-Za-z_][A-Za-z0-9_]*=.*/.test(line),
-		);
-
 const isValidNewPassphrase = (passphrase: string): boolean =>
 	passphrase.length >= 8;
 
@@ -1031,89 +1020,50 @@ const runEditPayload = async (
 		return presentFailure("EDITOR_UNAVAILABLE");
 	}
 
-	let stderr = gate.stderr;
-	let editorText = opened.payload.envText;
+	const stderr = gate.stderr;
+	const edited = await input.terminal.openEditor(opened.payload.envText);
 
-	for (let attempt = 0; attempt < 5; attempt++) {
-		const edited = await input.terminal.openEditor(editorText);
-
-		if (edited.kind === "failure") {
-			return {
-				...presentFailure(edited.code),
-				stderr: `${stderr}${presentFailure(edited.code).stderr}`,
-			};
-		}
-
-		if (edited.kind === "cancel") {
-			return {
-				...presentFailure("CANCELLED", 130),
-				stderr: `${stderr}${presentFailure("CANCELLED", 130).stderr}`,
-			};
-		}
-
-		editorText = edited.text;
-
-		if (editorText === opened.payload.envText) {
-			return {
-				...presentSuccess(`Payload unchanged: ${opened.payload.path}`),
-				stderr: `${stderr}${presentSuccess(`Payload unchanged: ${opened.payload.path}`).stderr}`,
-			};
-		}
-
-		if (!isValidEnvText(editorText)) {
-			stderr += await emitInteractiveFeedback(
-				input,
-				presentFailure("PAYLOAD_ENV_INVALID"),
-			);
-			const selected = await promptSelectOne(
-				input.terminal,
-				"Invalid .env content",
-				[
-					{ value: "reopen-editor", label: "Reopen editor", disabled: false },
-					{ value: CANCEL_CHOICE, label: "Cancel", disabled: false },
-				],
-			);
-
-			if (selected === CANCEL_CHOICE) {
-				return {
-					...presentFailure("CANCELLED", 130),
-					stderr: `${stderr}${presentFailure("CANCELLED", 130).stderr}`,
-				};
-			}
-
-			if (selected === "reopen-editor" || selected === null) {
-				continue;
-			}
-
-			return {
-				...presentFailure("CANCELLED", 130),
-				stderr: `${stderr}${presentFailure("CANCELLED", 130).stderr}`,
-			};
-		}
-
-		const response = await input.core.commands.editPayload({
-			path: opened.payload.path,
-			passphrase: opened.passphrase,
-			editedEnvText: editorText,
-		});
-
-		if (response.result.kind === "failure") {
-			return {
-				...presentFailure(response.result.code),
-				stderr: `${stderr}${presentFailure(response.result.code).stderr}`,
-			};
-		}
-
-		const outcome =
-			response.result.value.outcome === "unchanged" ? "unchanged" : "edited";
-
+	if (edited.kind === "failure") {
 		return {
-			...presentSuccess(`Payload ${outcome}: ${response.result.value.path}`),
-			stderr: `${stderr}${presentSuccess(`Payload ${outcome}: ${response.result.value.path}`).stderr}`,
+			...presentFailure(edited.code),
+			stderr: `${stderr}${presentFailure(edited.code).stderr}`,
 		};
 	}
 
-	return presentFailure("PAYLOAD_ENV_INVALID");
+	if (edited.kind === "cancel") {
+		return {
+			...presentFailure("CANCELLED", 130),
+			stderr: `${stderr}${presentFailure("CANCELLED", 130).stderr}`,
+		};
+	}
+
+	if (edited.text === opened.payload.envText) {
+		return {
+			...presentSuccess(`Payload unchanged: ${opened.payload.path}`),
+			stderr: `${stderr}${presentSuccess(`Payload unchanged: ${opened.payload.path}`).stderr}`,
+		};
+	}
+
+	const response = await input.core.commands.editPayload({
+		path: opened.payload.path,
+		passphrase: opened.passphrase,
+		editedEnvText: edited.text,
+	});
+
+	if (response.result.kind === "failure") {
+		return {
+			...presentFailure(response.result.code),
+			stderr: `${stderr}${presentFailure(response.result.code).stderr}`,
+		};
+	}
+
+	const outcome =
+		response.result.value.outcome === "unchanged" ? "unchanged" : "edited";
+
+	return {
+		...presentSuccess(`Payload ${outcome}: ${response.result.value.path}`),
+		stderr: `${stderr}${presentSuccess(`Payload ${outcome}: ${response.result.value.path}`).stderr}`,
+	};
 };
 
 const resolveGrantRecipient = async (

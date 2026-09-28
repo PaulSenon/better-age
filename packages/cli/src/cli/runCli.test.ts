@@ -976,10 +976,12 @@ describe("runCli command contracts", () => {
 			},
 		]);
 
+		// Regression: edited text is saved as-is; there is no .env format gate.
 		const changed = makeCore();
+		const arbitraryText = 'not valid env\n  free = form\n{"json": true}';
 		let editorInput = "";
 		let editCount = 0;
-		let recoveryChoices: ReadonlyArray<string> = [];
+		let selectCount = 0;
 		await expect(
 			runCli({
 				argv: ["edit", "secrets.env.enc"],
@@ -991,24 +993,22 @@ describe("runCli command contracts", () => {
 					openEditor: async (initialText) => {
 						editorInput = initialText;
 						editCount++;
-						return editCount === 1
-							? { kind: "saved", text: "not valid env" }
-							: { kind: "saved", text: "API_KEY=new-value\n" };
+						return { kind: "saved", text: arbitraryText };
 					},
-					selectOne: async (_label, choices) => {
-						recoveryChoices = choices.map((choice) => choice.value);
-						return "reopen-editor";
+					selectOne: async () => {
+						selectCount++;
+						return "cancel";
 					},
 				},
 			}),
 		).resolves.toEqual({
 			exitCode: 0,
 			stdout: "",
-			stderr:
-				"[ERROR] PAYLOAD_ENV_INVALID: invalid .env content\n[OK] Payload edited: secrets.env.enc\n",
+			stderr: "[OK] Payload edited: secrets.env.enc\n",
 		});
-		expect(editorInput).toBe("not valid env");
-		expect(recoveryChoices).toEqual(["reopen-editor", "cancel"]);
+		expect(editorInput).toBe(decryptedPayload.envText);
+		expect(editCount).toBe(1);
+		expect(selectCount).toBe(0);
 		expect(changed.calls).toEqual([
 			{
 				name: "decryptPayload",
@@ -1019,36 +1019,15 @@ describe("runCli command contracts", () => {
 				input: {
 					path: "secrets.env.enc",
 					passphrase: "correct horse",
-					editedEnvText: "API_KEY=new-value\n",
+					editedEnvText: arbitraryText,
 				},
 			},
 		]);
-
-		const invalidCancelled = makeCore();
-		await expect(
-			runCli({
-				argv: ["edit", "secrets.env.enc"],
-				core: invalidCancelled.core,
-				payloadPathExists: async () => true,
-				terminal: {
-					mode: "interactive",
-					promptSecret: async () => "correct horse",
-					openEditor: async () => ({ kind: "saved", text: "bad env" }),
-					selectOne: async () => "cancel",
-				},
-			}),
-		).resolves.toEqual({
-			exitCode: 130,
-			stdout: "",
-			stderr:
-				"[ERROR] PAYLOAD_ENV_INVALID: invalid .env content\n[ERROR] CANCELLED: command cancelled\n",
-		});
 	});
 
 	it("emits recoverable edit feedback immediately in interactive sessions", async () => {
 		const passphrases = ["wrong", "correct horse"];
 		const emitted: Array<string> = [];
-		let editCount = 0;
 		const core = makeCore({
 			queries: {
 				decryptPayload: async (input) => {
@@ -1068,11 +1047,10 @@ describe("runCli command contracts", () => {
 				terminal: {
 					mode: "interactive",
 					promptSecret: async () => passphrases.shift() ?? "",
-					openEditor: async () =>
-						editCount++ === 0
-							? { kind: "saved", text: "bad env" }
-							: { kind: "saved", text: "API_KEY=new-value\n" },
-					selectOne: async () => "reopen-editor",
+					openEditor: async () => ({
+						kind: "saved",
+						text: "API_KEY=new-value\n",
+					}),
 					writeResult: (result) => {
 						emitted.push(result.stderr);
 					},
@@ -1085,7 +1063,6 @@ describe("runCli command contracts", () => {
 		});
 		expect(emitted).toEqual([
 			"[ERROR] PASSPHRASE_INCORRECT: invalid passphrase, try again\n",
-			"[ERROR] PAYLOAD_ENV_INVALID: invalid .env content\n",
 		]);
 	});
 

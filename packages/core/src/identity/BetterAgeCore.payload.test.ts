@@ -267,7 +267,7 @@ describe("BetterAgeCore payload lifecycle", () => {
 		});
 	});
 
-	it("edits payload env text with validation and unchanged detection", async () => {
+	it("edits payload env text with unchanged detection", async () => {
 		const { core } = makeHarness();
 		await core.commands.createSelfIdentity({
 			displayName: "Isaac",
@@ -278,15 +278,6 @@ describe("BetterAgeCore payload lifecycle", () => {
 			passphrase: "correct horse",
 		});
 
-		await expect(
-			core.commands.editPayload({
-				path: ".env.enc",
-				passphrase: "correct horse",
-				editedEnvText: "not valid",
-			}),
-		).resolves.toMatchObject({
-			result: { kind: "failure", code: "PAYLOAD_ENV_INVALID" },
-		});
 		await expect(
 			core.commands.editPayload({
 				path: ".env.enc",
@@ -326,6 +317,43 @@ describe("BetterAgeCore payload lifecycle", () => {
 					envKeys: ["DATABASE_URL"],
 				},
 			},
+		});
+	});
+
+	// Regression: payload text is stored as-is; there is no .env format gate.
+	it("accepts and round-trips arbitrary non-env payload text byte-for-byte", async () => {
+		const { core } = makeHarness();
+		await core.commands.createSelfIdentity({
+			displayName: "Isaac",
+			passphrase: "correct horse",
+		});
+		await core.commands.createPayload({
+			path: ".env.enc",
+			passphrase: "correct horse",
+		});
+		const arbitraryText =
+			'not valid\r\n  indented = spaced\n9STARTS_WITH_DIGIT=1\nexport FOO=bar\n{"json": true}\n\t\u00e9\u00e8 \u{1f510}\n=no-key\nno trailing newline';
+
+		await expect(
+			core.commands.editPayload({
+				path: ".env.enc",
+				passphrase: "correct horse",
+				editedEnvText: arbitraryText,
+			}),
+		).resolves.toMatchObject({
+			result: {
+				kind: "success",
+				code: "PAYLOAD_EDITED",
+				value: { outcome: "edited" },
+			},
+		});
+		await expect(
+			core.queries.decryptPayload({
+				path: ".env.enc",
+				passphrase: "correct horse",
+			}),
+		).resolves.toMatchObject({
+			result: { kind: "success", value: { envText: arbitraryText } },
 		});
 	});
 

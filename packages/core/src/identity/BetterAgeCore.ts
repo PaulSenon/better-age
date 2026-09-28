@@ -443,17 +443,6 @@ const envKeysFromText = (envText: EnvText): ReadonlyArray<string> =>
 		.map((line) => line.split("=", 1)[0])
 		.filter((key): key is string => key !== undefined && key.length > 0);
 
-const isValidEnvText = (envText: EnvText): boolean =>
-	envText
-		.split(/\r?\n/)
-		.map((line) => line.trim())
-		.every(
-			(line) =>
-				line.length === 0 ||
-				line.startsWith("#") ||
-				/^[A-Za-z_][A-Za-z0-9_]*=.*/.test(line),
-		);
-
 const isSamePublicIdentity = (
 	left: PublicIdentitySnapshot,
 	right: PublicIdentitySnapshot,
@@ -945,10 +934,6 @@ export const createBetterAgeCore = (ports: BetterAgeCorePorts) => {
 		readonly passphrase: Passphrase;
 		readonly editedEnvText: EnvText;
 	}) => {
-		if (!isValidEnvText(input.editedEnvText)) {
-			return failure("PAYLOAD_ENV_INVALID", undefined);
-		}
-
 		const opened = await openPayloadPlaintext(input);
 
 		if (opened.kind === "failure") {

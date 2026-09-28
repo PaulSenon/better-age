@@ -133,6 +133,52 @@ describe("real core adapters", () => {
 		});
 	});
 
+	// Regression: arbitrary payload text survives real age encryption unchanged.
+	it("round-trips arbitrary non-env payload text through real age crypto", async () => {
+		const homeDir = await makeTempDir();
+		const payloadPath = join(homeDir, "notes.age");
+		const core = createBetterAgeCore({
+			clock: { now: async () => "2026-04-25T10:00:00.000Z" },
+			homeRepository: createNodeHomeRepository({ homeDir }),
+			identityCrypto: createAgeIdentityCrypto(),
+			payloadCrypto: createAgePayloadCrypto(),
+			payloadRepository: createNodePayloadRepository(),
+			randomIds: {
+				nextOwnerId: async () => "owner_real",
+				nextPayloadId: async () => "payload_real",
+			},
+		});
+		const arbitraryText =
+			'free-form notes\r\n-----END BETTER AGE PAYLOAD-----\n{"k": [1, 2]}\n\u00e9\u{1f510}\n\n  = \nno trailing newline';
+
+		await core.commands.createSelfIdentity({
+			displayName: "Isaac",
+			passphrase: "old passphrase",
+		});
+		await core.commands.createPayload({
+			path: payloadPath,
+			passphrase: "old passphrase",
+		});
+
+		await expect(
+			core.commands.editPayload({
+				path: payloadPath,
+				passphrase: "old passphrase",
+				editedEnvText: arbitraryText,
+			}),
+		).resolves.toMatchObject({
+			result: { kind: "success", value: { outcome: "edited" } },
+		});
+		await expect(
+			core.queries.decryptPayload({
+				path: payloadPath,
+				passphrase: "old passphrase",
+			}),
+		).resolves.toMatchObject({
+			result: { kind: "success", value: { envText: arbitraryText } },
+		});
+	});
+
 	it("repairs loose home and key permissions before reading local keys", async () => {
 		const homeDir = await makeTempDir();
 		const core = createBetterAgeCore({
