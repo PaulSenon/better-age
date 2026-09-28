@@ -98,6 +98,24 @@ pnpm -F @better-age/varlock check
 pnpm -F @better-age/varlock test
 ```
 
+## Git worktrees
+
+Each worktree (T3, `git worktree add`, ...) must be initialized once:
+
+```sh
+node tools/worktree/init.mjs          # install deps + link shared read-only assets
+node tools/worktree/init.mjs --check  # report only, exit 1 if something is missing
+```
+
+It is idempotent and never overwrites existing paths. It runs
+`pnpm install --frozen-lockfile` (per-worktree `node_modules`) and, outside the
+primary checkout, symlinks gitignored `.llms/references` from the primary
+checkout if present. Nothing else is shared: no `node_modules`, `dist`, caches,
+`.alchemy` state, secrets, or home-directory state.
+
+T3 Code: in the better-age project scripts, set the `install` script command to
+`node tools/worktree/init.mjs` and enable "run on worktree create".
+
 ## Architecture rules
 
 - keep v0 simple
