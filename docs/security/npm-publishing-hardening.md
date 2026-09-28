@@ -35,7 +35,12 @@ Already handled in code:
   token. It runs check/test/build/pack and a zizmor workflow audit.
 - no workflow uses a dependency cache (avoids cache poisoning into release jobs).
 - published packages set `publishConfig.registry` and `publishConfig.access`.
-- pnpm install policy uses a 3-day package age gate and explicit build allowlist.
+- pnpm install policy (`pnpm-workspace.yaml`): `minimumReleaseAge: 4320`
+  (3-day age gate), `trustPolicy: no-downgrade`, `blockExoticSubdeps: true`, and
+  an explicit `allowBuilds` allowlist for install scripts. An urgent security fix
+  younger than 3 days needs a temporary `minimumReleaseAgeExclude` entry.
+  Dependabot does not know about this gate, so its npm PRs for fresh versions
+  can fail install until the version ages.
 
 Still manual:
 

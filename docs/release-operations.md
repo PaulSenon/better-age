@@ -57,7 +57,8 @@ Official docs:
 
 Expected baseline branch protection for `main`:
 - require pull request before merging
-- require at least one review
+- required approvals: `0` while solo (GitHub does not let a PR author approve
+  their own PR, so `1` would block every merge); raise to `1` with a second maintainer
 - require conversation resolution
 - do not allow bypassing protection rules
 - restrict direct pushes to trusted maintainers only

@@ -22,7 +22,7 @@
 		"pack": "pnpm pack --pack-destination ./dist",
 		"build": "rimraf ./dist && node ./esbuild.config.mjs",
 		"clean": "rimraf ./dist",
-		"language-service:patch": "effect-language-service patch",
+		"prepare": "effect-language-service patch",
 		"lint": "biome check .",
 		"lint:fix": "biome check . --write",
 		"typecheck": "tsc --noEmit",
