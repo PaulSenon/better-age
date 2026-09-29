@@ -11,7 +11,7 @@ import {
 	GlobalFlag,
 } from "effect/unstable/cli";
 import { bage } from "./commands.js";
-import { CliFailure, exitCodeOf, type Failure } from "./failures.js";
+import { exitCodeOf, isFailure } from "./failures.js";
 import { error } from "./present.js";
 import { say, sayFailure, sayWarning, Ui } from "./ui/Ui.js";
 
@@ -35,14 +35,6 @@ export const noticesLayer = Layer.effect(Notices)(
 		};
 	}),
 );
-
-const isFailure = (error: unknown): error is Failure =>
-	error instanceof CliFailure ||
-	(typeof error === "object" &&
-		error !== null &&
-		"_tag" in error &&
-		typeof error._tag === "string" &&
-		/^[A-Z_]+$/.test(error._tag));
 
 export const runBage = Effect.fnUntraced(function* (
 	argv: ReadonlyArray<string>,

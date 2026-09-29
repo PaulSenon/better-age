@@ -12,6 +12,7 @@ export const hideCursor = "\u001B[?25l";
 export const showCursor = "\u001B[?25h";
 
 export type ViewerAction =
+	| "abort"
 	| "down"
 	| "end"
 	| "noop"
@@ -32,38 +33,6 @@ export type ViewerKey = {
 	readonly ctrl?: boolean;
 	readonly name?: string;
 	readonly sequence?: string;
-};
-
-export type ViewerStdin = {
-	readonly isTTY?: boolean;
-	readonly isRaw?: boolean;
-	off(
-		event: "keypress",
-		listener: (input: string, key: ViewerKey) => void,
-	): void;
-	on(
-		event: "keypress",
-		listener: (input: string, key: ViewerKey) => void,
-	): void;
-	pause(): void;
-	resume(): void;
-	setRawMode(value: boolean): void;
-};
-
-export type ViewerStderr = {
-	readonly isTTY?: boolean;
-	readonly rows?: number;
-	clearScreenDown(): void;
-	cursorTo(x: number, y: number): void;
-	off(event: "resize", listener: () => void): void;
-	on(event: "resize", listener: () => void): void;
-	write(chunk: string): void;
-};
-
-export type SecureViewerRuntime = {
-	readonly emitKeypressEvents: (stream: ViewerStdin) => void;
-	readonly stderr: ViewerStderr;
-	readonly stdin: ViewerStdin;
 };
 
 export const createViewerState = (input: {
@@ -122,6 +91,7 @@ export const reduceViewerState = (
 			return { ...state, scrollTop: 0 };
 		case "end":
 			return { ...state, scrollTop: getMaxScrollTop(state) };
+		case "abort":
 		case "noop":
 		case "quit":
 			return state;
@@ -153,7 +123,7 @@ export const renderViewerFrame = (state: ViewerState) => {
 
 export const toViewerAction = (key: ViewerKey): ViewerAction => {
 	if (key.ctrl && key.name === "c") {
-		return "quit";
+		return "abort";
 	}
 
 	switch (key.name) {

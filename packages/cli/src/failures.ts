@@ -11,6 +11,7 @@ export type CliCode =
 	| "COMMAND_PARSE"
 	| "EDITOR_EXIT_NON_ZERO"
 	| "EDITOR_UNAVAILABLE"
+	| "IDENTITY_REFERENCE_AMBIGUOUS"
 	| "IDENTITY_REFERENCE_MISSING"
 	| "IDENTITY_STRING_MISSING"
 	| "INTERACTIVE_UNAVAILABLE"
@@ -60,6 +61,8 @@ const messages: Record<BetterAgeErrorCode | CliCode, string> = {
 	HOME_STATE_NOT_FOUND: "run bage setup first",
 	IDENTITY_KEY_UPDATE_REQUIRES_TRUST:
 		"identity key update requires explicit trust",
+	IDENTITY_REFERENCE_AMBIGUOUS:
+		"several identities match; use the owner id or a local alias",
 	IDENTITY_REFERENCE_MISSING: "pass an identity reference or run interactively",
 	IDENTITY_REFERENCE_NOT_FOUND: "identity reference not found",
 	IDENTITY_STRING_INVALID: "identity string is invalid",
@@ -94,6 +97,15 @@ const messages: Record<BetterAgeErrorCode | CliCode, string> = {
 	UNEXPECTED: "unexpected error",
 	VIEWER_UNAVAILABLE: "secure viewer is unavailable",
 };
+
+/** True for any failure with a known public code (Core or CLI). */
+export const isFailure = (error: unknown): error is Failure =>
+	error instanceof CliFailure ||
+	(typeof error === "object" &&
+		error !== null &&
+		"_tag" in error &&
+		typeof error._tag === "string" &&
+		Object.hasOwn(messages, error._tag));
 
 export const codeOf = (failure: Failure): BetterAgeErrorCode | CliCode =>
 	failure._tag === "CliFailure" ? failure.code : failure._tag;

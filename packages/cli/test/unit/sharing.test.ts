@@ -110,6 +110,51 @@ describe("grant", () => {
 	});
 });
 
+describe("reference resolution", () => {
+	it("refuses a display name shared by several identities", async () => {
+		const first = await otherIdentityString("Sam");
+		const second = await otherIdentityString("Sam");
+		const cli = makeTestCli();
+		await setupHome(cli);
+		await cli.run(["identity", "import", first], { interactive: false });
+		await cli.run(["identity", "import", second, "--alias", "sam2"], {
+			interactive: false,
+		});
+		await cli.run(["create", ".env.enc"], secret);
+
+		expect((await cli.run(["grant", ".env.enc", "Sam"], secret)).stderr).toBe(
+			"[ERROR] IDENTITY_REFERENCE_AMBIGUOUS: several identities match; use the owner id or a local alias\n",
+		);
+		expect(
+			(await cli.run(["grant", ".env.enc", "sam2"], secret)).stderr,
+		).toMatch(/^\[OK\] Recipient granted: sam2#fp_\w+\n$/);
+		expect((await cli.run(["identity", "forget", "Sam"])).stderr).toContain(
+			"IDENTITY_REFERENCE_AMBIGUOUS",
+		);
+	});
+
+	it("pushes a trusted key update of a known identity by name", async () => {
+		const sarah = makeTestCli();
+		await setupHome(sarah, "Sarah");
+		const before = (await sarah.run(["identity", "export"])).stdout.trim();
+		const cli = makeTestCli();
+		await setupHome(cli);
+		await cli.run(["identity", "import", before, "--alias", "sarah"]);
+		await cli.run(["create", ".env.enc"], secret);
+		await cli.run(["grant", ".env.enc", "sarah"], secret);
+
+		await sarah.run(["identity", "rotate"], secret);
+		const after = (await sarah.run(["identity", "export"])).stdout.trim();
+		await cli.run(["identity", "import", after, "--trust-key-update"], {
+			interactive: false,
+		});
+
+		expect(
+			(await cli.run(["grant", ".env.enc", "sarah"], secret)).stderr,
+		).toMatch(/^\[OK\] Recipient updated: sarah#fp_\w+\n$/);
+	});
+});
+
 describe("revoke", () => {
 	it("revokes exact and guided recipients but never self", async () => {
 		const { cli } = await sharedSetup();

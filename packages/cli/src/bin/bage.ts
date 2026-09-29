@@ -19,13 +19,21 @@ const layer = Layer.mergeAll(
 	noticesLayer,
 ).pipe(Layer.provideMerge(Layer.mergeAll(NodeServices.layer, nodeUiLayer)));
 
+// Closing the terminal (SIGHUP) must clean up like Ctrl-C: runMain interrupts
+// on SIGTERM, which closes scopes (editor plaintext temp dir, viewer raw mode).
+process.on("SIGHUP", () => process.kill(process.pid, "SIGTERM"));
+// Once the terminal is gone, writes fail with EIO; never let that crash cleanup.
+for (const stream of [process.stdout, process.stderr]) {
+	stream.on("error", () => {});
+}
+
 runBage(process.argv.slice(2), version).pipe(
 	Effect.tap((exitCode) =>
 		Effect.sync(() => {
 			process.exitCode = exitCode;
 		}),
 	),
-	// SIGINT/SIGTERM outside a prompt (e.g. during key derivation or while the
+	// SIGINT/SIGTERM/SIGHUP outside a prompt (e.g. during key derivation or while the
 	// editor runs): scopes close, then runMain exits 130.
 	Effect.onInterrupt(() =>
 		Effect.sync(() => {

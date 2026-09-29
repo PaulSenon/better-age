@@ -16,14 +16,28 @@ const renderControl = (character: string) =>
 			? "\\r"
 			: `\\x${character.charCodeAt(0).toString(16).padStart(2, "0")}`;
 
-/** Renders C0/C1 control characters visibly instead of interpreting them. */
+const isInvisibleFormat = (code: number) =>
+	(code >= 0x200b && code <= 0x200f) || // zero-width, LRM/RLM
+	(code >= 0x202a && code <= 0x202e) || // bidi embeddings/overrides
+	(code >= 0x2066 && code <= 0x2069) || // bidi isolates
+	code === 0x2028 ||
+	code === 0x2029 ||
+	code === 0xfeff;
+
+/**
+ * Renders C0/C1 controls, bidi overrides, and zero-width characters visibly,
+ * so untrusted names cannot drive the terminal or spoof picker labels.
+ */
 export const sanitize = (text: string) =>
 	Array.from(text)
 		.map((character) => {
 			const code = character.charCodeAt(0);
-			return code < 0x20 || code === 0x7f || (code >= 0x80 && code <= 0x9f)
-				? renderControl(character)
-				: character;
+
+			if (code < 0x20 || code === 0x7f || (code >= 0x80 && code <= 0x9f)) {
+				return renderControl(character);
+			}
+
+			return isInvisibleFormat(code) ? `\\u{${code.toString(16)}}` : character;
 		})
 		.join("");
 

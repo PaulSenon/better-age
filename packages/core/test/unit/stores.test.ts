@@ -91,8 +91,11 @@ describe("home store", () => {
 		const core = makeTestCore({
 			files: { [`${keys}/a.age`]: "old-a", [`${keys}/b.age`]: "old-b" },
 		});
+		// Fail only the post-commit cleanup (after the marker is gone).
 		core.fs.failWhen = (method, path) =>
-			method === "remove" && path === `${keys}/b.age.bak`;
+			method === "remove" &&
+			path === `${keys}/b.age.bak` &&
+			core.fs.file(`${keys}/b.age`) === "new-b";
 
 		return Effect.gen(function* () {
 			yield* (yield* HomeStore).replaceKeys([
@@ -130,6 +133,31 @@ describe("home store", () => {
 			expect(core.fs.file(`${keys}/b.age.new`)).toBeUndefined();
 		}).pipe(Effect.provide(core.layer));
 	});
+
+	it.effect(
+		"never restores a stale backup from an earlier committed swap",
+		() => {
+			const core = makeTestCore({
+				files: {
+					[`${keys}/a.age`]: "current-a",
+					[`${keys}/a.age.bak`]: "stale-a",
+				},
+			});
+			core.fs.failWhen = (method, path) =>
+				method === "rename" && path === `${keys}/a.age.new`;
+
+			return Effect.gen(function* () {
+				const exit = yield* Effect.exit(
+					(yield* HomeStore).replaceKeys([
+						{ ref: "keys/a.age", lockedKey: "new-a" },
+					]),
+				);
+
+				expect(Exit.isFailure(exit)).toBe(true);
+				expect(core.fs.file(`${keys}/a.age`)).toBe("current-a");
+			}).pipe(Effect.provide(core.layer));
+		},
+	);
 
 	it.effect("refuses key refs outside the managed keys directory", () => {
 		const core = makeTestCore();

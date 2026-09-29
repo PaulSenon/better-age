@@ -1,6 +1,6 @@
 // `setup` and `identity *` flows.
 import type { KnownIdentity } from "@better-age/core/domain/Identity";
-import { IdentityNotFound } from "@better-age/core/Errors";
+import { HomeAlreadySetup, IdentityNotFound } from "@better-age/core/Errors";
 import * as Home from "@better-age/core/Home";
 import * as Identities from "@better-age/core/Identities";
 import { Effect, Option } from "effect";
@@ -30,6 +30,11 @@ export const setup = Effect.fn("setup")(function* (
 
 	if (displayName.length === 0) {
 		return yield* usage("SETUP_NAME_MISSING");
+	}
+
+	// Fail before asking for a passphrase that would be thrown away.
+	if ((yield* Home.status).status === "setup") {
+		return yield* new HomeAlreadySetup();
 	}
 
 	const passphrase = yield* askNewPassphrase("Passphrase");
@@ -176,18 +181,40 @@ export const listKeys = Effect.fn("listKeys")(function* (flags: {
 	);
 });
 
-/** Matches a user reference against owner id, alias, handle, or display name. */
-export const matchesReference = (
-	identity: Pick<
-		KnownIdentity,
-		"ownerId" | "localAlias" | "handle" | "displayName"
-	>,
+type Referenceable = Pick<
+	KnownIdentity,
+	"ownerId" | "localAlias" | "handle" | "displayName"
+>;
+
+/**
+ * Resolves a user reference by precedence: owner id, local alias, handle,
+ * then display name. Display names come from other people's identity strings,
+ * so a name shared by several identities is refused instead of guessed.
+ */
+export const resolveReference = <T extends Referenceable>(
+	items: ReadonlyArray<T>,
 	reference: string,
 ) =>
-	identity.ownerId === reference ||
-	identity.localAlias === reference ||
-	identity.handle === reference ||
-	identity.displayName === reference;
+	Effect.gen(function* () {
+		for (const matches of [
+			(item: T) => item.ownerId === reference,
+			(item: T) => item.localAlias === reference,
+			(item: T) => item.handle === reference,
+			(item: T) => item.displayName === reference,
+		]) {
+			const found = items.filter(matches);
+
+			if (found.length > 1) {
+				return yield* new CliFailure({ code: "IDENTITY_REFERENCE_AMBIGUOUS" });
+			}
+
+			if (found[0] !== undefined) {
+				return Option.some(found[0]);
+			}
+		}
+
+		return Option.none<T>();
+	});
 
 export const forgetIdentity = Effect.fn("forgetIdentity")(function* (
 	reference: Option.Option<string>,
@@ -214,14 +241,14 @@ export const forgetIdentity = Effect.fn("forgetIdentity")(function* (
 		return yield* cancelled();
 	}
 
-	const identity = known.find((item) => matchesReference(item, selected));
+	const identity = yield* resolveReference(known, selected);
 
-	if (identity === undefined) {
+	if (Option.isNone(identity)) {
 		return yield* new IdentityNotFound();
 	}
 
-	yield* Identities.forgetIdentity(identity.ownerId);
-	yield* sayOk(`Identity forgotten: ${identity.ownerId}`);
+	yield* Identities.forgetIdentity(identity.value.ownerId);
+	yield* sayOk(`Identity forgotten: ${identity.value.ownerId}`);
 });
 
 export const rotateIdentity = Effect.gen(function* () {

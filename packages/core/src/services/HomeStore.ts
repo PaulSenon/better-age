@@ -280,18 +280,19 @@ const makeHomeStore = Effect.fnUntraced(function* (homeDir: string) {
 		const swap = Effect.gen(function* () {
 			yield* ensurePrivateDir(path.dirname(markerPath));
 			for (const key of keys) {
+				// No marker means the last swap committed: any `.bak` is stale and
+				// must not be restorable by a later recovery.
+				yield* fs.remove(`${keyPath(key.ref)}.bak`, { force: true });
 				yield* writePrivateFile(`${keyPath(key.ref)}.new`, key.lockedKey);
 			}
-			yield* fs.writeFileString(
+			yield* writePrivateFile(
 				markerPath,
 				JSON.stringify({
 					entries: keys.map((key) => ({ ref: key.ref })),
 					kind: "better-age/key-transaction",
 					version: 1,
 				}),
-				{ mode: privateFileMode },
 			);
-			yield* fs.chmod(markerPath, privateFileMode);
 			for (const key of keys) {
 				const stable = keyPath(key.ref);
 				yield* fs.rename(stable, `${stable}.bak`);
@@ -300,7 +301,11 @@ const makeHomeStore = Effect.fnUntraced(function* (homeDir: string) {
 			}
 			// Commit point: once the marker is gone the new keys are authoritative.
 			yield* fs.remove(markerPath, { force: true });
-		}).pipe(Effect.catchTag("PlatformError", Effect.die));
+		}).pipe(
+			Effect.catchTag("PlatformError", Effect.die),
+			// Ctrl-C must not cut the swap between renames.
+			Effect.uninterruptible,
+		);
 
 		yield* swap.pipe(
 			Effect.catchCause((cause) =>

@@ -8,7 +8,7 @@ import { CliFailure, cancelled, usage } from "../failures.js";
 import { error, identityLabel } from "../present.js";
 import { say, sayOk, Ui } from "../ui/Ui.js";
 import { ensureUpToDate, type OpenedPayload, openPayload } from "./common.js";
-import { importWithTrustGate, matchesReference } from "./identity.js";
+import { importWithTrustGate, resolveReference } from "./identity.js";
 
 const enterIdentityString = "__enter_identity_string__";
 
@@ -19,25 +19,27 @@ const toPublicIdentity = (identity: PublicIdentity): PublicIdentity => ({
 	identityUpdatedAt: identity.identityUpdatedAt,
 });
 
-/** Exact reference: payload recipient, known identity, or identity string. */
+/**
+ * Exact reference: known identity or payload recipient (the known copy wins
+ * for the same owner, so a trusted key update can be pushed), else an
+ * identity string.
+ */
 const resolveGrantReference = Effect.fnUntraced(function* (
 	opened: OpenedPayload,
 	reference: string,
 ) {
-	const recipient = opened.payload.recipients.find((item) =>
-		matchesReference(item, reference),
-	);
+	const known = yield* Identities.knownIdentities;
+	const knownOwners = new Set(known.map((identity) => identity.ownerId));
+	const candidates = [
+		...known,
+		...opened.payload.recipients.filter(
+			(recipient) => !knownOwners.has(recipient.ownerId),
+		),
+	];
+	const found = yield* resolveReference(candidates, reference);
 
-	if (recipient !== undefined) {
-		return toPublicIdentity(recipient);
-	}
-
-	const known = (yield* Identities.knownIdentities).find((item) =>
-		matchesReference(item, reference),
-	);
-
-	if (known !== undefined) {
-		return toPublicIdentity(known);
+	if (Option.isSome(found)) {
+		return toPublicIdentity(found.value);
 	}
 
 	return yield* Identities.parseIdentityString(reference).pipe(
@@ -175,9 +177,8 @@ export const revoke = Effect.fn("revoke")(function* (input: {
 		return yield* cancelled();
 	}
 
-	const recipient = recipients.find((item) =>
-		matchesReference(item, reference),
-	);
+	const found = yield* resolveReference(recipients, reference);
+	const recipient = Option.getOrUndefined(found);
 
 	if (recipient === undefined) {
 		return yield* new CliFailure({ code: "RECIPIENT_REFERENCE_NOT_FOUND" });

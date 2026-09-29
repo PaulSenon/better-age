@@ -62,7 +62,10 @@ Use `"$BAGE" --help` to confirm the build runs.
 - Use `j`, `k`, page down, page up, `g`, and `G`.
 - Press `q`.
 - Confirm the viewer closes, the previous screen is restored, and the shell is
-  usable. Repeat and press Ctrl-C instead of `q`: same result.
+  usable. Repeat and press Ctrl-C instead of `q`: the terminal is restored the
+  same way and the command exits 130.
+- During `edit`, close the terminal window while the editor is open; confirm no
+  `$TMPDIR/better-age-edit-*` dir remains afterwards.
 
 ## Interactive menu loop
 

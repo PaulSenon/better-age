@@ -5,12 +5,7 @@ import { Effect, FileSystem, Option } from "effect";
 import { cancelled, usage } from "../failures.js";
 import { payloadInspect } from "../present.js";
 import { sayOk, Ui } from "../ui/Ui.js";
-import {
-	ensureUpToDate,
-	openPayload,
-	requireInteractive,
-	withPassphrase,
-} from "./common.js";
+import { ensureUpToDate, openPayload, withPassphrase } from "./common.js";
 import { editText } from "./editor.js";
 
 const defaultPayloadPath = ".env.enc";
@@ -61,7 +56,6 @@ export const createPayload = Effect.fn("createPayload")(function* (
 	pathArg: Option.Option<string>,
 ) {
 	const target = yield* resolveNewPayloadTarget(pathArg);
-	yield* requireInteractive();
 	yield* withPassphrase((passphrase) =>
 		Payloads.create({ ...target, passphrase }),
 	);

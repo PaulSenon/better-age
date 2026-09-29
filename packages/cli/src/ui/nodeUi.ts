@@ -111,9 +111,10 @@ export const viewInTerminal =
 			const onKeypress = (_input: string, key: ViewerKey | undefined) => {
 				const action = toViewerAction(key ?? {});
 
-				if (action === "quit") {
+				if (action === "quit" || action === "abort") {
 					cleanup();
-					resume(Effect.void);
+					// Ctrl-C aborts (exit 130) like everywhere else; q/Esc just close.
+					resume(action === "quit" ? Effect.void : Effect.fail(aborted()));
 					return;
 				}
 

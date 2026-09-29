@@ -31,12 +31,12 @@ describe("setup", () => {
 			{ kind: "secret", label: "Confirm passphrase" },
 		]);
 		expect(
-			(
-				await cli.run(["setup", "--name", "Again"], {
-					secret: () => passphrase,
-				})
-			).stderr,
-		).toBe("[ERROR] SETUP_ALREADY_CONFIGURED: identity is already set up\n");
+			await cli.run(["setup", "--name", "Again"], { secret: () => passphrase }),
+		).toMatchObject({
+			exitCode: 1,
+			stderr: "[ERROR] SETUP_ALREADY_CONFIGURED: identity is already set up\n",
+			prompts: [],
+		});
 	});
 
 	it("guides the name interactively and never prompts headless", async () => {

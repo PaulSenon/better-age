@@ -67,7 +67,7 @@ describe("secure viewer model", () => {
 		expect(reduceViewerState(bottom, "down").scrollTop).toBe(2);
 		expect(reduceViewerState(bottom, "page-up").scrollTop).toBe(0);
 		expect(toViewerAction({ name: "q" })).toBe("quit");
-		expect(toViewerAction({ ctrl: true, name: "c" })).toBe("quit");
+		expect(toViewerAction({ ctrl: true, name: "c" })).toBe("abort");
 		expect(toViewerAction({ name: "space" })).toBe("page-down");
 		expect(toViewerAction({ sequence: "G" })).toBe("end");
 	});
@@ -86,6 +86,19 @@ describe("secure viewer runtime", () => {
 		expect(writes.at(-1)).toBe("\u001B[?25h\u001B[?1049l");
 		expect(stdin.isRaw).toBe(false);
 		expect(stdin.listenerCount("keypress")).toBe(0);
+	});
+
+	it("aborts with CANCELLED on Ctrl-C and still restores the terminal", async () => {
+		const { terminal, stdin, writes } = makeTerminal();
+		const done = Effect.runPromiseExit(viewInTerminal(terminal)("A", "p"));
+
+		stdin.emit("keypress", "\u0003", { ctrl: true, name: "c" });
+		const exit = await done;
+
+		expect(Exit.isFailure(exit)).toBe(true);
+		expect(JSON.stringify(exit)).toContain('"abort":true');
+		expect(writes.at(-1)).toBe("\u001B[?25h\u001B[?1049l");
+		expect(stdin.isRaw).toBe(false);
 	});
 
 	it("restores the terminal when interrupted (e.g. SIGINT)", async () => {
@@ -121,6 +134,12 @@ describe("secure viewer runtime", () => {
 });
 
 describe("presentation", () => {
+	it("makes bidi overrides and zero-width characters visible", () => {
+		expect(sanitize("evil\u202Egnp.exe\u200B")).toBe(
+			"evil\\u{202e}gnp.exe\\u{200b}",
+		);
+	});
+
 	it("neutralizes terminal control sequences in untrusted text", () => {
 		expect(sanitize("Nora\u001b]0;x\u0007\r\t")).toBe(
 			"Nora\\x1b]0;x\\x07\\r\\t",
