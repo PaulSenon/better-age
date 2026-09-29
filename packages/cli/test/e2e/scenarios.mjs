@@ -155,6 +155,24 @@ scenario("Ctrl-C at a passphrase prompt exits 130", async () => {
 });
 
 scenario(
+	"closing the terminal while the editor runs removes plaintext temp files",
+	async () => {
+		const edit = run("alice", ["edit", ".env.enc"], {
+			env: { BAGE_E2E_EDITOR_SLEEP: "30" },
+		});
+		await edit.answer("Passphrase", pass.alice);
+		await edit.expect("fake-editor: editing");
+		assert.equal(editTempDirs().length, 1);
+		edit.dispose(); // hang up the terminal
+		const deadline = Date.now() + 5_000;
+		while (editTempDirs().length > 0 && Date.now() < deadline) {
+			await new Promise((resolve) => setTimeout(resolve, 50));
+		}
+		assert.deepEqual(editTempDirs(), [], "plaintext temp dir left behind");
+	},
+);
+
+scenario(
 	"SIGINT while the editor runs removes plaintext temp files",
 	async () => {
 		const edit = run("alice", ["edit", ".env.enc"], {
@@ -205,7 +223,7 @@ for (const { name, body } of scenarios) {
 		console.log(`not ok - ${name}\n${error?.stack ?? error}`);
 	} finally {
 		// A failed step must never leave a PTY/bage/editor process behind.
-		disposeAll();
+		await disposeAll();
 	}
 }
 console.log(`${failures === 0 ? "PASS" : "FAIL"}: ${failures} failed`);

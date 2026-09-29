@@ -56,19 +56,24 @@ const child = spawn(
 	{ stdio: "inherit" },
 );
 
+let interrupted = false;
 const timer = setTimeout(() => {
 	console.error(`E2E exceeded ${timeoutMs}ms; removing container ${name}`);
 	removeContainer();
 }, timeoutMs);
 for (const signal of ["SIGINT", "SIGTERM"]) {
 	process.on(signal, () => {
+		interrupted = true;
+		child.kill("SIGTERM");
 		removeContainer();
-		process.exit(130);
 	});
 }
 
 child.on("exit", (code) => {
 	clearTimeout(timer);
 	removeContainer();
-	process.exit(code ?? 1);
+	// A signal can land while the daemon is still creating the container.
+	spawnSync("sleep", ["1"]);
+	removeContainer();
+	process.exit(interrupted ? 130 : (code ?? 1));
 });

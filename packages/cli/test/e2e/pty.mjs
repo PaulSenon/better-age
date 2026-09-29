@@ -18,9 +18,19 @@ const expectTimeoutMs = Number(
 /** Every started session, so the runner can kill leftovers unconditionally. */
 const live = new Set();
 
-/** Kills every still-running session (SIGKILL on the whole process group). */
-export const disposeAll = () => {
+/**
+ * Kills every still-running session, then waits for them to exit. Killing
+ * `script` closes the PTY, so the kernel hangs up bage and its editor
+ * (SIGHUP), which bage turns into the same cleanup as Ctrl-C.
+ */
+export const disposeAll = async (timeoutMs = 5_000) => {
 	for (const session of live) session.dispose();
+	const deadline = Date.now() + timeoutMs;
+	while (live.size > 0 && Date.now() < deadline) {
+		await new Promise((resolve) => setTimeout(resolve, 50));
+	}
+	// Give hung-up bage processes a moment to finish their cleanup.
+	await new Promise((resolve) => setTimeout(resolve, 300));
 };
 
 const quote = (value) => `'${String(value).replaceAll("'", `'\\''`)}'`;
@@ -34,8 +44,8 @@ export const startBage = ({ args, env, cwd, stdoutFile }) => {
 	const command = `stty cols 100 rows 30; exec node /opt/bage/bage ${args
 		.map(quote)
 		.join(" ")}${redirect}`;
-	// detached: `script` leads its own process group, so dispose() can kill
-	// script, the shell, bage, and any editor child in one signal.
+	// detached: `script` leads its own process group, so dispose() can kill it
+	// with one signal. bage runs in the PTY's own session under it.
 	const child = spawn("script", ["-q", "-e", "-c", command, "/dev/null"], {
 		cwd,
 		env,
