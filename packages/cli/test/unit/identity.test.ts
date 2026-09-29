@@ -192,6 +192,7 @@ describe("identity export / keys / list", () => {
 	it("changes the passphrase with current retry and confirmation", async () => {
 		const cli = makeTestCli();
 		await setupHome(cli);
+		// `pw` and `pass` are aliases of `identity passphrase`.
 		const changed = await cli.run(["identity", "pw"], {
 			secret: queue(
 				"wrong passphrase",
@@ -215,15 +216,26 @@ describe("identity export / keys / list", () => {
 		expect(changed.stderr.endsWith("[OK] Passphrase changed\n")).toBe(true);
 		expect(
 			(
+				await cli.run(["identity", "pass"], {
+					secret: queue(
+						"new passphrase",
+						"third passphrase",
+						"third passphrase",
+					),
+				})
+			).stderr,
+		).toBe("[OK] Passphrase changed\n");
+		expect(
+			(
 				await cli.run(["identity", "rotate"], {
-					secret: () => "new passphrase",
+					secret: () => "third passphrase",
 				})
 			).exitCode,
 		).toBe(0);
 		expect(
 			(
 				await cli.run(["identity", "passphrase"], {
-					secret: queue("new passphrase", "short", "short", "short"),
+					secret: queue("third passphrase", "short", "short", "short"),
 				})
 			).stderr,
 		).toMatch(
@@ -303,7 +315,10 @@ describe("identity import / list / forget", () => {
 				confirm: () => false,
 			},
 		);
-		expect(declined.exitCode).toBe(130);
+		expect(declined).toMatchObject({
+			exitCode: 1,
+			stderr: "[ERROR] CANCELLED: command cancelled\n",
+		});
 		expect(declined.prompts).toEqual([
 			{
 				kind: "confirm",
@@ -335,6 +350,20 @@ describe("identity import / list / forget", () => {
 				)
 			).exitCode,
 		).toBe(0);
+	});
+
+	it("re-prompts an invalid guided alias", async () => {
+		const sarah = await otherIdentityString("Sarah");
+		const cli = makeTestCli();
+		await setupHome(cli);
+		const aliases = ["1-bad", "ops"];
+
+		const result = await cli.run(["identity", "import", sarah], {
+			text: () => aliases.shift() ?? "",
+		});
+		expect(result.stderr).toMatch(
+			/^\[ERROR\] LOCAL_ALIAS_INVALID: alias is invalid\n\[OK\] Identity imported: ops#fp_\w+\n$/,
+		);
 	});
 
 	it("forgets by reference or through a picker of known identities only", async () => {
@@ -370,7 +399,13 @@ describe("identity import / list / forget", () => {
 				.exitCode,
 		).toBe(130);
 		expect(
-			(await cli.run(["identity", "forget"], { interactive: false })).exitCode,
-		).toBe(2);
+			await cli.run(["identity", "forget"], { interactive: false }),
+		).toEqual({
+			exitCode: 2,
+			stdout: "",
+			stderr:
+				"[ERROR] IDENTITY_REFERENCE_MISSING: pass an identity reference or run interactively\n",
+			prompts: [],
+		});
 	});
 });

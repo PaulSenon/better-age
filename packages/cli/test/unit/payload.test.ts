@@ -284,7 +284,7 @@ describe("edit", () => {
 
 		const fromEnv = await edit({ env: { EDITOR: "vim --clean" } });
 		expect(fromEnv.prompts.find((p) => p.kind === "editor")?.label).toMatch(
-			/^vim \/tmp\/better-age-edit-\d+\/payload-[\w-]+\.env$/,
+			/^vim --clean \/tmp\/better-age-edit-\d+\/payload-[\w-]+\.env$/,
 		);
 		expect((await edit({ env: { VISUAL: "missing-editor" } })).stderr).toBe(
 			"[ERROR] EDITOR_UNAVAILABLE: editor is unavailable\n",
@@ -310,6 +310,73 @@ describe("edit", () => {
 		expect(remembered.prompts.some((p) => p.kind === "select")).toBe(false);
 		expect(remembered.prompts.find((p) => p.kind === "editor")?.label).toMatch(
 			/^nano /,
+		);
+	});
+
+	it("launches the editor attached, with args, on a private temp file", async () => {
+		const cli = await readyCli("A=1\n");
+		const result = await cli.run(["edit", ".env.enc"], {
+			...secret,
+			env: { VISUAL: "vim --clean -n", EDITOR: "nano" },
+			editor: () => "B=2\n",
+		});
+		const launched = result.prompts.find((p) => p.kind === "editor");
+
+		expect(launched).toMatchObject({
+			label: expect.stringMatching(
+				/^vim --clean -n \/tmp\/better-age-edit-\d+\/payload-[\w-]+\.env$/,
+			),
+			fileMode: 0o600,
+			dirMode: 0o700,
+			detached: false,
+		});
+	});
+
+	it("does not remember a declined pick and re-picks when the saved editor is gone", async () => {
+		const cli = await readyCli("A=1\n");
+		const edit = (terminal: ScriptedTerminal) =>
+			cli.run(["edit", ".env.enc"], {
+				...secret,
+				env: {},
+				editor: (t) => t,
+				...terminal,
+			});
+
+		const declined = await edit({ select: () => "vim", confirm: () => false });
+		expect(declined.exitCode).toBe(0);
+		expect(
+			(await edit({ select: () => "nano", confirm: () => true })).prompts.some(
+				(p) => p.kind === "select",
+			),
+		).toBe(true);
+
+		const savedMissing = await edit({
+			installed: ["vim"],
+			select: () => "vim",
+			confirm: () => false,
+		});
+		expect(savedMissing.prompts.find((p) => p.kind === "select")).toMatchObject(
+			{
+				label: "Editor",
+			},
+		);
+		expect(
+			savedMissing.prompts.find((p) => p.kind === "editor")?.label,
+		).toMatch(/^vim /);
+	});
+
+	it("reports editor failure when the editor cannot run", async () => {
+		const cli = await readyCli("A=1\n");
+
+		expect(
+			(
+				await cli.run(["edit", ".env.enc"], {
+					...secret,
+					editor: () => ({ exitCode: 137 }),
+				})
+			).stderr,
+		).toBe(
+			"[ERROR] EDITOR_EXIT_NON_ZERO: editor exited with a non-zero status\n",
 		);
 	});
 
@@ -353,6 +420,21 @@ describe("outdated payloads", () => {
 		).toBe(
 			"[WARN] Payload update recommended: run bage update\n[ERROR] PAYLOAD_UPDATE_REQUIRED: run bage update before mutating payload\n",
 		);
+
+		const cancelled = await cli.run(["edit"], {
+			...secret,
+			select: (label) => (label === "Payload" ? ".env.enc" : "cancel"),
+		});
+		expect(cancelled.exitCode).toBe(130);
+		expect(
+			cancelled.prompts.find((p) => p.label === "Payload update required"),
+		).toMatchObject({
+			choices: [
+				{ value: "update-now", label: "Update now" },
+				{ value: "back", label: "Back" },
+				{ value: "cancel", label: "Cancel" },
+			],
+		});
 
 		const guided = await cli.run(["edit"], {
 			...secret,

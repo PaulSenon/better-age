@@ -109,13 +109,19 @@ export const editText = Effect.fn("editText")(function* (initialText: string) {
 			yield* fs.writeFileString(file, initialText, { mode: 0o600 });
 			yield* fs.chmod(file, 0o600);
 
-			const exitCode = yield* spawner.exitCode(
-				ChildProcess.make(command, [...args, file], {
-					stdin: "inherit",
-					stdout: "inherit",
-					stderr: "inherit",
-				}),
-			);
+			// Not detached: the editor must stay in the terminal's foreground
+			// process group (resize, job control, /dev/tty). Spawn failures and
+			// signal deaths count as a failed editor run, like a non-zero exit.
+			const exitCode = yield* spawner
+				.exitCode(
+					ChildProcess.make(command, [...args, file], {
+						detached: false,
+						stdin: "inherit",
+						stdout: "inherit",
+						stderr: "inherit",
+					}),
+				)
+				.pipe(Effect.orElseSucceed(() => 1));
 
 			if (exitCode !== 0) {
 				return yield* new CliFailure({ code: "EDITOR_EXIT_NON_ZERO" });

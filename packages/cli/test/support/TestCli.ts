@@ -53,7 +53,15 @@ export type PromptEvent =
 			readonly choices: ReadonlyArray<Choice>;
 	  }
 	| { readonly kind: "view"; readonly label: string }
-	| { readonly kind: "editor"; readonly label: string };
+	| {
+			readonly kind: "editor";
+			/** Full command line, e.g. `vim --clean /tmp/.../payload-x.env`. */
+			readonly label: string;
+			/** Modes of the plaintext temp file and its directory at launch. */
+			readonly fileMode: number | undefined;
+			readonly dirMode: number | undefined;
+			readonly detached: boolean | undefined;
+	  };
 
 export type RunResult = {
 	readonly exitCode: number;
@@ -85,7 +93,13 @@ const fakeSpawner = (
 
 			const file = standard.args.at(-1) ?? "";
 			const current = fs.file(file) ?? "";
-			prompts.push({ kind: "editor", label: `${standard.command} ${file}` });
+			prompts.push({
+				kind: "editor",
+				label: [standard.command, ...standard.args].join(" "),
+				fileMode: fs.mode(file),
+				dirMode: fs.mode(file.slice(0, file.lastIndexOf("/"))),
+				detached: standard.options.detached,
+			});
 			const result = terminal.editor?.(current) ?? current;
 
 			if (typeof result !== "string") {

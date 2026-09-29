@@ -62,7 +62,8 @@ export const importWithTrustGate = Effect.fnUntraced(function* (input: {
 				);
 
 				if (!trusted) {
-					return yield* cancelled();
+					// Declining is an answer, not an abort: exit 1 as before.
+					return yield* new CliFailure({ code: "CANCELLED" });
 				}
 
 				return yield* Identities.importIdentity({

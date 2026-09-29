@@ -60,3 +60,43 @@ describe("node prompts", () => {
 		expect(JSON.stringify(exit)).toContain('"abort":true');
 	});
 });
+
+describe("node terminal detection", () => {
+	const detect = async (tty: boolean, noColor: string | undefined) => {
+		const saved = {
+			stdin: process.stdin.isTTY,
+			stderr: process.stderr.isTTY,
+			noColor: process.env.NO_COLOR,
+		};
+		process.stdin.isTTY = tty;
+		process.stderr.isTTY = tty;
+		if (noColor === undefined) delete process.env.NO_COLOR;
+		else process.env.NO_COLOR = noColor;
+		try {
+			const exit = await withUi((ui) =>
+				Effect.succeed({ interactive: ui.interactive, color: ui.color }),
+			);
+			return Exit.isSuccess(exit) ? exit.value : undefined;
+		} finally {
+			process.stdin.isTTY = saved.stdin;
+			process.stderr.isTTY = saved.stderr;
+			if (saved.noColor === undefined) delete process.env.NO_COLOR;
+			else process.env.NO_COLOR = saved.noColor;
+		}
+	};
+
+	it("is interactive and colored only on a TTY without NO_COLOR", async () => {
+		expect(await detect(true, undefined)).toEqual({
+			interactive: true,
+			color: true,
+		});
+		expect(await detect(true, "1")).toEqual({
+			interactive: true,
+			color: false,
+		});
+		expect(await detect(false, undefined)).toEqual({
+			interactive: false,
+			color: false,
+		});
+	});
+});

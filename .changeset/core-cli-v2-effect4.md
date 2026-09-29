@@ -11,4 +11,4 @@ User-visible changes:
 - Ctrl-C in any prompt aborts the command or the whole interactive session with exit code 130; explicit Cancel/Back still returns to the menu. Grant, revoke, and forget pickers gain a Cancel row.
 - `create` retries a wrong passphrase like other commands.
 - Errors that previously printed `unmapped failure code` now have messages (for example `CANNOT_GRANT_SELF`, `PAYLOAD_ACCESS_DENIED`).
-- Help and parse-error wording follow the Effect v4 CLI; `--completions <shell>` is available.
+- Help and parse-error wording follow the Effect v4 CLI; `--completions <shell>` is available. `bage load` without `--protocol-version` now reports `LOAD_PROTOCOL_REQUIRED` (still exit 2) instead of a generic `COMMAND_PARSE`.
