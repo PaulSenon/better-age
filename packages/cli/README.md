@@ -86,9 +86,31 @@ Promptable operands are optional in the grammar. In an interactive terminal,
 missing payloads, identities, and setup names can be requested by the command
 flow. Protocol inputs stay strict; `load` requires `--protocol-version=1`.
 
-Command grammar, help, and parser errors are owned by `@effect/cli`. Normal
-interactive prompts are backed by `@inquirer/prompts`; custom terminal handling
-is limited to the secure viewer and final stdout/stderr writing.
+Command grammar, help, completions, and parser errors are owned by Effect v4's
+`effect/unstable/cli`. Interactive prompts are backed by `@inquirer/prompts`
+rendered on stderr (Effect's own `Prompt` renders on stdout, which would break
+`load`); custom terminal handling is limited to the secure viewer.
+
+## Architecture
+
+```txt
+src/bin/bage.ts      entry: Node layers + NodeRuntime.runMain (signals -> 130)
+src/main.ts          runs the grammar, renders failures, maps exit codes
+src/commands.ts      command tree; each handler calls one flow
+src/flows/*.ts       linear Effect flows over @better-age/core use cases
+src/ui/Ui.ts         the only terminal boundary (prompts, viewer, stdout/stderr)
+src/ui/nodeUi.ts     Node implementation (inquirer + raw-mode viewer)
+src/failures.ts      every error code, message, and exit code
+src/present.ts       pure text rendering and sanitization
+```
+
+Flows never catch errors to re-render them: Core tagged errors and CLI failures
+propagate and are printed once as `[ERROR] <CODE>: <message>`.
+
+Exit codes: `0` success, `1` failure, `2` usage/parse error, `130` cancelled.
+Ctrl-C (or EOF) in any prompt aborts the command or the whole interactive
+session with `130`; an explicit Cancel/Back choice returns to the menu. Scoped
+resources (viewer raw mode, editor temp files) are always released.
 
 ## Examples
 
@@ -141,11 +163,12 @@ bage interactive
 - Reimporting a known owner with a changed public key requires explicit trust.
   Interactive mode asks for confirmation with old/new fingerprints; exact mode
   requires `--trust-key-update`.
-- Recoverable prompt-loop feedback, such as wrong passphrases or invalid edited
-  `.env` content, is printed immediately in interactive sessions instead of
-  being buffered until the command returns to the menu.
+- Recoverable prompt-loop feedback, such as wrong passphrases or invalid
+  identity strings, is printed immediately instead of being buffered until the
+  command returns to the menu.
 - `edit` resolves `$VISUAL`, then `$EDITOR`, then remembered editor preference,
-  then interactive editor picker.
+  then interactive editor picker (remember optional). Editor commands may carry
+  arguments, e.g. `EDITOR="code --wait"`.
 - External editor mode necessarily writes plaintext to a private temp file while
   the editor runs. Better Age uses a private temp directory, a random temp file
   name, `0600` file permissions, and deletes the file afterward, but editor
@@ -163,7 +186,8 @@ bage interactive
 
 - Home state and encrypted private key files are written under private
   filesystem permissions where supported.
-- Loose home/key permissions are repaired before use and surfaced as notices.
+- Loose home/key permissions are repaired before use and surfaced as `[WARN]`
+  notices on stderr.
 - Private key refs are constrained to `keys/<safe-name>.age`.
 - Local private key files decrypt to an age-compatible identity-file plaintext:
   a Better Age metadata comment followed by one age identity line.
