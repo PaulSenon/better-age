@@ -256,11 +256,31 @@ awk '
 
 ## Known Limitations
 
-- Docker and pseudo-TTY E2E are deferred.
-- Interactive terminal behavior is covered by unit/contract tests plus the
-  repository manual QA checklist.
+- Interactive terminal behavior is covered by contract tests (scripted `Ui`),
+  an opt-in real-PTY E2E suite (below), and the manual QA checklist.
 - The MVP targets Unix-like terminals.
 - Headless secret injection is out of scope.
+
+## Real-terminal E2E (Docker, opt-in)
+
+```sh
+pnpm -F @better-age/cli test:e2e
+```
+
+Builds `dist/bage`, then runs `test/e2e/scenarios.mjs` in a digest-pinned
+`node:lts-slim` container with `script(1)` as the pseudo-terminal. Covers hidden
+passphrase input, prompt/stdout separation for `load`, a real `$EDITOR` process
+and temp-file cleanup (also on SIGINT), the secure viewer's alternate screen,
+keyboard menus, Ctrl-C exit 130, sharing between two homes, rotation/update,
+and permission repair.
+
+Isolation: `--network=none`, read-only root, tmpfs `/tmp` as the only writable
+place (throwaway homes), non-root user, all capabilities dropped, read-only
+mounts of `dist/` and `test/e2e/` only. The host HOME, credentials, and npm
+registry are never touched. The container gets a unique name and is always
+force-removed on success, failure, `BAGE_E2E_TIMEOUT_MS` (default 5 min), or
+Ctrl-C of the runner. `BAGE_E2E_ONLY=<text>` runs matching scenarios.
+Requires a running Docker daemon; not part of `pnpm test`.
 
 ## Contributing
 

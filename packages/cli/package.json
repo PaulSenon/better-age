@@ -23,7 +23,8 @@
 		"typecheck": "tsc --noEmit",
 		"check": "pnpm run lint && pnpm run typecheck",
 		"test:unit": "vitest run -c vitest.unit.config.ts",
-		"test": "pnpm run test:unit"
+		"test": "pnpm run test:unit",
+		"test:e2e": "node test/e2e/run.mjs"
 	},
 	"devDependencies": {
 		"@better-age/core": "workspace:*",
