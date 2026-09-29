@@ -8,7 +8,7 @@
 import * as Home from "@better-age/core/Home";
 import { Config, Crypto, Effect, FileSystem, Option, Path } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
-import { CliFailure } from "../failures.js";
+import { aborted, CliFailure } from "../failures.js";
 import { Ui } from "../ui/Ui.js";
 
 const commonEditors = ["nano", "vi", "vim", "nvim"] as const;
@@ -110,8 +110,9 @@ export const editText = Effect.fn("editText")(function* (initialText: string) {
 			yield* fs.chmod(file, 0o600);
 
 			// Not detached: the editor must stay in the terminal's foreground
-			// process group (resize, job control, /dev/tty). Spawn failures and
-			// signal deaths count as a failed editor run, like a non-zero exit.
+			// process group (resize, job control, /dev/tty). An editor killed by
+			// the user's Ctrl-C/hang-up is an abort; other spawn failures count as
+			// a failed editor run, like a non-zero exit.
 			const exitCode = yield* spawner
 				.exitCode(
 					ChildProcess.make(command, [...args, file], {
@@ -121,7 +122,13 @@ export const editText = Effect.fn("editText")(function* (initialText: string) {
 						stderr: "inherit",
 					}),
 				)
-				.pipe(Effect.orElseSucceed(() => 1));
+				.pipe(
+					Effect.catchTag("PlatformError", (error) =>
+						/signal: 'SIG(INT|TERM|HUP)'/.test(error.message)
+							? Effect.fail(aborted())
+							: Effect.succeed(1),
+					),
+				);
 
 			if (exitCode !== 0) {
 				return yield* new CliFailure({ code: "EDITOR_EXIT_NON_ZERO" });
