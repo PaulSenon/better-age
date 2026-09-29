@@ -2,10 +2,7 @@
 // built `bage` sees a real TTY (raw mode, hidden input, Ctrl-C -> SIGINT)
 // without native modules. Runs inside the E2E container only.
 import { spawn } from "node:child_process";
-
-// biome-ignore lint/suspicious/noControlCharactersInRegex: strips terminal escape sequences
-const ansi =
-	/\u001B(?:\[[0-?]*[ -/]*[@-~]|\][^\u0007]*\u0007|[()][0-9A-Za-z])/g;
+import { stripVTControlCharacters } from "node:util";
 
 export const keys = {
 	enter: "\r",
@@ -65,7 +62,7 @@ export const startBage = ({ args, env, cwd, stdoutFile }) => {
 	const session = {
 		/** Everything the terminal displayed so far, ANSI-stripped. */
 		get screen() {
-			return raw.replace(ansi, "");
+			return stripVTControlCharacters(raw);
 		},
 		get raw() {
 			return raw;
